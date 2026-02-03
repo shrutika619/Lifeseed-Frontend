@@ -392,11 +392,25 @@ const QuestionsView = ({ selectedConditions, questionsDb, answers, onAnswer, onB
     );
 }
 
-const SecondHomePage = () => {
+
+    const SecondHomePage = () => {
   const { isStarted, startAssessment } = useAssessment();
 
+  useEffect(() => {
+    if (window.location.hash === "#assessment") {
+      const el = document.getElementById("assessment");
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth" });
+        }, 200);
+      }
+    }
+  }, []);
+
   return (
-    <div className="flex items-center justify-center py-14 w-full bg-gray-50">
+    <div
+      id="assessment"
+      className="flex items-center justify-center py-14 w-full bg-gray-50">
       {!isStarted ? (
         <div className="bg-white shadow-lg rounded-xl p-6 max-w-md text-center">
           <h2 className="text-xl font-semibold mb-4">Confidential Wellness Assessment 🔒</h2>
