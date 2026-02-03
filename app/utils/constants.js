@@ -1,5 +1,5 @@
 export class Constants {
-  static API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+  static API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.men10.co.in/api/v1";
   
   static urlEndPoints = {
     // --- PATIENT AUTH ---
