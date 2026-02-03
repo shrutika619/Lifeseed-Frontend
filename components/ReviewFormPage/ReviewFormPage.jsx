@@ -6,9 +6,6 @@ import { FileText } from "lucide-react";
 const ReviewFormPage = () => {
   const router = useRouter();
 
-  const handleSimulateApproval = () => {
-    router.push("/hospitaldashboard");
-  };
 
   const handleBackHome = () => {
     router.push("/");
@@ -62,13 +59,6 @@ const ReviewFormPage = () => {
               Back to Home
             </button>
 
-            {/* ADDED: Simulate Approval (Test) Button */}
-            <button
-              onClick={handleSimulateApproval}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200"
-            >
-              Simulate Approval (Test)
-            </button>
           </div>
         </div>
       </div>

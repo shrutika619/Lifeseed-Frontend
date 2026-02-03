@@ -1,13 +1,17 @@
-import api from "@/lib/axios";
+import axios from "axios"; // Use standard axios for Proxy calls to avoid interceptors
+import api from "@/lib/axios"; // Use your configured instance for direct backend calls
 import { Constants } from "@/app/utils/constants";
+
+// ✅ Define Proxy Endpoint Constant
+// We define this locally because it points to Next.js (Client Side), not the External Backend.
+const LOGIN_PROXY_ROUTE = "/api/auth/login";
+
 /**
  * Send OTP for Login
  * Calls backend directly (no auth needed)
  */
 export const sendLoginOtp = async (mobileNo) => {
   try {
-    // Import Constants dynamically to avoid issues
-    
     const response = await api.post(Constants.urlEndPoints.SEND_OTP, {
       mobileNo
     });
@@ -27,69 +31,41 @@ export const sendLoginOtp = async (mobileNo) => {
 
 /**
  * ✅ CRITICAL: Verify OTP and Login
- * Must use Next.js API proxy (/api/login) to set HTTP-Only cookie
+ * Calls Next.js Proxy to set HTTP-Only cookie
  */
 export const verifyLoginOtp = async (mobileNo, otp) => {
   try {
-    // ✅ Call Next.js API Route (not backend directly)
-    // This route will set the HTTP-Only refreshToken cookie
-    const response = await api.post(  Constants.urlEndPoints.VERIFY_OTP, {
+    // ⚠️ Call Next.js API Route (Proxy), NOT the backend directly
+    const response = await axios.post(LOGIN_PROXY_ROUTE, {
+      type: 'otp', // 👈 Flag for Proxy
       mobileNo,
       otp
-    }, {
-      withCredentials: true // Important for cookie handling
     });
     
-    const resData = response.data;
-
-    console.log(resData)
-
-if (!resData.success) {
-  throw new Error(resData.message || "Login failed");
-}
-
-const { accessToken, user } = resData.data;
-
-if (!accessToken) {
-  throw new Error("Login failed - no access token");
-}
-
-return {
-  accessToken,
-  user,
-};
+    // Proxy returns: { success: true, accessToken, user }
+    return response.data;
 
   } catch (error) {
     console.error("Verify OTP error:", error);
-    throw error;
+    throw error.response?.data || error;
   }
 };
 
 /**
- * ✅ Admin Login (if needed)
- * Also uses Next.js proxy to set cookie
+ * ✅ Admin Login
+ * Calls Next.js Proxy to set HTTP-Only cookie
  */
 export const adminLogin = async (username, password) => {
   try {
-    const response = await axios.post("/api/login", {
+    const response = await axios.post(LOGIN_PROXY_ROUTE, {
+      type: 'password', // 👈 Flag for Proxy
       username,
       password
-    }, {
-      withCredentials: true
     });
     
-    const data = response.data;
-    
-    if (!data.success) {
-      throw new Error(data.message || "Login failed");
-    }
-    
-    return {
-      accessToken: data.accessToken,
-      user: data.user
-    };
+    return response.data;
   } catch (error) {
     console.error("Admin login error:", error);
-    throw error;
+    throw error.response?.data || error;
   }
 };
