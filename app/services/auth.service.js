@@ -42,6 +42,8 @@ export const verifyLoginOtp = async (mobileNo, otp) => {
     
     const resData = response.data;
 
+    console.log(resData)
+
 if (!resData.success) {
   throw new Error(resData.message || "Login failed");
 }

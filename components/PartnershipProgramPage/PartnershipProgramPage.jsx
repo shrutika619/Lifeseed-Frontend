@@ -26,32 +26,46 @@ export default function ClinicAuth() {
   const isValidPhone = (num) => /^[6-9]\d{9}$/.test(num);
 
   /* ---------------- SEND OTP ---------------- */
-  const handleSendOTP = async () => {
-    if (!isValidPhone(phone)) {
-      toast.error("Please enter a valid 10-digit mobile number");
-      return;
-    }
+  /* ---------------- SEND OTP ---------------- */
+  const handleSendOTP = async () => {
+    if (!isValidPhone(phone)) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
 
-    setLoading(true); // ✅ Start Loading
-    try {
-      const res = await sendClinicOtp(phone);
+    setLoading(true);
+    try {
+      const res = await sendClinicOtp(phone);
+      // Optional: console.log to see the actual success response
+      console.log("OTP Sent:", res); 
 
-      toast.success(res.message || "OTP sent successfully");
-      setStep(2);
-    } catch (err) {
-      const message = err.response?.data?.message;
+      toast.success(res.message || "OTP sent successfully");
+      setStep(2);
+    } catch (err) {
+      // 1. Capture the message safely
+      const message = err.response?.data?.message || "";
 
-      if (message === "Please login") {
-        toast.info("Clinic already exists. Please login.");
-        router.push("/login"); // Redirect to main login
-        return;
-      }
+      // 3. FIX: Use .includes() instead of === and check for common keywords
+      if (
+        message.includes("Please login") || 
+        message.includes("already exists") || 
+        message.includes("already approved")
+      ) {
+        toast.error(message);
+        
+        // 4. Add a slight delay so the user sees the Toast before the page jumps
+        setTimeout(() => {
+          router.push("/login"); 
+        }, 1500);
 
-      toast.error(message || "Failed to send OTP");
-    } finally {
-      setLoading(false); // ✅ Stop Loading
-    }
-  };
+        return;
+      }
+
+      toast.error(message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /* ---------------- OTP INPUT HANDLER ---------------- */
   const handleOtpChange = (index, value) => {

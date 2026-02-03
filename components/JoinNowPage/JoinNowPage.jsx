@@ -1,18 +1,23 @@
 "use client";
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {toast} from "sonner";
-import {sendClinicOtp, submitClinicForm} from "@/app/services/clinic-auth.service"; // ADDED: useRouter for navigation
+import { toast } from "sonner";
+import { sendClinicOtp, submitClinicForm } from "@/app/services/clinic-auth.service";
+import { getAllCities } from "@/app/services/clinic.service"; // ✅ Import City Service
 
 const JoinNowPage = () => {
-  const router = useRouter(); // ADDED: Initialize router
+  const router = useRouter();
+  
+  // ✅ State for Cities List
+  const [cities, setCities] = useState([]);
+
   const [formData, setFormData] = useState({
     hospitalName: "",
     officialCallingNumber: "",
     hospitalEmailID: "",
     areaNameOnly: "",
     hospitalInfo: "",
-    cityNameOnly: "",
+    city: "", // ✅ Stores City ID now
     hospitalDescription: "",
     fullAddress: "",
     googleMapsLink: "",
@@ -33,6 +38,21 @@ const JoinNowPage = () => {
   const [finalOtpSent, setFinalOtpSent] = useState(false);
   const [finalOtp, setFinalOtp] = useState("");
   const [showReviewPage, setShowReviewPage] = useState(false);
+
+  /* ---------------- FETCH CITIES ON MOUNT ---------------- */
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const res = await getAllCities();
+        if (res.success && res.data) {
+          setCities(res.data); // Assuming API returns { data: [{_id, name}] }
+        }
+      } catch (error) {
+        console.error("Failed to fetch cities", error);
+      }
+    };
+    fetchCities();
+  }, []);
 
   /* ---------------- PREFILL MOBILE FROM LOCAL STORAGE ---------------- */
   useEffect(() => {
@@ -64,15 +84,12 @@ const JoinNowPage = () => {
       return;
     }
 
-    // setLoading(true);
     try {
       await sendClinicOtp(mobile);
       toast.success(`OTP sent successfully to +91${mobile}`);
       setFinalOtpSent(true);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to send OTP");
-    } finally {
-      // setLoading(false);
     }
   };
 
@@ -88,12 +105,18 @@ const JoinNowPage = () => {
       return;
     }
 
+    // ✅ Validation: Ensure City is selected
+    if (!formData.city) {
+      toast.error("Please select a city");
+      return;
+    }
+
     const fd = new FormData();
 
     fd.append("mobileNo", formData.finalOtpMobile);
     fd.append("otp", finalOtp);
     fd.append("clinicName", formData.hospitalName);
-    fd.append("city", formData.cityNameOnly);
+    fd.append("city", formData.city); // ✅ Sends City ID
     fd.append("clinicDescription", formData.hospitalDescription);
 
     fd.append("officeCallingNo", formData.officialCallingNumber);
@@ -112,28 +135,19 @@ const JoinNowPage = () => {
 
     fd.append("termsAndConditions", acceptedTerms);
 
-    if (ownerProfilePhoto)
-      fd.append("ownerProfilePhoto", ownerProfilePhoto);
+    if (ownerProfilePhoto) fd.append("ownerProfilePhoto", ownerProfilePhoto);
+    if (hospitalFrontPhoto) fd.append("clinicfrontPhoto", hospitalFrontPhoto);
+    if (hospitalInteriorPhoto) fd.append("clinicinteriorPhoto", hospitalInteriorPhoto);
+    if (doctorClaimPhoto) fd.append("doctorCabinPhoto", doctorClaimPhoto);
 
-    if (hospitalFrontPhoto)
-      fd.append("clinicfrontPhoto", hospitalFrontPhoto);
-
-    if (hospitalInteriorPhoto)
-      fd.append("clinicinteriorPhoto", hospitalInteriorPhoto);
-
-    if (doctorClaimPhoto)
-      fd.append("doctorCabinPhoto", doctorClaimPhoto);
-
-
-    // setLoading(true);
     try {
       const res = await submitClinicForm(fd);
       toast.success(res.message);
-      router.push("/reviewform");
+      // Clean up storage
+      localStorage.removeItem("clinic_mobile");
+      setShowReviewPage(true); // Show success screen
     } catch (err) {
       toast.error(err.response?.data?.message || "Form submission failed");
-    } finally {
-      // setLoading(false);
     }
   };
 
@@ -154,7 +168,7 @@ const JoinNowPage = () => {
             <div className="flex justify-center mb-6">
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             </div>
@@ -162,21 +176,14 @@ const JoinNowPage = () => {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Registration Under Review
             </h2>
-
             <p className="text-gray-600 mb-6 leading-relaxed">
               Thank you for submitting your details. Our team is now manually reviewing your application.
             </p>
-
             <div className="bg-blue-50 rounded-lg p-4 mb-6">
               <p className="text-blue-700 font-medium">
                 This process usually takes about 1-5 working days.
               </p>
             </div>
-
-            <p className="text-gray-600 text-sm mb-8 leading-relaxed">
-              You will receive an email and SMS notification on your registered contact details once the review is complete. Please check your inbox (and spam folder).
-            </p>
-
             <button 
               onClick={handleBackToHome}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200"
@@ -237,13 +244,27 @@ const JoinNowPage = () => {
             value={formData.hospitalInfo}
             onChange={handleInputChange}
           />
-          <InputField
-            label="City Name Only"
-            name="cityNameOnly"
-            placeholder="Pune"
-            value={formData.cityNameOnly}
-            onChange={handleInputChange}
-          />
+
+          {/* ✅ CITY DROPDOWN REPLACING INPUT */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              City
+            </label>
+            <select
+              name="city"
+              value={formData.city}
+              onChange={handleInputChange}
+              className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm w-full focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white"
+            >
+              <option value="">Select a City</option>
+              {cities.map((city) => (
+                <option key={city._id} value={city._id}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
         </div>
 
         <div className="mt-6">
@@ -281,7 +302,7 @@ const JoinNowPage = () => {
           <input
             type="url"
             name="googleMapsLink"
-            placeholder="https://maps.app.goo.gl/..."
+            placeholder="http://googleusercontent.com/maps.google.com/..."
             value={formData.googleMapsLink}
             onChange={handleInputChange}
             className="border border-gray-300 rounded-lg px-4 py-2.5 text-sm w-full focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
@@ -361,9 +382,6 @@ const JoinNowPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Enter OTP
               </label>
-              <p className="text-xs text-gray-500 mb-3">
-                Enter the 6-digit code sent to your mobile number.
-              </p>
               <div className="flex gap-2">
                 {[0, 1, 2, 3, 4, 5].map((index) => (
                   <input
@@ -376,8 +394,7 @@ const JoinNowPage = () => {
                       newOtp[index] = e.target.value;
                       setFinalOtp(newOtp.join(""));
                       if (e.target.value && index < 5) {
-                        const nextInput = e.target.nextElementSibling;
-                        if (nextInput) nextInput.focus();
+                        e.target.nextElementSibling?.focus();
                       }
                     }}
                     className="w-12 h-12 text-center border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"

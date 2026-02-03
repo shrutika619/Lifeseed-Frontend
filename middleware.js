@@ -15,7 +15,9 @@ export function middleware(request) {
   // Protected pages (Admin, Clinic, Patient Dashboards, Assessment)
   const isProtectedPath = pathname.startsWith('/dashboard') || 
                           pathname.startsWith('/admin') || 
-                          pathname.startsWith('/clinic') ||
+                          pathname.startsWith('/profile') || 
+                          pathname.startsWith('/joinnow') || 
+                          pathname.startsWith('/reviewform') || 
                           pathname.startsWith('/assessment');
 
   // CASE A: User is NOT logged in but tries to access protected routes
