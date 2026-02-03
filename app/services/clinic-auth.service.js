@@ -6,6 +6,7 @@ export const sendClinicOtp = async (mobileNo) => {
         Constants.urlEndPoints.CLINIC_SEND_OTP,
         { mobileNo }
     );
+    console.log(response)
     return response.data;
 };
 
@@ -14,6 +15,7 @@ export const verifyClinicOtp = async (mobileNo, otp) => {
         Constants.urlEndPoints.CLINIC_VERIFY_OTP,
         { mobileNo, otp }
     );
+    console.log(response)
     return response.data;
 };
 

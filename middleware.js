@@ -16,6 +16,8 @@ export function middleware(request) {
   const isProtectedPath = pathname.startsWith('/dashboard') || 
                           pathname.startsWith('/admin') || 
                           pathname.startsWith('/profile') || 
+                          pathname.startsWith('/joinnow') || 
+                          pathname.startsWith('/reviewform') || 
                           pathname.startsWith('/assessment');
 
   // CASE A: User is NOT logged in but tries to access protected routes
