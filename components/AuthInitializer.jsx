@@ -1,9 +1,15 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useDispatch, useStore } from "react-redux";
-import { setCredentials, sessionRestorationComplete } from "@/redux/slices/authSlice";
-import { injectStore } from "@/lib/axios";
 import axios from "axios";
+import { injectStore } from "@/lib/axios";
+
+// ✅ Import actions from your provided slice
+import { 
+  setCredentials, 
+  logoutSuccess, 
+  sessionRestorationComplete 
+} from "@/redux/slices/authSlice";
 
 export default function AuthInitializer({ children }) {
   const dispatch = useDispatch();
@@ -11,7 +17,7 @@ export default function AuthInitializer({ children }) {
   const initialized = useRef(false);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Inject store into axios ONCE
+  // 1. Inject Redux Store into Axios (Singleton Pattern)
   if (!initialized.current) {
     injectStore(store);
     initialized.current = true;
@@ -20,48 +26,38 @@ export default function AuthInitializer({ children }) {
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        console.log("🔵 AuthInit: Attempting session restoration...");
-        
-        // ✅ Call Next.js API Route Proxy (which reads HTTP-Only cookie)
+        // 2. Attempt to refresh token (HttpOnly Cookie -> Access Token)
         const { data } = await axios.post("/api/auth/refresh", {}, {
-          withCredentials: true // Ensure cookies are sent
+          withCredentials: true 
         });
 
-        // ✅ Handle different response structures
-        const responseData = data?.success ? data : data?.data;
-        
-        if (responseData?.accessToken) {
-          console.log("🟢 AuthInit: Session Restored Successfully!");
+        // 3. Success: User is logged in
+        if (data?.accessToken || data?.data?.accessToken) {
+          const payload = data.data || data;
           dispatch(setCredentials({ 
-             accessToken: responseData.accessToken, 
-             user: responseData.user 
+             accessToken: payload.accessToken, 
+             user: payload.user 
           }));
         } else {
-          console.log("⚠️ AuthInit: No access token in response");
-          dispatch(sessionRestorationComplete());
+          // Edge case: 200 OK but empty data
+          dispatch(logoutSuccess());
         }
+
       } catch (error) {
-        console.error("🔴 AuthInit: Session restoration failed");
-        
-        // ✅ Detailed error logging
-        if (error.response) {
-          console.error("   Status:", error.response.status);
-          console.error("   Message:", error.response.data?.message || error.response.statusText);
-          
-          if (error.response.status === 401) {
-            console.log("   → No valid session found (user needs to login)");
-          } else if (error.response.status === 500) {
-            console.error("   → Server error - check backend logs");
-          }
-        } else if (error.code === 'ECONNREFUSED') {
-          console.error("   → Backend connection refused - is server running?");
-        } else {
-          console.error("   →", error.message);
+        // 4. ✅ ELEGANT HANDLING: 401 means "Guest User"
+        if (error.response?.status === 401) {
+          // Fail silently. Do not show error toast.
+          // Just ensure Redux knows we are not logged in.
+          dispatch(logoutSuccess());
+        } 
+        // 5. Handle Real Errors (Server Down, 500s)
+        else {
+          console.error("Session Restore Error:", error.message);
         }
-        
-        // ✅ Mark restoration as complete even on failure
-        dispatch(sessionRestorationComplete());
       } finally {
+        // 6. ✅ CRITICAL: Open the gates. 
+        // This sets sessionRestored = true in your slice, allowing the UI to render.
+        dispatch(sessionRestorationComplete());
         setLoading(false);
       }
     };
@@ -69,13 +65,12 @@ export default function AuthInitializer({ children }) {
     restoreSession();
   }, [dispatch]);
 
-  // ✅ Show loading state while restoring session
+  // Loading Screen (Only shows for ~300ms on first load)
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
-         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-         <p className="text-lg font-semibold text-blue-600">Restoring Session...</p>
-         <p className="text-sm text-gray-500 mt-2">Please wait</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8FAFC]">
+         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
+         <p className="text-gray-500 text-sm font-medium">Restoring Session...</p>
       </div>
     );
   }
