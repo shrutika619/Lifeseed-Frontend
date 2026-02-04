@@ -42,10 +42,21 @@ export const getAllClinics = async (cityId) => {
 
 export const getAllCities = async () => {
     try {
-        const response = await api.get(Constants.urlEndPoints.GET_CLINICS_city);
+        // 1. Debug the URL first
+        const url = Constants.urlEndPoints.GET_CLINICS_city;
+        console.log("Fetching Cities from:", url); // Check your console
+
+        if (!url) throw new Error("URL Constant is undefined!");
+
+        const response = await api.get(url);
         return response.data;
     } catch (error) {
-        console.error("Error fetching cities:", error);
-        return { success: false, data: [] };
+        // 2. Log the specific error details
+        console.error("Error fetching cities:", error.message);
+        if (error.response) {
+            console.error("Server Status:", error.response.status);
+            console.error("Server Data:", error.response.data);
+        }
+        return []; // Return empty array so UI doesn't crash
     }
 };
