@@ -10,12 +10,10 @@ const rootReducer = combineReducers({
   // Add other reducers here in the future (e.g., cart: cartReducer)
 });
 
-// 2. Configure Persistence
 const persistConfig = {
-  key: 'root',
+  key: 'root_v2', // ⚡ CHANGE THIS (e.g. from 'root' to 'root_v1' or 'root_v2')
+  version: 1,     // Best practice to version your state
   storage,
-  // 🛑 CRITICAL: Blacklist 'auth' so tokens are NOT saved to localStorage.
-  // This ensures we rely on the secure HTTP-Only cookie for session restoration.
   blacklist: ['auth'], 
 };
 

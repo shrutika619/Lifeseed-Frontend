@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 // Reusable component for the rating stars
 const StarRating = ({ rating, count }) => {
-  const fullStars = Math.floor(rating);
+  const fullStars = Math.floor(rating || 0);
   const starsArray = Array(5).fill(null).map((_, index) => (
     <Star
       key={index}
@@ -18,9 +18,9 @@ const StarRating = ({ rating, count }) => {
       <div className="flex -space-x-1.5">
         {starsArray}
       </div>
-      <span className="text-sm font-semibold text-gray-700">{rating} stars</span>
+      <span className="text-sm font-semibold text-gray-700">{rating || 0} stars</span>
       <span className="text-sm text-gray-500">|</span>
-      <span className="text-sm text-gray-500">{count} ratings</span>
+      <span className="text-sm text-gray-500">{count || "100+"} ratings</span>
       <span className="ml-4 px-3 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
         Open Now
       </span>
@@ -29,16 +29,42 @@ const StarRating = ({ rating, count }) => {
 };
 
 // Main Hero Section Component
-const HerosectionClinincseedetailsPage = () => {
+const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data Prop
 
-  const router = useRouter();   // <-- Added
+  const router = useRouter();
+  
+  // ✅ 2. Safe Data Extraction
+  const clinic = data?.clinic || {};
+  
+  // Fallbacks to keep design intact if data is missing
+  const clinicName = `MEN 10 Clinic ${clinic.areaName}`;
+  const areaName = clinic.areaName ? `${clinic.areaName} Branch` : "MEN's Sexual Health Clinic";
+  const partnerName = clinic.clinicName ;
+  
+  // Images from DB
+  const hospitalImageUrl = clinic.photos?.clinicfrontPhoto || "https://placehold.co/800x600/60a5fa/ffffff?text=Clinic+Front";
+  const doctorImageUrl = clinic.photos?.doctorCabinPhoto || "https://placehold.co/800x600/94a3b8/ffffff?text=Clinic+Interior";
 
-  const clinicName = "MEN 10 Clinic - Besa, Nagpur";
-  const partnerName = "Meditrina Hospital, Nagpur";
-  const partnerDescription = "Our partnership with one of Nagpur's leading hospitals ensures you receive comprehensive, integrated care for any condition requiring advanced facilities.";
+  // ✅ 3. Dynamic Timings Logic
+  const getTodayTimings = () => {
+    if (!clinic.timings) return "Loading...";
+    
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const todayName = days[new Date().getDay()];
+    const todaySchedule = clinic.timings.find(t => t.day?.toLowerCase() === todayName);
 
-  const hospitalImageUrl = "https://placehold.co/800x600/60a5fa/ffffff?text=Meditrina+Hospital+Nagpur";
-  const doctorImageUrl = "https://placehold.co/800x600/94a3b8/ffffff?text=Clinic+Partner";
+    if (!todaySchedule || todaySchedule.isClosed) return "Closed Today";
+
+    const { morning, afternoon, evening } = todaySchedule.sections || {};
+    let slots = [];
+    
+    // Format matches your design style
+    if (morning?.enabled) slots.push(`morning ${morning.start}-${morning.end}`);
+    if (afternoon?.enabled) slots.push(`afternoon ${afternoon.start}-${afternoon.end}`);
+    if (evening?.enabled) slots.push(`evening ${evening.start}-${evening.end}`);
+    
+    return slots.length > 0 ? slots.join(", ") : "Open (See details below)";
+  };
 
   return (
     <div className="bg-zinc-50 min-h-screen py-12 md:py-20 font-sans">
@@ -50,7 +76,7 @@ const HerosectionClinincseedetailsPage = () => {
           {/* Left column */}
           <div className="space-y-6">
             <p className="text-sm font-medium uppercase text-indigo-600 tracking-wider">
-              MEN's Sexual Health Clinic
+              {areaName}
             </p>
 
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-800 leading-tight">
@@ -68,7 +94,8 @@ const HerosectionClinincseedetailsPage = () => {
               <CalendarCheck className="w-5 h-5 flex-shrink-0 mt-1 text-gray-500" />
               <div>
                 <p className="font-semibold text-gray-700">Timings Today:</p>
-                <p>morning 11am-1pm, afternoon 2pm-5pm, evening 6pm-8pm</p>
+                {/* ✅ Dynamic Timings inserted here */}
+                <p className="text-sm">{getTodayTimings()}</p>
               </div>
             </div>
 
@@ -84,7 +111,10 @@ const HerosectionClinincseedetailsPage = () => {
                 Book Appointment
               </button>
 
-              <button className="flex items-center justify-center px-8 py-3 border-2 border-indigo-600 text-base font-medium rounded-xl text-indigo-600 bg-white hover:bg-indigo-50 transition">
+              <button 
+                onClick={() => window.location.href = `tel:${clinic.officeCallingNo}`} // ✅ Dynamic Call
+                className="flex items-center justify-center px-8 py-3 border-2 border-indigo-600 text-base font-medium rounded-xl text-indigo-600 bg-white hover:bg-indigo-50 transition"
+              >
                 <Phone className="w-5 h-5 mr-2" />
                 Call Now
               </button>
@@ -95,7 +125,7 @@ const HerosectionClinincseedetailsPage = () => {
           <div className="shadow-2xl rounded-3xl overflow-hidden transform hover:scale-[1.01] transition-transform duration-300">
             <img 
               src={hospitalImageUrl}
-              alt="Meditrina Hospital Nagpur Building"
+              alt={clinicName}
               className="w-full h-auto object-cover aspect-video"
             />
           </div>
@@ -109,7 +139,7 @@ const HerosectionClinincseedetailsPage = () => {
             <div className="overflow-hidden rounded-2xl">
               <img 
                 src={doctorImageUrl}
-                alt="Professional man representing the clinic partner"
+                alt="Clinic Interior"
                 className="w-full h-auto object-cover aspect-[4/3] rounded-2xl transform hover:scale-105 transition-transform duration-500"
               />
             </div>
@@ -118,15 +148,16 @@ const HerosectionClinincseedetailsPage = () => {
           {/* Right text */}
           <div className="order-1 lg:order-2 space-y-6 lg:pl-10">
             <p className="text-sm font-medium uppercase text-gray-700 tracking-wider">
-              Our Trusted Partner Hospital
+              About the Clinic
             </p>
 
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
-              {partnerName}
+              {clinicName}
             </h2>
 
             <p className="text-lg text-gray-600 leading-relaxed">
-              {partnerDescription}
+              {/* ✅ Dynamic Description from Database */}
+              {clinic.clinicDescription || "Comprehensive care for all your needs."}
             </p>
           </div>
 

@@ -25,7 +25,7 @@ const HerosectionErectileDysfunctionPage = () => {
             Book Consultation
           </a>
           <a
-            href="#self-assessment"
+            href="/#assessment"
             className="border border-blue-600 text-blue-600 font-semibold px-6 py-3 rounded-md hover:bg-blue-50 transition"
           >
             Take Self-Assessment

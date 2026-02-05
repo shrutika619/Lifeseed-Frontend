@@ -1,6 +1,7 @@
 import api from "@/lib/axios"; // ✅ Use the new engine
 import { Constants } from "@/app/utils/constants";
 
+
 export const getAllClinics = async (cityId) => {
     if (!cityId) {
         return { 
@@ -42,10 +43,37 @@ export const getAllClinics = async (cityId) => {
 
 export const getAllCities = async () => {
     try {
-        const response = await api.get(Constants.urlEndPoints.GET_CLINICS_city);
+        // 1. Debug the URL first
+        const url = Constants.urlEndPoints.GET_CLINICS_city;
+        console.log("Fetching Cities from:", url); // Check your console
+
+        if (!url) throw new Error("URL Constant is undefined!");
+
+        const response = await api.get(url);
         return response.data;
     } catch (error) {
-        console.error("Error fetching cities:", error);
-        return { success: false, data: [] };
+        // 2. Log the specific error details
+        console.error("Error fetching cities:", error.message);
+        if (error.response) {
+            console.error("Server Status:", error.response.status);
+            console.error("Server Data:", error.response.data);
+        }
+        return []; // Return empty array so UI doesn't crash
     }
+};
+
+export const getClinicById = async (id) => {
+  try {
+    // Uses the existing GET_CLINICS endpoint + ID
+    // Final URL: http://localhost:5000/api/v1/public/clinics/{id}
+    const response = await api.get(`${Constants.urlEndPoints.GET_CLINICS}/${id}`);
+    
+    if (response.data.success) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, message: response.data.message };
+  } catch (error) {
+    console.error("Error fetching clinic details:", error);
+    return { success: false, message: "Failed to load clinic details" };
+  }
 };

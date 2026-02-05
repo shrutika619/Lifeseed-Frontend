@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation"; 
+import { toast } from "sonner";
 import {
   LineChart,
   Line,
@@ -10,129 +11,172 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { toast } from "sonner";
-// ✅ Import Service
+
+// ✅ Import Redux
+import { useSelector, useDispatch } from "react-redux";
+import { selectIsAuthenticated, selectUserRole, selectUser, logoutSuccess } from "@/redux/slices/authSlice";
+
+// ✅ Import Services
 import { sendClinicOtp, verifyClinicOtp } from "@/app/services/clinic-auth.service";
+import api from "@/lib/axios"; // Needed for logout
 
 export default function ClinicAuth() {
   const router = useRouter(); 
+  const dispatch = useDispatch();
   
+  // ✅ Redux State
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const userRole = useSelector(selectUserRole);
+  const user = useSelector(selectUser);
+
   const [step, setStep] = useState(0);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [mode, setMode] = useState("");
-  const [loading, setLoading] = useState(false); // ✅ Manage loading state
+  const [loading, setLoading] = useState(false);
 
-  const isValidPhone = (num) => /^[6-9]\d{9}$/.test(num);
-
-  /* ---------------- SEND OTP ---------------- */
-  /* ---------------- SEND OTP ---------------- */
-  const handleSendOTP = async () => {
-    if (!isValidPhone(phone)) {
-      toast.error("Please enter a valid 10-digit mobile number");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await sendClinicOtp(phone);
-      // Optional: console.log to see the actual success response
-      console.log("OTP Sent:", res); 
-
-      toast.success(res.message || "OTP sent successfully");
-      setStep(2);
-    } catch (err) {
-      // 1. Capture the message safely
-      const message = err.response?.data?.message || "";
-
-      // 3. FIX: Use .includes() instead of === and check for common keywords
-      if (
-        message.includes("Please login") || 
-        message.includes("already exists") || 
-        message.includes("already approved")
-      ) {
-        toast.error(message);
-        
-        // 4. Add a slight delay so the user sees the Toast before the page jumps
-        setTimeout(() => {
-          router.push("/login"); 
-        }, 1500);
-
-        return;
-      }
-
-      toast.error(message || "Failed to send OTP");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ---------------- OTP INPUT HANDLER ---------------- */
-  const handleOtpChange = (index, value) => {
-    if (!/^\d?$/.test(value)) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    if (value && index < otp.length - 1) {
-      document.getElementById(`otp-${index + 1}`)?.focus();
-    }
-
-    if (!value && index > 0) {
-      document.getElementById(`otp-${index - 1}`)?.focus();
+  // ✅ LOGOUT HANDLER
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout'); // Clear Server Cookie
+    } catch (error) {
+      console.error("Logout failed", error);
+    } finally {
+      dispatch(logoutSuccess()); // Clear Client State
+      toast.success("Logged out successfully");
+      router.refresh(); // Refresh to clear any cached data
     }
   };
 
-  /* ---------------- VERIFY OTP ---------------- */
+  /* -------------------------------------------------------------
+     🛑 BLOCKER UI: If User is Already Logged In
+     ------------------------------------------------------------- */
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+            !
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            You are already logged in
+          </h2>
+          
+          <p className="text-gray-600 mb-6">
+            You are currently logged in as <strong>{user?.fullName || 'User'}</strong> ({userRole}). 
+            To register a new clinic or access the partnership portal, you must log out first.
+          </p>
+
+          <div className="space-y-3">
+             {/* Option 1: Go to Dashboard */}
+             <button
+              onClick={() => {
+                if (userRole === 'clinic_admin') router.push('/clinic/dashboard');
+                else if (userRole === 'admin') router.push('/admin/dashboard');
+                else router.push('/');
+              }}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition"
+            >
+              Go to Dashboard
+            </button>
+
+            {/* Option 2: Logout */}
+            <button
+              onClick={handleLogout}
+              className="w-full border border-red-200 text-red-600 bg-red-50 py-3 rounded-xl font-medium hover:bg-red-100 transition"
+            >
+              Logout to Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* -------------------------------------------------------------
+     ✅ STANDARD FLOW (For Guests / Pending Clinics)
+     ------------------------------------------------------------- */
+  
+  const isValidPhone = (num) => /^[6-9]\d{9}$/.test(num);
+
+  // ... (Keep handleSendOTP, handleOtpChange, handleVerifyOTP logic EXACTLY as before) ...
+  const handleSendOTP = async () => {
+    if (!isValidPhone(phone)) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await sendClinicOtp(phone);
+      console.log("OTP Sent:", res); 
+      toast.success(res.message || "OTP sent successfully");
+      setStep(2);
+    } catch (err) {
+      const message = err.response?.data?.message || "";
+      if (message.includes("Please login") || message.includes("already exists") || message.includes("already approved")) {
+        toast.error(message);
+        setTimeout(() => router.push("/login"), 1500);
+        return;
+      }
+      toast.error(message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index, value) => {
+    if (!/^\d?$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+    if (value && index < otp.length - 1) document.getElementById(`otp-${index + 1}`)?.focus();
+    if (!value && index > 0) document.getElementById(`otp-${index - 1}`)?.focus();
+  };
+
   const handleVerifyOTP = async () => {
     const otpCode = otp.join("");
-
     if (otpCode.length !== 6) {
       toast.error("Enter full 6-digit OTP");
       return;
     }
-
-    setLoading(true); // ✅ Start Loading
+    setLoading(true);
     try {
       const res = await verifyClinicOtp(phone, otpCode);
-      const data = res.data || res; // Handle different response structures
+      const resultData = res.data; 
 
-      // ✅ 1. Store Mobile for Registration Form (As per docs)
-      if(data.mobileNo){
-        localStorage.setItem("clinic_mobile", data.mobileNo);
-      }
+      if(resultData?.mobileNo) localStorage.setItem("clinic_mobile", resultData.mobileNo);
 
-      // 🔁 2. Clinic already approved → redirect to login
-      if (data.shouldRedirectToLogin) {
-        toast.success(
-            data.message || "Clinic already approved. Please login."
-        );
-        router.push("/login"); 
+      if (resultData?.shouldRedirectToLogin) {
+        toast.info(resultData.message || "Clinic has beeb approved. Please login.");
+        setTimeout(() => router.push("/login"), 1500); 
         return;
       }
 
-      // ❌ 3. Clinic rejected
-      if (data.status === "rejected") {
-        toast.error(data.rejectionReason || "Clinic application rejected");
+      if (resultData?.status === "rejected") {
+        toast.error(resultData.rejectionReason || "Application rejected contact admin.");
         return;
       }
 
-      // ✅ 4. OTP verified, New/Pending Clinic -> Show Info Page
-      toast.success("OTP verified successfully");
-      setStep(3);
+      if (resultData?.hasSubmittedForm && resultData?.status === "pending") {
+         toast.info("Your application is pending approval. Redirecting to status...");
+         setTimeout(() => router.push("/reviewform"), 1500);
+         return;
+      }
+
+      toast.success("OTP Verified. Please complete registration.");
+      setTimeout(() => router.push("/joinnow"), 1000);
       
     } catch (err) {
-      toast.error(
-          err.response?.data?.message || "Invalid or expired OTP"
-      );
+      console.error(err);
+      toast.error(err.response?.data?.message || "Invalid or expired OTP");
     } finally {
-      setLoading(false); // ✅ Stop Loading
+      setLoading(false);
     }
   };
 
   const handleRedirect = () => {
-    router.push("/joinnow"); // ✅ redirect to Registration Form
+    router.push("/joinnow"); 
   };
 
   const data = [
@@ -350,37 +394,6 @@ export default function ClinicAuth() {
             >
               Get Started Now
             </button>
-
-            <p className="text-[11px] text-gray-400 mt-2 max-w-xs mx-auto">
-              By getting started, you agree to our{" "}
-              <a href="#" className="text-indigo-500 hover:underline">
-                Terms of Service
-              </a>{" "}
-              and{" "}
-              <a href="#" className="text-indigo-500 hover:underline">
-                Privacy Policy
-              </a>
-              .
-            </p>
-          </section>
-
-          {/* Clinics Grid */}
-          <section className="text-center mb-12">
-            <h3 className="text-base font-semibold text-gray-800 mb-4">
-              Our Modern & Discreet Clinics
-            </h3>
-            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
-              {["Reception", "Consultation", "Waiting Area", "Exterior"].map(
-                (text) => (
-                  <div
-                    key={text}
-                    className="bg-gray-100 rounded-xl shadow-sm py-6 flex items-center justify-center text-gray-700 font-medium hover:bg-gray-200 transition"
-                  >
-                    {text}
-                  </div>
-                )
-              )}
-            </div>
           </section>
 
           {/* Contact Footer */}
