@@ -1,12 +1,14 @@
-import React from 'react'
-import ClinicseedetailsPage from '../../components/ClinicseedetailsPage/ClinicseedetailsPage'
+"use client";
+import React, { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import ClinicseedetailsPage from '../../components/ClinicseedetailsPage/ClinicseedetailsPage';
 
-const page = () => {
-  return (
-    <div>
-        <ClinicseedetailsPage />
-    </div>
-  )
-}
 
-export default page
+const Page = () => {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id'); // ✅ Reads '?id=6974...'
+    return <ClinicseedetailsPage id={id} />;
+
+};
+
+export default Page;

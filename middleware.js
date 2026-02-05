@@ -74,7 +74,7 @@ export async function middleware(request) {
          if (ROLES.ADMIN.includes(role)) return NextResponse.redirect(new URL('/admin/dashboard', request.url));
          if (ROLES.CLINIC.includes(role)) return NextResponse.redirect(new URL('/clinic/dashboard', request.url));
          
-         return NextResponse.redirect(new URL('/dashboard', request.url));
+         return NextResponse.redirect(new URL('/', request.url));
        } catch (e) {
          return NextResponse.next();
        }

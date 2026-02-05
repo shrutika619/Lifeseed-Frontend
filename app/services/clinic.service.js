@@ -1,6 +1,7 @@
 import api from "@/lib/axios"; // ✅ Use the new engine
 import { Constants } from "@/app/utils/constants";
 
+
 export const getAllClinics = async (cityId) => {
     if (!cityId) {
         return { 
@@ -59,4 +60,20 @@ export const getAllCities = async () => {
         }
         return []; // Return empty array so UI doesn't crash
     }
+};
+
+export const getClinicById = async (id) => {
+  try {
+    // Uses the existing GET_CLINICS endpoint + ID
+    // Final URL: http://localhost:5000/api/v1/public/clinics/{id}
+    const response = await api.get(`${Constants.urlEndPoints.GET_CLINICS}/${id}`);
+    
+    if (response.data.success) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, message: response.data.message };
+  } catch (error) {
+    console.error("Error fetching clinic details:", error);
+    return { success: false, message: "Failed to load clinic details" };
+  }
 };
