@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import api from "@/lib/axios"; // ✅ Use Custom Interceptor instead of 'axios'
+import { Constants } from "@/app/utils/constants";
 import {
   Filter,
   Search,
@@ -10,150 +12,81 @@ import {
   ArrowLeft,
   Building2,
   MoreVertical,
+  Loader2,
 } from "lucide-react";
 
 export default function AdminClinicsPage() {
+  const [clinics, setClinics] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("City");
   const [selectedClinic, setSelectedClinic] = useState(null);
   const [activeTab, setActiveTab] = useState("Doctors");
 
-  const clinics = [
-    {
-      id: "#DO987",
-      name: "Care Hospital men 10 sexual health clinic - multi Specialist",
-      contact: "9987909023",
-      email: "care@abc.com",
-      address: "Wardha Rd, Sita Burdi, Nagpur",
-      fullAddress: "Plot no 18 near nagar kalva chowk kuthrudi",
-      googleLink: "https://maps.app.goo.gl/...",
-      doctors: "10 Doctors",
-      transactions: "05",
-      status: "Active",
-      contactPerson: {
-        name: "Parul Jadhav",
-        phone: "9987865463",
-        email: "carehospital@abc.com",
-      },
-      attendant: {
-        name: "Ashok Mali",
-        phone: "9987865463",
-        email: "carehospital@abc.com",
-      },
-      hospitalPublic: {
-        phone: "9987865463",
-        email: "carehospital@abc.com",
-      },
-      owner: {
-        name: "Ramesh More",
-        phone: "9987865463",
-        email: "carehospital@abc.com",
-      },
-      doctorsList: [
-        {
-          id: "#D01",
-          name: "Sheetal Dayal",
-          phone: "9973827100",
-          email: "sheetald@xyz.com",
-          type: "IPD",
-          exp: "12 Years",
-          qualification: "MBBS, MS OBGY",
-          specialization: "Gynecologist",
-          status: "Active",
-          language: "Hindi, English, Marathi",
-        },
-        {
-          id: "#D02",
-          name: "Rohit Singh",
-          phone: "9973827101",
-          email: "rohit@xyz.com",
-          type: "OPD",
-          exp: "8 Years",
-          qualification: "MBBS",
-          specialization: "Physician",
-          status: "Active",
-          language: "Hindi, English",
-        },
-        {
-          id: "#D03",
-          name: "Priya Sharma",
-          phone: "9973827102",
-          email: "priya@xyz.com",
-          type: "IPD",
-          exp: "15 Years",
-          qualification: "MBBS, MD",
-          specialization: "Cardiologist",
-          status: "Active",
-          language: "Hindi, English, Marathi",
-        },
-      ],
-    },
-    {
-      id: "#DR9088",
-      name: "Sai Hospital",
-      contact: "9987909023",
-      email: "sai@abc.com",
-      address: "Wardha Rd, Sita Burdi, Nagpur",
-      fullAddress: "Plot no 18 near nagar kalva chowk kuthrudi",
-      googleLink: "https://maps.app.goo.gl/...",
-      doctors: "8 Doctors",
-      transactions: "03",
-      status: "Active",
-      contactPerson: {
-        name: "Parul Jadhav",
-        phone: "9987865463",
-        email: "saihospital@abc.com",
-      },
-      attendant: {
-        name: "Ashok Mali",
-        phone: "9987865463",
-        email: "saihospital@abc.com",
-      },
-      hospitalPublic: {
-        phone: "9987865463",
-        email: "saihospital@abc.com",
-      },
-      owner: {
-        name: "Ramesh More",
-        phone: "9987865463",
-        email: "saihospital@abc.com",
-      },
-      doctorsList: [],
-    },
-    {
-      id: "#DR9089",
-      name: "Global Care Hospital",
-      contact: "9987909023",
-      email: "global@abc.com",
-      address: "Wardha Rd, Sita Burdi, Nagpur",
-      fullAddress: "Plot no 18 near nagar kalva chowk kuthrudi",
-      googleLink: "https://maps.app.goo.gl/...",
-      doctors: "12 Doctors",
-      transactions: "07",
-      status: "Active",
-      contactPerson: {
-        name: "Parul Jadhav",
-        phone: "9987865463",
-        email: "globalcare@abc.com",
-      },
-      attendant: {
-        name: "Ashok Mali",
-        phone: "9987865463",
-        email: "globalcare@abc.com",
-      },
-      hospitalPublic: {
-        phone: "9987865463",
-        email: "globalcare@abc.com",
-      },
-      owner: {
-        name: "Ramesh More",
-        phone: "9987865463",
-        email: "globalcare@abc.com",
-      },
-      doctorsList: [],
-    },
-  ];
+  // ✅ FETCH DATA USING INTERCEPTOR
+  useEffect(() => {
+    const fetchClinics = async () => {
+      try {
+        // 🚀 api.get handles Authorization headers & Token Refresh automatically
+        const response = await api.get(Constants.urlEndPoints.GET_ALL_CLINICS);
+        
+        if (response.data.success) {
+          const mappedData = response.data.data.clinics.map((c) => ({
+            id: `#${c._id.slice(-5).toUpperCase()}`,
+            dbId: c._id,
+            name: c.clinicName,
+            contact: c.mobileNo,
+            email: c.clinicEmail,
+            address: c.areaName || "Nagpur",
+            fullAddress: c.fulladdress,
+            googleLink: c.googleMapsLink,
+            doctors: "0 Doctors", 
+            transactions: "00",   
+            status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : "New",
+            
+            contactPerson: {
+              name: c.contactPersonName || "N/A",
+              phone: c.mobileNo,
+              email: c.contactPersonEmail || c.clinicEmail,
+            },
+            attendant: {
+              name: c.attendantName || "N/A",
+              phone: c.attendantNumber || "N/A",
+              email: "N/A",
+            },
+            hospitalPublic: {
+              phone: c.officeCallingNo,
+              email: c.clinicEmail,
+            },
+            owner: {
+              name: c.ownerName || "N/A",
+              phone: c.ownerContactNo || "N/A",
+              email: c.clinicEmail,
+            },
+            doctorsList: [],
+          }));
+
+          setClinics(mappedData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch clinics:", error);
+        // Optional: Add toast error here
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClinics();
+  }, []);
+
+  const counts = {
+    New: clinics.filter(c => c.status === "New").length,
+    Active: clinics.filter(c => c.status === "Active").length,
+    Inactive: 0,
+    Block: 0,
+    All: clinics.length
+  };
 
   const filteredClinics = clinics.filter((clinic) => {
     const matchesStatus =
@@ -163,6 +96,14 @@ export default function AdminClinicsPage() {
       clinic.id.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   if (selectedClinic) {
     return (
@@ -196,7 +137,7 @@ export default function AdminClinicsPage() {
                     <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-3">
                       <Building2 size={32} className="text-white" />
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors">
+                    <button onClick={() => window.location.href=`tel:${selectedClinic.contact}`} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors">
                       <Phone size={16} />
                       Call
                     </button>
@@ -247,13 +188,13 @@ export default function AdminClinicsPage() {
                     </div>
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Address Google link</p>
-                      <a href={selectedClinic.googleLink} className="text-blue-600 text-xs hover:underline">
+                      <a href={selectedClinic.googleLink} target="_blank" rel="noreferrer" className="text-blue-600 text-xs hover:underline truncate block">
                         {selectedClinic.googleLink}
                       </a>
                     </div>
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Status</p>
-                      <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${selectedClinic.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
                         {selectedClinic.status}
                       </span>
                     </div>
@@ -428,8 +369,8 @@ export default function AdminClinicsPage() {
             </div>
             <div className="flex items-center gap-2 ml-auto">
               {[
-                { label: "New", count: 6, bg: "bg-blue-50", text: "text-blue-600" },
-                { label: "Active", count: 3, bg: "bg-green-50", text: "text-green-600" },
+                { label: "New", count: counts.New, bg: "bg-blue-50", text: "text-blue-600" },
+                { label: "Active", count: counts.Active, bg: "bg-green-50", text: "text-green-600" },
                 { label: "Inactive", count: 0, bg: "bg-gray-50", text: "text-gray-600" },
                 { label: "Block", count: 0, bg: "bg-gray-50", text: "text-gray-600" },
               ].map((btn) => (
@@ -481,7 +422,7 @@ export default function AdminClinicsPage() {
                     <td className="py-4 px-4 text-sm text-gray-900">{clinic.address}</td>
                     <td className="py-4 px-4 text-sm text-gray-900">{clinic.doctors}</td>
                     <td className="py-4 px-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${clinic.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                         {clinic.status}
                       </span>
                     </td>

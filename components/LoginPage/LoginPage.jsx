@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-// ✅ 1. Import useSearchParams
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useDispatch } from "react-redux";
@@ -13,7 +12,6 @@ const LoginPage = () => {
   const router = useRouter();
   const dispatch = useDispatch();
   
-  // ✅ 2. Get the 'from' parameter (Default to '/' if missing)
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("from") || "/";
 
@@ -64,7 +62,8 @@ const LoginPage = () => {
     
     try {
       const data = await verifyLoginOtp(phone, finalOtp);
-      const { accessToken, isNewUser } = data;
+      // ✅ Extract User & Role
+      const { accessToken, user, isNewUser } = data;
       
       if (!accessToken) throw new Error("Login failed - no access token");
 
@@ -75,29 +74,40 @@ const LoginPage = () => {
 
       toast.success("Login Successful");
 
-      // 🔍 CHECK 1: IS NEW USER?
-      // If backend explicitly says it's a new user, force profile setup
+      // 🛑 ROLE CHECK: If Admin or Doctor, SKIP profile check & Redirect
+      const userRole = user?.role || "patient";
+      const exemptedRoles = ["clinic_admin", "doctor", "super_admin", "admin"];
+
+      if (exemptedRoles.includes(userRole)) {
+        console.log(`User is ${userRole} -> Skipping profile check`);
+        router.push(redirectPath);
+        return; // Stop execution here
+      }
+
+      // 🟢 PATIENT LOGIC BELOW
+      
+      // 1. If backend says new user -> Profile Setup
       if (isNewUser) {
-        console.log("New user detected -> Profile Setup");
+        console.log("New Patient detected -> Profile Setup");
         setStep("success"); 
         return;
       }
 
-      // 🔍 CHECK 2: DOES PROFILE EXIST?
-      // Even if not "new", check if profile data is actually filled
+      // 2. If existing user, verify if profile data actually exists
       try {
         const profileCheck = await getPatientProfile();
         
         if (profileCheck.success && profileCheck.data) {
-          // ✅ Profile Exists -> Go to requested page
-          console.log(`Profile found -> Redirecting to ${redirectPath}`);
+          // Profile Found -> Redirect
+          console.log(`Patient Profile found -> Redirecting to ${redirectPath}`);
           router.push(redirectPath);
         } else {
-          // ❌ Profile Missing -> Profile Setup
-          console.log("Profile missing -> Profile Setup");
+          // Profile Missing -> Setup
+          console.log("Patient Profile missing -> Profile Setup");
           setStep("success");
         }
       } catch (profileError) {
+        // Fallback -> Setup
         console.log("Profile check failed -> Profile Setup");
         setStep("success");
       }
@@ -131,7 +141,6 @@ const LoginPage = () => {
 
     if (response.success) {
         toast.success("Profile Saved!");
-        // ✅ Redirect to requested page after save
         router.push(redirectPath);
     } else {
         setMessage(response.message || "Failed to save profile");
@@ -205,7 +214,6 @@ const LoginPage = () => {
             <button onClick={() => setStep("profile")} className="bg-[#4285F4] text-white w-full py-3.5 rounded-xl font-semibold mb-3 hover:bg-blue-600 transition-colors">
               Set Profile
             </button>
-            {/* ✅ SKIP Button redirects to requested page */}
             <button onClick={() => router.push(redirectPath)} className="text-[#4285F4] text-sm font-semibold border border-[#E2E8F0] w-full py-3 rounded-xl hover:bg-gray-50 transition-colors">
               Skip
             </button>

@@ -3,10 +3,6 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAllCities } from "@/app/services/clinic.service";
-
-// ✅ Import API Engine for Logout Call
-import api from "@/lib/axios"; 
-
 // Icons
 import { User, LogOut, ChevronDown } from "lucide-react";
 
@@ -18,6 +14,7 @@ import {
   logoutSuccess,
   fetchProfileDetails 
 } from "@/redux/slices/authSlice";
+import axios from "axios";
 
 const Navbar = () => {
   const router = useRouter();
@@ -107,7 +104,7 @@ const Navbar = () => {
   const handleLogout = async () => {
     try {
       // 1. Call Backend to delete HTTP-Only Cookie
-      await api.post('/auth/logout');
+      await axios.post('/api/auth/logout');
     } catch (error) {
       console.error("Logout API call failed", error);
     } finally {
