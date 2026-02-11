@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import api from "@/lib/axios"; // ✅ Use Custom Interceptor instead of 'axios'
+import api from "@/lib/axios"; 
 import { Constants } from "@/app/utils/constants";
+import { ClinicStatusService } from "@/app/services/clinicStatus.service"; // ✅ Import Service
+import { toast } from "sonner"; // ✅ For notifications
 import {
   Filter,
   Search,
@@ -23,68 +25,72 @@ export default function AdminClinicsPage() {
   const [selectedCity, setSelectedCity] = useState("City");
   const [selectedClinic, setSelectedClinic] = useState(null);
   const [activeTab, setActiveTab] = useState("Doctors");
+  
+  // ✅ State to track open dropdown
+  const [openDropdownId, setOpenDropdownId] = useState(null);
 
   // ✅ FETCH DATA USING INTERCEPTOR
-  useEffect(() => {
-    const fetchClinics = async () => {
-      try {
-        // 🚀 api.get handles Authorization headers & Token Refresh automatically
-        const response = await api.get(Constants.urlEndPoints.GET_ALL_CLINICS);
-        
-        if (response.data.success) {
-          const mappedData = response.data.data.clinics.map((c) => ({
-            id: `#${c._id.slice(-5).toUpperCase()}`,
-            dbId: c._id,
-            name: c.clinicName,
-            contact: c.mobileNo,
+  const fetchClinics = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(Constants.urlEndPoints.GET_ALL_CLINICS);
+      
+      if (response.data.success) {
+        const mappedData = response.data.data.clinics.map((c) => ({
+          id: `#${c._id.slice(-5).toUpperCase()}`,
+          dbId: c._id,
+          name: c.clinicName,
+          contact: c.mobileNo,
+          email: c.clinicEmail,
+          address: c.areaName || "Nagpur",
+          fullAddress: c.fulladdress,
+          googleLink: c.googleMapsLink,
+          doctors: "0 Doctors", 
+          transactions: "00",   
+          status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : 
+                  (c.status === "pending" || c.status === "PENDING") ? "New" : 
+                  (c.status === "rejected" || c.status === "REJECTED") ? "Inactive" : "Block",
+          
+          contactPerson: {
+            name: c.contactPersonName || "N/A",
+            phone: c.mobileNo,
+            email: c.contactPersonEmail || c.clinicEmail,
+          },
+          attendant: {
+            name: c.attendantName || "N/A",
+            phone: c.attendantNumber || "N/A",
+            email: "N/A",
+          },
+          hospitalPublic: {
+            phone: c.officeCallingNo,
             email: c.clinicEmail,
-            address: c.areaName || "Nagpur",
-            fullAddress: c.fulladdress,
-            googleLink: c.googleMapsLink,
-            doctors: "0 Doctors", 
-            transactions: "00",   
-            status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : "New",
-            
-            contactPerson: {
-              name: c.contactPersonName || "N/A",
-              phone: c.mobileNo,
-              email: c.contactPersonEmail || c.clinicEmail,
-            },
-            attendant: {
-              name: c.attendantName || "N/A",
-              phone: c.attendantNumber || "N/A",
-              email: "N/A",
-            },
-            hospitalPublic: {
-              phone: c.officeCallingNo,
-              email: c.clinicEmail,
-            },
-            owner: {
-              name: c.ownerName || "N/A",
-              phone: c.ownerContactNo || "N/A",
-              email: c.clinicEmail,
-            },
-            doctorsList: [],
-          }));
+          },
+          owner: {
+            name: c.ownerName || "N/A",
+            phone: c.ownerContactNo || "N/A",
+            email: c.clinicEmail,
+          },
+          doctorsList: [],
+        }));
 
-          setClinics(mappedData);
-        }
-      } catch (error) {
-        console.error("Failed to fetch clinics:", error);
-        // Optional: Add toast error here
-      } finally {
-        setLoading(false);
+        setClinics(mappedData);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch clinics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchClinics();
   }, []);
 
   const counts = {
     New: clinics.filter(c => c.status === "New").length,
     Active: clinics.filter(c => c.status === "Active").length,
-    Inactive: 0,
-    Block: 0,
+    Inactive: clinics.filter(c => c.status === "Inactive").length,
+    Block: clinics.filter(c => c.status === "Block").length,
     All: clinics.length
   };
 
@@ -97,7 +103,36 @@ export default function AdminClinicsPage() {
     return matchesStatus && matchesSearch;
   });
 
-  if (loading) {
+  // ✅ Function to handle dropdown actions with API
+  const handleAction = async (action, dbId) => {
+    setOpenDropdownId(null);
+    try {
+      if (action === 'Accept') {
+        await ClinicStatusService.approveClinic(dbId);
+        toast.success("Clinic approved successfully!");
+      } 
+      else if (action === 'Reject') {
+        const reason = window.prompt("Please enter a reason for rejecting this clinic:");
+        if (!reason) return; 
+        await ClinicStatusService.rejectClinic(dbId, reason);
+        toast.success("Clinic rejected successfully!");
+      } 
+      else if (action === 'Block') {
+        if (!window.confirm("Are you sure you want to block this clinic?")) return;
+        await ClinicStatusService.blockClinic(dbId);
+        toast.success("Clinic blocked successfully!");
+      }
+
+      // Refresh table data
+      fetchClinics();
+
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+      toast.error(error.message || `Failed to ${action.toLowerCase()} clinic`);
+    }
+  };
+
+  if (loading && clinics.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -105,6 +140,7 @@ export default function AdminClinicsPage() {
     );
   }
 
+  // --- DETAILS VIEW ---
   if (selectedClinic) {
     return (
       <div className="flex min-h-screen bg-gray-50">
@@ -197,15 +233,6 @@ export default function AdminClinicsPage() {
                       <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${selectedClinic.status === 'Active' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
                         {selectedClinic.status}
                       </span>
-                    </div>
-                    <div className="pt-4 border-t border-gray-200">
-                      <p className="text-blue-600 text-sm font-medium mb-2">Banking Details</p>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Bank Name</span>
-                          <span className="text-gray-900">Branch Name</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -310,19 +337,13 @@ export default function AdminClinicsPage() {
                     </div>
                   )}
                   {activeTab === "Transactions" && (
-                    <div className="p-8 text-center text-gray-500">
-                      <p>No transactions available</p>
-                    </div>
+                    <div className="p-8 text-center text-gray-500"><p>No transactions available</p></div>
                   )}
                   {activeTab === "Images" && (
-                    <div className="p-8 text-center text-gray-500">
-                      <p>No images available</p>
-                    </div>
+                    <div className="p-8 text-center text-gray-500"><p>No images available</p></div>
                   )}
                   {activeTab === "Billing" && (
-                    <div className="p-8 text-center text-gray-500">
-                      <p>No billing information available</p>
-                    </div>
+                    <div className="p-8 text-center text-gray-500"><p>No billing information available</p></div>
                   )}
                 </div>
               </div>
@@ -333,6 +354,7 @@ export default function AdminClinicsPage() {
     );
   }
 
+  // --- DASHBOARD LIST VIEW ---
   return (
     <div className="flex min-h-screen bg-gray-50">
       <div className="flex-1 flex flex-col">
@@ -371,8 +393,8 @@ export default function AdminClinicsPage() {
               {[
                 { label: "New", count: counts.New, bg: "bg-blue-50", text: "text-blue-600" },
                 { label: "Active", count: counts.Active, bg: "bg-green-50", text: "text-green-600" },
-                { label: "Inactive", count: 0, bg: "bg-gray-50", text: "text-gray-600" },
-                { label: "Block", count: 0, bg: "bg-gray-50", text: "text-gray-600" },
+                { label: "Inactive", count: counts.Inactive, bg: "bg-gray-50", text: "text-gray-600" },
+                { label: "Block", count: counts.Block, bg: "bg-gray-50", text: "text-gray-600" },
               ].map((btn) => (
                 <button
                   key={btn.label}
@@ -386,7 +408,7 @@ export default function AdminClinicsPage() {
           </div>
         </div>
         <div className="flex-1 p-6">
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-visible pb-24"> 
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -427,14 +449,48 @@ export default function AdminClinicsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      >
-                        <MoreVertical size={18} className="text-gray-400" />
-                      </button>
+                      <div className="relative inline-block text-left">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(openDropdownId === clinic.id ? null : clinic.id);
+                          }}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors relative z-10"
+                        >
+                          <MoreVertical size={18} className="text-gray-400" />
+                        </button>
+
+                        {openDropdownId === clinic.id && (
+                          <div 
+                            className="fixed inset-0 z-40" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownId(null);
+                            }}
+                          />
+                        )}
+
+                        {/* ✅ Action Dropdown Panel (Styled like reference image) */}
+                        {openDropdownId === clinic.id && (
+                          <div className="absolute right-0 top-8 w-40 bg-white rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.08)] border border-gray-100 py-1.5 z-50">
+                            {clinic.status === 'Active' && (
+                              <>
+                                <button onClick={(e) => { e.stopPropagation(); handleAction('Block', clinic.dbId); }} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Block</button>
+                              </>
+                            )}
+                            {clinic.status === 'New' && (
+                              <>
+                                <button onClick={(e) => { e.stopPropagation(); handleAction('Accept', clinic.dbId); }} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Accept</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleAction('Reject', clinic.dbId); }} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Reject</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleAction('Block', clinic.dbId); }} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Block</button>
+                              </>
+                            )}
+                            {(clinic.status === 'Inactive' || clinic.status === 'Block') && (
+                              <button onClick={(e) => { e.stopPropagation(); handleAction('Accept', clinic.dbId); }} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Accept</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

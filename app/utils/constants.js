@@ -38,6 +38,10 @@ export class Constants {
     GET_MY_ASSESSMENT: `${this.API_BASE_URL}/assessment/my-assessment`,
     
     // --- ASSESSMENT ---
-    GET_ALL_CLINICS: `${this.API_BASE_URL}/admin/clinics`
+    GET_ALL_CLINICS: `${this.API_BASE_URL}/admin/clinics`,
+
+    //--SLOTS & DOCTOR--
+    GET_CLINIC_DOCTORS: `${this.API_BASE_URL}/clinicDoctor`,
+    GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/clinicDoctor`, 
   };
 }

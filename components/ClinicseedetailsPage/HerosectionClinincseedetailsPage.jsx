@@ -29,11 +29,11 @@ const StarRating = ({ rating, count }) => {
 };
 
 // Main Hero Section Component
-const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data Prop
+const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ Accept Data Prop
 
   const router = useRouter();
   
-  // ✅ 2. Safe Data Extraction
+  // Safe Data Extraction
   const clinic = data?.clinic || {};
   
   // Fallbacks to keep design intact if data is missing
@@ -45,7 +45,7 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data P
   const hospitalImageUrl = clinic.photos?.clinicfrontPhoto || "https://placehold.co/800x600/60a5fa/ffffff?text=Clinic+Front";
   const doctorImageUrl = clinic.photos?.doctorCabinPhoto || "https://placehold.co/800x600/94a3b8/ffffff?text=Clinic+Interior";
 
-  // ✅ 3. Dynamic Timings Logic
+  // Dynamic Timings Logic
   const getTodayTimings = () => {
     if (!clinic.timings) return "Loading...";
     
@@ -94,7 +94,6 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data P
               <CalendarCheck className="w-5 h-5 flex-shrink-0 mt-1 text-gray-500" />
               <div>
                 <p className="font-semibold text-gray-700">Timings Today:</p>
-                {/* ✅ Dynamic Timings inserted here */}
                 <p className="text-sm">{getTodayTimings()}</p>
               </div>
             </div>
@@ -102,9 +101,9 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data P
             {/* Buttons */}
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 pt-6">
               
-              {/* --------- BOOK BUTTON WITH ROUTE --------- */}
+              {/* --------- BOOK BUTTON WITH ROUTE + CLINIC ID --------- */}
               <button
-                onClick={() => router.push("/bookappointment")}
+                onClick={() => router.push(clinic?._id ? `/bookappointment?clinicId=${clinic._id}` : "/bookappointment")}
                 className="flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/50"
               >
                 <CalendarCheck className="w-5 h-5 mr-2" />
@@ -112,7 +111,7 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data P
               </button>
 
               <button 
-                onClick={() => window.location.href = `tel:${clinic.officeCallingNo}`} // ✅ Dynamic Call
+                onClick={() => window.location.href = `tel:${clinic.officeCallingNo}`} 
                 className="flex items-center justify-center px-8 py-3 border-2 border-indigo-600 text-base font-medium rounded-xl text-indigo-600 bg-white hover:bg-indigo-50 transition"
               >
                 <Phone className="w-5 h-5 mr-2" />
@@ -156,7 +155,6 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ 1. Accept Data P
             </h2>
 
             <p className="text-lg text-gray-600 leading-relaxed">
-              {/* ✅ Dynamic Description from Database */}
               {clinic.clinicDescription || "Comprehensive care for all your needs."}
             </p>
           </div>

@@ -74,9 +74,8 @@ const ConditionTag = ({ icon: Icon, label, onToggle, active }) => {
   );
 };
 
-// ✅ UPDATED TIMINGS TABLE (Matches your Horizontal Reference)
+// TIMINGS TABLE
 const TimingsTable = ({ timings }) => {
-  // Color mapping based on slot position (1st=Blue, 2nd=Orange, 3rd=Purple)
   const getSlotColor = (index) => {
     if (index === 0) return "bg-blue-100 text-blue-700";
     if (index === 1) return "bg-orange-100 text-orange-700";
@@ -84,20 +83,15 @@ const TimingsTable = ({ timings }) => {
     return "bg-gray-100 text-gray-700";
   };
 
-  const todayIndex = new Date().getDay(); // 0=Sunday, 1=Monday...
-  // Map JS day index to your data's day string if needed for highlighting
-
   return (
     <div className="space-y-3">
       {timings.map((d, idx) => (
         <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
           
-          {/* Day Name */}
           <div className="w-24 font-semibold text-sm text-gray-800">
             {d.day}
           </div>
 
-          {/* Slots Container - Horizontal Layout */}
           <div className="flex-1 flex flex-wrap gap-2 justify-start">
             {d.closed ? (
               <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded">
@@ -150,7 +144,6 @@ const MapEmbed = ({ address }) => {
   
   return (
     <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 h-56">
-      {/* Visual Map using Embed API */}
       <iframe
         title="clinic-map"
         src={`https://maps.google.com/maps?q=${query}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
@@ -226,7 +219,6 @@ const SidebarCard = ({ clinic, timings, onBookNow, onCall }) => {
       </div>
 
       <div className="mt-4">
-        {/* Pass Timings to Table */}
         <TimingsTable timings={timings} />
       </div>
 
@@ -282,7 +274,10 @@ export default function SecondClinicseedetailsPage({ clinic, doctors }) {
     { label: "12 Weeks", value: 95 }
   ];
 
-  const openBooking = () => router.push("/bookappointment");
+  // --------- DYNAMIC URL ROUTING WITH ID ---------
+  const openBooking = () => {
+    router.push(clinic?._id ? `/bookappointment?clinicId=${clinic._id}` : "/bookappointment");
+  };
 
   // Format Timings for UI
   const formattedTimings = clinic?.timings?.map((t) => {

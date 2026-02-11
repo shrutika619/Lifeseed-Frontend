@@ -57,7 +57,7 @@ const ClinicseedetailsPage = ({ id }) => {
     <div>
       <HerosectionClinincseedetailsPage data={clinicData} />
       <SecondClinicseedetailsPage clinic={clinicData.clinic} doctors={clinicData.doctors} />
-      <ThirdClinicseedetailsPage />
+      <ThirdClinicseedetailsPage clinic={clinicData.clinic} />
     </div>
   );
 };

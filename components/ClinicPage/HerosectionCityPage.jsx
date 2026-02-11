@@ -38,6 +38,8 @@ export default function HerosectionCity({ cityName }) {
         // 2. Fetch clinics ONLY for that specific city ID
         const clinicResult = await getAllClinics(targetCity._id);
 
+        console.log(clinicResult)
+
         if (clinicResult.success) {
           setClinics(clinicResult.clinics);
         } else {
@@ -110,7 +112,7 @@ export default function HerosectionCity({ cityName }) {
             >
               <div className="h-48 w-full bg-gray-200 overflow-hidden border-b border-gray-300">
                 <img
-                  src={clinic.googleMapsLink || "https://via.placeholder.com/800x400?text=Clinic+Image"}
+                  src={clinic.photos?.clinicfrontPhoto}
                   alt={clinic.clinicName}
                   className="w-full h-full object-cover"
                 />

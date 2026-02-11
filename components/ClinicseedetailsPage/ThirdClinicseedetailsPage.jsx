@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation'; // <-- Yeh add kiya
+import { useRouter } from 'next/navigation'; 
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 
 const testimonials = [
@@ -30,8 +30,9 @@ const testimonials = [
   }
 ];
 
-const ThirdClinicseedetailsPage = () => {
-  const router = useRouter(); // <-- Router hook
+// ✅ 1. Accept clinic as a prop
+const ThirdClinicseedetailsPage = ({ clinic }) => {
+  const router = useRouter(); 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -70,9 +71,9 @@ const ThirdClinicseedetailsPage = () => {
     return () => clearInterval(autoPlay);
   }, []);
 
-  // Button click handler - redirect to booking page
+  // ✅ 2. Append clinicId to the route if it exists
   const handleBookAppointment = () => {
-    router.push('/bookappointment');
+    router.push(clinic?._id ? `/bookappointment?clinicId=${clinic._id}` : "/bookappointment");
   };
 
   return (
@@ -168,7 +169,7 @@ const ThirdClinicseedetailsPage = () => {
           confidential consultation today.
         </p>
         <button 
-          onClick={handleBookAppointment} // <-- Yeh handler add kiya
+          onClick={handleBookAppointment} 
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg px-10 py-4 rounded-lg shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
         >
           Book My Appointment Now
