@@ -23,6 +23,7 @@ const Navbar = () => {
   const user = useSelector(selectUser);
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [mobileDropdown, setMobileDropdown] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const conditionsDropdownRef = useRef(null);
@@ -34,8 +35,12 @@ const Navbar = () => {
   const toggleDropdown = (menu) =>
     setOpenDropdown(openDropdown === menu ? null : menu);
 
+  const toggleMobileDropdown = (menu) =>
+    setMobileDropdown(mobileDropdown === menu ? null : menu);
+
   const closeDropdown = () => {
     setOpenDropdown(null);
+    setMobileDropdown(null);
     setMobileMenuOpen(false);
   };
 
@@ -279,7 +284,7 @@ const Navbar = () => {
           className="md:hidden text-2xl"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
-          ☰
+          {mobileMenuOpen ? "✕" : "☰"}
         </button>
       </div>
 
@@ -287,29 +292,119 @@ const Navbar = () => {
       {mobileMenuOpen && (
         <div className="md:hidden bg-white shadow-lg border-t border-gray-100">
           <ul className="flex flex-col gap-3 px-6 py-4 font-medium">
-            <Link href="/" onClick={closeDropdown} className="py-1">Home</Link>
-            <Link href="/about" onClick={closeDropdown} className="py-1">About Us</Link>
+            <li>
+              <Link href="/" onClick={closeDropdown} className="block py-1">
+                Home
+              </Link>
+            </li>
+            
+            <li>
+              <Link href="/about" onClick={closeDropdown} className="block py-1">
+                About Us
+              </Link>
+            </li>
 
+            {/* Conditions Mobile Dropdown */}
+            <li>
+              <button
+                onClick={() => toggleMobileDropdown("conditions")}
+                className="flex items-center justify-between w-full py-1"
+              >
+                <span>Conditions We Treat</span>
+                <span>▾</span>
+              </button>
+              {mobileDropdown === "conditions" && (
+                <div className="mt-2 ml-4 bg-[#F3F6FF] rounded-lg shadow-md p-3 space-y-2">
+                  {Object.entries(conditionLinks).map(([label, path]) => (
+                    <Link
+                      key={path}
+                      href={`/conditionswetreat/${path}`}
+                      className="block py-2 px-3 hover:bg-white rounded-md transition-colors text-sm"
+                      onClick={closeDropdown}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </li>
+
+            {/* Clinic Mobile Dropdown */}
+            <li>
+              <button
+                onClick={() => toggleMobileDropdown("clinic")}
+                className="flex items-center justify-between w-full py-1"
+              >
+                <span>Clinic</span>
+                <span>▾</span>
+              </button>
+              {mobileDropdown === "clinic" && (
+                <div className="mt-2 ml-4 bg-[#F3F6FF] rounded-lg shadow-md p-3 space-y-2">
+                  {Object.entries(clinicLinks).map(([label, path]) => (
+                    <Link
+                      key={path}
+                      href={`/clinic/${path}`}
+                      className="block py-2 px-3 hover:bg-white rounded-md transition-colors text-sm"
+                      onClick={closeDropdown}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </li>
+
+            {/* Login/Profile Mobile */}
             {isAuthenticated ? (
-              <>
-                 <Link href="/profile" onClick={closeDropdown} className="flex items-center gap-2 py-1">
-                    <User size={18} /> My Profile ({user?.fullName || "User"})
-                 </Link>
-                 <button onClick={handleLogout} className="text-red-600 text-left py-1 flex items-center gap-2">
-                    <LogOut size={18} /> Logout
-                 </button>
-              </>
+              <li>
+                <button
+                  onClick={() => toggleMobileDropdown("profile")}
+                  className="flex items-center justify-between w-full py-1"
+                >
+                  <span className="flex items-center gap-2">
+                    <User size={18} /> {user?.fullName || "User"}
+                  </span>
+                  <span>▾</span>
+                </button>
+                {mobileDropdown === "profile" && (
+                  <div className="mt-2 ml-4 bg-[#F3F6FF] rounded-lg shadow-md p-3 space-y-2">
+                    <Link
+                      href="/profile"
+                      onClick={closeDropdown}
+                      className="block py-2 px-3 hover:bg-white rounded-md transition-colors text-sm"
+                    >
+                      My Profile
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left py-2 px-3 text-red-600 hover:bg-white rounded-md transition-colors text-sm flex items-center gap-2"
+                    >
+                      <LogOut size={14} /> Logout
+                    </button>
+                  </div>
+                )}
+              </li>
             ) : (
-              <Link href="/login" onClick={closeDropdown} className="py-1 text-blue-600">Login</Link>
+              <li>
+                <Link 
+                  href="/login" 
+                  onClick={closeDropdown} 
+                  className="block py-1 text-blue-600"
+                >
+                  Login
+                </Link>
+              </li>
             )}
 
-            <Link
-              href="/free-consultation"
-              onClick={closeDropdown}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-center mt-2"
-            >
-              Start Now
-            </Link>
+            <li>
+              <Link
+                href="/free-consultation"
+                onClick={closeDropdown}
+                className="block bg-blue-600 text-white px-4 py-2 rounded-lg text-center mt-2"
+              >
+                Start Now
+              </Link>
+            </li>
           </ul>
         </div>
       )}
