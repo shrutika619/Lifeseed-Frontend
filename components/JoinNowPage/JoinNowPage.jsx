@@ -310,6 +310,58 @@ const JoinNowPage = () => {
         </div>
       </div>
 
+      {/* ---------- Key Personnel Details ---------- */}
+      <div>
+        <h3 className="text-xl font-bold mb-6 text-gray-800">
+          Key Personnel Details
+        </h3>
+        <div className="grid md:grid-cols-2 gap-6">
+          <InputField
+            label="Owner Name"
+            name="ownerName"
+            placeholder="Enter owner name"
+            value={formData.ownerName}
+            onChange={handleInputChange}
+          />
+          <InputField
+            label="Owner Contact Number"
+            name="ownerContactNumber"
+            placeholder="Enter contact number"
+            value={formData.ownerContactNumber}
+            onChange={handleInputChange}
+          />
+          <InputField
+            label="Contact Person Name"
+            name="contactPersonName"
+            placeholder="Enter contact person name"
+            value={formData.contactPersonName}
+            onChange={handleInputChange}
+          />
+          <InputField
+            label="Contact Person Email ID"
+            type="email"
+            name="contactPersonEmail"
+            placeholder="person@hospital.com"
+            value={formData.contactPersonEmail}
+            onChange={handleInputChange}
+          />
+          <InputField
+            label="Attendant Name"
+            name="attendantName"
+            placeholder="Enter attendant name"
+            value={formData.attendantName}
+            onChange={handleInputChange}
+          />
+          <InputField
+            label="Attendant Number"
+            name="attendantNumber"
+            placeholder="Enter attendant number"
+            value={formData.attendantNumber}
+            onChange={handleInputChange}
+          />
+        </div>
+      </div>
+
       {/* ---------- Media & Verification ---------- */}
       <div>
         <h3 className="text-xl font-bold mb-6 text-gray-800">
