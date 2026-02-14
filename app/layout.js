@@ -37,7 +37,8 @@ export default function RootLayout({ children }) {
     "/super-admin/team","/admin/first-time-user","/super-admin/first-time-user",
     "/super-admin/dashboard","/super-admin/log-in-user","/admin/log-in-user",
     "/super-admin/in-clinic-consultation","/admin/in-clinic-consultation",
-    "/admin/clinics","/super-admin/clinics", "/login", "/register", "/verify-otp"
+    "/admin/clinics","/super-admin/clinics", "/login", "/register", "/verify-otp", "/hospitaldashboard/time-table"
+    ,"/hospitaldashboard/doctors"
   ];
 
   // Logic to handle exact matches or sub-paths if necessary

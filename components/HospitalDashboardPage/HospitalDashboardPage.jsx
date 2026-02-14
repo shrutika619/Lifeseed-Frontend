@@ -1,486 +1,711 @@
 "use client";
+import React, { useState } from 'react';
+import { Plus, Star, Clock, User, Calendar, Droplet, X, Check } from 'lucide-react';
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation"; // Uncommented & Working
-import {
-  Menu,
-  X,
-  Plus,
-  Filter,
-  Clock,
-  Settings,
-  Users,
-  HelpCircle,
-  FileText,
-  LogOut,
-  ChevronRight,
-  Star,
-  Tag,
-  Calendar,
-} from "lucide-react";
+const HospitalDashboard = () => {
+  const [activeTab, setActiveTab] = useState('all');
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showRejectCard, setShowRejectCard] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAbsentModal, setShowAbsentModal] = useState(false);
+  const [followUpStatus, setFollowUpStatus] = useState('');
+  const [paymentReceived, setPaymentReceived] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [requests, setRequests] = useState([
+    {
+      id: 'ED#0298848',
+      time: 'Today 10:30 AM',
+      type: 'Collet CASH ED',
+      amount: 599,
+      patient: {
+        name: 'Pavan Karchal',
+        age: 38,
+        gender: 'Male',
+        bloodGroup: null,
+        initials: 'PK',
+        image: null
+      },
+      slot: 'Today 11 AM - 12 PM',
+      doctor: {
+        name: 'Dr. Ram Sharma',
+        qualification: 'MBBS, M.D Medicine',
+        specialty: 'General Physician',
+        experience: '3 years',
+        rating: 4,
+        available: true,
+        image: null
+      },
+      status: 'pending'
+    },
+    {
+      id: 'ED#0298098',
+      time: 'Today 10:30 AM',
+      type: 'Collet CASH',
+      amount: 599,
+      orderType: 'Low Sperm',
+      patient: {
+        name: 'Pavan Karchal',
+        age: 38,
+        gender: 'Male',
+        bloodGroup: 'O+',
+        initials: 'PK',
+        image: null
+      },
+      slot: 'Today 11 AM - 12 PM',
+      doctor: {
+        name: 'Dr. Shankar Dayal',
+        qualification: 'MBBS, M.D Medicine',
+        specialty: 'General Physician',
+        experience: '3 years',
+        rating: 4,
+        available: true,
+        image: null
+      },
+      status: 'pending'
+    }
+  ]);
 
-// Helper component for the Sidebar Item 
-const SidebarItem = ({ icon: Icon, label, onClick }) => (
-  <button
-    onClick={onClick}
-    className="w-full flex items-center justify-between p-3 rounded-lg mb-1 text-gray-700 hover:bg-gray-100 transition"
-  >
-    <div className="flex items-center gap-3">
-      <Icon size={20} className="text-gray-600" />
-      <span className="font-medium">{label}</span>
-    </div>
-    <ChevronRight size={16} className="text-gray-400" />
-  </button>
-);
-
-// Helper function for patient initials
-const getInitials = (name) => {
-  if (!name) return 'U';
-  const parts = name.split(" ");
-  return parts.map(p => p[0]).join('').toUpperCase();
-};
-
-// Helper component for the Booking Card 
-const BookingCard = ({ booking, handleAccept, handleReject }) => {
-  const patientInitials = getInitials(booking.patientName);
-  const isPending = booking.bookingStatus === "pending";
-
-  return (
-    <div
-      className="bg-white rounded-xl shadow-md p-4 border border-gray-100"
-      key={booking.id}
-    >
-      {/* Order Info */}
-      <div className="text-xs text-gray-500 mb-3 flex items-center justify-between flex-wrap gap-2">
-        <span className="font-semibold text-sm text-gray-600">
-          • Order ID#{booking.orderId}
-        </span>
-        <span className="text-xs">
-          Today {booking.time} • Collet {booking.calledBy}
-        </span>
-      </div>
-
-      {/* Issue (If present) */}
-      {booking.issue && (
-        <div className="text-sm font-semibold text-gray-800 mb-2">
-          {booking.issue}
-        </div>
-      )}
-
-      {/* Patient Info */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
-          <div className="w-full h-full bg-gray-300 flex items-center justify-center text-gray-600 text-lg font-semibold">
-            {patientInitials}
-          </div>
-        </div>
-        <div>
-          <h4 className="font-bold text-sm text-gray-900">{booking.patientName}</h4>
-          <p className="text-xs text-gray-500">
-            {booking.gender} • {booking.age} years
-            {booking.bloodGroup && ` • Blood group ${booking.bloodGroup}`}
-          </p>
-        </div>
-      </div>
-
-      {/* Slot */}
-      <div className="text-sm text-gray-600 mb-4 pb-3 border-t border-b border-gray-100">
-        <span className="font-semibold text-gray-700">Slot:</span> Today {booking.slot}
-      </div>
-
-      {/* Doctor Info */}
-      <div className="text-xs text-gray-500 mb-2 font-medium">Booking for</div>
-      <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
-            <div
-              className="w-full h-full bg-cover bg-center"
-              style={{ backgroundImage: `ur[](https://placehold.co/120x120/007bff/ffffff/png?text=Dr)` }}
-            >
-              <div className="w-full h-full bg-gray-300 flex items-center justify-center text-gray-600 text-lg font-semibold">
-                Dr
-              </div>
-            </div>
-          </div>
-          <div>
-            <h5 className="font-bold text-base text-gray-900 leading-tight">{booking.doctorName}</h5>
-            <p className="text-xs text-gray-600 leading-tight">{booking.doctorQualification}</p>
-            <p className="text-xs text-gray-500 leading-tight">
-              {booking.doctorSpecialty} • Exp - {booking.doctorExp}
-            </p>
-            <div className="flex gap-0.5 mt-1">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} size={12} fill="#ffc107" stroke="#ffc107" />
-              ))}
-            </div>
-          </div>
-        </div>
-        <span
-          className="text-xs px-3 py-1 rounded-full font-medium self-start mt-1"
-          style={{
-            backgroundColor: booking.status === 'Available' ? '#e6fffb' : '#f0f0f0',
-            color: booking.status === 'Available' ? '#00bfa5' : '#666',
-            border: '1px solid',
-            borderColor: booking.status === 'Available' ? '#00bfa5' : '#ccc'
-          }}
-        >
-          {booking.status}
-        </span>
-      </div>
-
-      {/* Action Buttons */}
-      {isPending && (
-        <div className="flex gap-3 pt-3 border-t border-gray-100">
-          <button
-            onClick={() => handleAccept(booking.id)}
-            className="flex-1 bg-white text-teal-600 border border-teal-600 py-2 rounded-lg font-semibold hover:bg-teal-50 transition text-sm shadow-sm"
-          >
-            Accept
-          </button>
-          <button
-            onClick={() => handleReject(booking.id)}
-            className="flex-1 bg-white text-red-600 border border-red-600 py-2 rounded-lg font-semibold hover:bg-red-50 transition text-sm shadow-sm"
-          >
-            Reject
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default function HospitalDashboardPage() {
-  const router = useRouter(); // Real router
-
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [dropdownFilter, setDropdownFilter] = useState("all");
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-
-  // Real navigation
-  const handleNavigation = (route) => {
-    router.push(route);
-  };
-
-  const hospitalData = {
-    name: "Care Hospital Nagpur",
-    address: "Wardha Rd, Jhansi Rani Sq, Nagpur",
-    location: "Sitaburdi, Nagpur",
-  };
-
-  const sampleBookings = [
-    { id: 1, orderId: "0298848", time: "10:30 AM", calledBy: "CASH ED", patientName: "Pavan Karchal", gender: "Male", age: "38", slot: "11 AM - 12 PM", doctorName: "Dr. Ram Sharma", doctorQualification: "MBBS, M.D Medicine", doctorSpecialty: "General Physician", doctorExp: "3 years", status: "Available", bookingStatus: "pending" },
-    { id: 2, orderId: "0298098", time: "10:30 AM", calledBy: "CASH", issue: "Low Sperm", patientName: "Pavan Karchal", gender: "Male", age: "38", bloodGroup: "O+", slot: "11 AM - 12 PM", doctorName: "Dr. Shankar Dayal", doctorQualification: "MBBS, M.D Medicine", doctorSpecialty: "General Physician", doctorExp: "3 years", status: "Available", bookingStatus: "pending" },
-    { id: 3, orderId: "0298850", time: "11:30 AM", calledBy: "ONLINE", patientName: "Amit Sharma", gender: "Male", age: "42", slot: "2 PM - 3 PM", doctorName: "Dr. Priya Singh", doctorQualification: "MBBS, MS", doctorSpecialty: "Cardiologist", doctorExp: "5 years", status: "Available", bookingStatus: "booked" },
-    { id: 4, orderId: "0298851", time: "12:30 PM", calledBy: "CASH", patientName: "Ritu Verma", gender: "Female", age: "29", slot: "4 PM - 5 PM", doctorName: "Dr. Neha Kulkarni", doctorQualification: "BDS, MDS", doctorSpecialty: "Dentist", doctorExp: "7 years", status: "Unavailable", bookingStatus: "cancelled" },
-    { id: 5, orderId: "0298852", time: "01:00 PM", calledBy: "CASH", patientName: "Rajesh Kumar", gender: "Male", age: "50", slot: "5 PM - 6 PM", doctorName: "Dr. Anand Gupta", doctorQualification: "MBBS, MS Ortho", doctorSpecialty: "Orthopedic", doctorExp: "10 years", status: "Available", bookingStatus: "completed" },
-    { id: 6, orderId: "0298853", time: "02:00 PM", calledBy: "ONLINE", patientName: "Pooja Mehta", gender: "Female", age: "30", slot: "6 PM - 7 PM", doctorName: "Dr. Seema Varma", doctorQualification: "MBBS, DGO", doctorSpecialty: "Gynecologist", doctorExp: "8 years", status: "Unavailable", bookingStatus: "pending" },
-    { id: 7, orderId: "0298854", time: "03:00 PM", calledBy: "CASH", patientName: "Vikram Saini", gender: "Male", age: "25", slot: "7 PM - 8 PM", doctorName: "Dr. Ram Sharma", doctorQualification: "MBBS, M.D Medicine", doctorSpecialty: "General Physician", doctorExp: "3 years", status: "Available", bookingStatus: "booked" },
-    { id: 8, orderId: "0298855", time: "04:00 PM", calledBy: "ONLINE", patientName: "Karan Singh", gender: "Male", age: "35", slot: "8 PM - 9 PM", doctorName: "Dr. A. B. Roy", doctorQualification: "MBBS", doctorSpecialty: "General Physician", doctorExp: "5 years", status: "Unavailable", bookingStatus: "ptAbsent" },
-    { id: 9, orderId: "0298856", time: "05:00 PM", calledBy: "CASH", patientName: "Sneha Das", gender: "Female", age: "22", slot: "9 PM - 10 PM", doctorName: "Dr. R. K. Jain", doctorQualification: "MBBS, MS", doctorSpecialty: "Surgeon", doctorExp: "12 years", status: "Available", bookingStatus: "followUp" },
-    { id: 10, orderId: "0298857", time: "06:00 PM", calledBy: "ONLINE", patientName: "Zoya Khan", gender: "Female", age: "40", slot: "10 PM - 11 PM", doctorName: "Dr. R. K. Jain", doctorQualification: "MBBS, MS", doctorSpecialty: "Surgeon", doctorExp: "12 years", status: "Available", bookingStatus: "sellD" },
+  const tabs = [
+    { id: 'all', label: 'All', count: requests.length },
+    { id: 'booked', label: 'Booked', count: requests.filter(r => r.status === 'accepted').length },
+    { id: 'cancelled', label: 'Cancelled', count: requests.filter(r => r.status === 'cancelled').length },
+    { id: 'completed', label: 'Completed', count: requests.filter(r => r.status === 'completed').length },
+    { id: 'absent', label: 'Pt Absent', count: requests.filter(r => r.status === 'absent').length },
+    { id: 'follow-up', label: 'Follow-up', count: requests.filter(r => r.status === 'follow-up').length },
+    { id: 'sold', label: 'Sold', count: requests.filter(r => r.status === 'sold').length }
   ];
 
-  useEffect(() => {
-    setTimeout(() => {
-      setBookings(sampleBookings);
-      setLoading(false);
-    }, 500);
-  }, []);
-
-  const stats = {
-    allFilterCount: 15,
-    bookedFilterCount: sampleBookings.filter(b => b.bookingStatus === 'booked').length,
-    cancelledFilterCount: sampleBookings.filter(b => b.bookingStatus === 'cancelled').length,
-    completedFilterCount: sampleBookings.filter(b => b.bookingStatus === 'completed').length,
-    ptAbsentCount: sampleBookings.filter(b => b.bookingStatus === 'ptAbsent').length,
-    followUpCount: sampleBookings.filter(b => b.bookingStatus === 'followUp').length,
-    sellDCount: sampleBookings.filter(b => b.bookingStatus === 'sellD').length * 2,
+  const handleAccept = (id) => {
+    setRequests(requests.map(req => 
+      req.id === id ? { ...req, status: 'accepted' } : req
+    ));
+    setShowRejectCard(false);
   };
 
-  const filteredBookings = bookings.filter((booking) => {
-    if (filterStatus === "all") return true;
-    return booking.bookingStatus === filterStatus;
-  });
-
-  const handleAcceptBooking = (bookingId) => {
-    setBookings(bookings.map(b => b.id === bookingId ? { ...b, bookingStatus: "booked" } : b));
+  const handleRejectClick = (request) => {
+    setSelectedRequest(request);
+    setShowRejectCard(true);
+    setNotes('');
   };
 
-  const handleRejectBooking = (bookingId) => {
-    setBookings(bookings.map(b => b.id === bookingId ? { ...b, bookingStatus: "cancelled" } : b));
+  const handleRejectFromCard = () => {
+    setShowRejectCard(false);
+    setShowRejectModal(true);
   };
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("hospitalToken");
-      localStorage.removeItem("hospitalId");
+  const handleCompleteClick = (request) => {
+    setSelectedRequest(request);
+    setShowCompleteModal(true);
+    setFollowUpStatus('');
+    setPaymentReceived(false);
+    setNotes('');
+  };
+
+  const handleAbsentClick = (request) => {
+    setSelectedRequest(request);
+    setShowAbsentModal(true);
+    setNotes('');
+  };
+
+  const handleCancel = (id) => {
+    setRequests(requests.map(req => 
+      req.id === id ? { ...req, status: 'cancelled' } : req
+    ));
+  };
+
+  const handleMarkCompletePaid = () => {
+    setPaymentReceived(true);
+  };
+
+  const handleFinalizeAppointment = () => {
+    let finalStatus = 'completed';
+    
+    if (followUpStatus === 'interested') {
+      finalStatus = 'follow-up';
+    } else if (followUpStatus === 'sell') {
+      finalStatus = 'sold';
     }
-    router.push("/"); // Real redirect
+    
+    setRequests(requests.map(req => 
+      req.id === selectedRequest.id ? { ...req, status: finalStatus } : req
+    ));
+    setShowCompleteModal(false);
+    setSelectedRequest(null);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const customFilters = [
-    { label: "By Doctor", icon: Users, options: ["Dr. Ram Sharma", "Dr. Shankar Dayal"] },
-    { label: "By Service", icon: Tag, options: ["General Checkup", "Low Sperm Treatment"] },
-    { label: "By Date", icon: Calendar, options: ["Today", "Next 7 Days"] },
-  ];
-
-  const getStatusStyle = (status) =>
-    filterStatus === status
-      ? "bg-blue-600 text-white shadow-md"
-      : "bg-white text-gray-700 border border-gray-300 shadow-sm";
-
-  const getBadgeStyle = (status) => {
-    switch (status) {
-      case 'all': return 'text-gray-900 bg-white border border-gray-300';
-      case 'booked': case 'followUp': return 'text-blue-600 bg-blue-50 border border-blue-200';
-      case 'cancelled': return 'text-red-600 bg-red-50 border border-red-200';
-      case 'completed': case 'ptAbsent': case 'sellD': return 'text-green-600 bg-green-50 border border-green-200';
-      default: return 'text-gray-700 bg-gray-200';
-    }
+  const handleCloseRejectAppointment = () => {
+    setRequests(requests.map(req => 
+      req.id === selectedRequest.id ? { ...req, status: 'rejected' } : req
+    ));
+    setShowRejectModal(false);
+    setSelectedRequest(null);
   };
+
+  const handleCloseAbsentAppointment = () => {
+    setRequests(requests.map(req => 
+      req.id === selectedRequest.id ? { ...req, status: 'absent' } : req
+    ));
+    setShowAbsentModal(false);
+    setSelectedRequest(null);
+  };
+
+  const filteredRequests = activeTab === 'all' 
+    ? requests 
+    : requests.filter(req => {
+        if (activeTab === 'booked') return req.status === 'accepted';
+        return req.status === activeTab;
+      });
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:w-64 bg-white shadow-xl flex-col flex-shrink-0 fixed h-full z-30 border-r border-gray-100">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `ur[](https://placehold.co/120x120/007bff/ffffff/png?text=U)` }}>
-                  <div className="w-full h-full bg-blue-300 flex items-center justify-center text-white text-xl font-semibold"></div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 text-base">Care Hospital</h3>
-                <p className="text-xs text-gray-500">{hospitalData.location}</p>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-gray-400" />
-          </div>
-        </div>
-
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <SidebarItem icon={Clock} label="Time Table" onClick={() => handleNavigation("/timetable")} />
-          <SidebarItem icon={Settings} label="Settings" onClick={() => handleNavigation("/settings")} />
-          <SidebarItem icon={Users} label="Doctors" onClick={() => handleNavigation("/doctors")} />
-          <SidebarItem icon={HelpCircle} label="Help" onClick={() => handleNavigation("/help")} />
-          <SidebarItem icon={FileText} label="Terms & Conditions" onClick={() => handleNavigation("/terms")} />
-        </nav>
-
-        <div className="p-4 border-t-2 border-gray-100 mt-auto">
-          <button
-            onClick={handleLogout}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Sidebar */}
-      {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setSidebarOpen(false)} />
-      )}
-      <div className={`lg:hidden fixed left-0 top-0 h-full w-64 bg-white shadow-2xl z-50 transform transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg text-gray-600">
-          <X size={24} />
-        </button>
-        <div className="p-6 pt-12 border-b">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                <div className="w-full h-full bg-blue-300 flex items-center justify-center text-white text-xl font-semibold"></div>
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 text-base">Care Hospital</h3>
-                <p className="text-xs text-gray-500">{hospitalData.location}</p>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-gray-400" />
-          </div>
-        </div>
-        <nav className="p-4 flex-1 overflow-y-auto">
-          {[
-            { icon: Clock, label: "Time Table", route: "/timetable" },
-            { icon: Settings, label: "Settings", route: "/settings" },
-            { icon: Users, label: "Doctors", route: "/doctors" },
-            { icon: HelpCircle, label: "Help", route: "/help" },
-            { icon: FileText, label: "Terms & Conditions", route: "/terms" },
-          ].map((item) => (
-            <SidebarItem
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              onClick={() => {
-                setSidebarOpen(false);
-                handleNavigation(item.route);
-              }}
-            />
-          ))}
-        </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t-2 border-gray-100 bg-white">
-          <button onClick={handleLogout} className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md">
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Menu */}
-      {isFilterMenuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsFilterMenuOpen(false)} />
-      )}
-      <div className={`fixed right-0 top-0 h-full w-72 bg-white shadow-2xl z-50 transform transition-transform ${isFilterMenuOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <div className="p-6 h-full flex flex-col">
-          <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Filter size={24} className="text-blue-600" /> Advanced Filter
-            </h3>
-            <button onClick={() => setIsFilterMenuOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
-              <X size={24} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto space-y-6">
-            {customFilters.map((filter) => (
-              <div key={filter.label}>
-                <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <filter.icon size={16} className="text-gray-500" />
-                  {filter.label}
-                </h4>
-                <div className="space-y-2">
-                  {filter.options.map((option) => (
-                    <label key={option} className="flex items-center text-sm text-gray-600 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition">
-                      <input type="checkbox" className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 mr-3 focus:ring-blue-500" />
-                      {option}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="pt-4 border-t mt-4 flex gap-3">
-            <button onClick={() => setIsFilterMenuOpen(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-xl font-medium hover:bg-gray-300 transition">
-              Clear
-            </button>
-            <button onClick={() => setIsFilterMenuOpen(false)} className="flex-1 bg-blue-600 text-white py-2 rounded-xl font-medium hover:bg-blue-700 transition">
-              Apply Filter
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
-        <div className="bg-white border-b p-4 shadow-sm flex-shrink-0">
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-700">
-                <Menu size={24} />
-              </button>
-              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                <div className="w-5 h-5 bg-white rounded-full"></div>
+              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
+                <div className="w-6 h-6 bg-white rounded" style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}></div>
               </div>
               <div>
-                <h2 className="font-semibold text-gray-900 text-sm lg:text-base">Care Hospital Nagpur</h2>
-                <p className="text-xs text-gray-500">{hospitalData.address}</p>
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900">Care Hospital Nagpur</h1>
+                <p className="text-xs sm:text-sm text-gray-500">Wardha Rd, Jhansi Rani Sq, Nagpur</p>
               </div>
             </div>
-            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-700">
-              <Menu size={24} />
-            </button>
           </div>
         </div>
+      </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <select
-              value={dropdownFilter}
-              onChange={(e) => setDropdownFilter(e.target.value)}
-              className="flex-1 min-w-[150px] border border-gray-300 px-4 py-2.5 rounded-lg bg-white appearance-none pr-8 text-sm font-medium focus:ring-blue-500"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 0.7rem center',
-                backgroundSize: '1.2rem'
-              }}
-            >
-              <option value="all">All requests</option>
-              <option value="pending">Pending</option>
-              <option value="booked">Booked</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="completed">Completed</option>
-              <option value="ptAbsent">Pt Absent</option>
-              <option value="followUp">Follow-up</option>
-              <option value="sellD">Sell D</option>
-            </select>
-
-            <button onClick={() => handleNavigation("/plus")} className="bg-white border border-gray-300 text-gray-700 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100 transition shadow-sm">
-              <Plus size={20} />
-            </button>
-
-            <button onClick={() => setIsFilterMenuOpen(true)} className="bg-white border border-gray-300 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-50 transition shadow-sm">
-              <Filter size={20} className="text-gray-700" />
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-2 lg:gap-3 mb-4 lg:mb-6 overflow-x-auto pb-2 border-b border-gray-200">
-            {[
-              { status: "all", label: "All", count: stats.allFilterCount },
-              { status: "booked", label: "Booked", count: stats.bookedFilterCount },
-              { status: "cancelled", label: "Cancelled", count: stats.cancelledFilterCount },
-              { status: "completed", label: "Completed", count: stats.completedFilterCount },
-              { status: "ptAbsent", label: "Pt Absent", count: stats.ptAbsentCount },
-              { status: "followUp", label: "Follow-up", count: stats.followUpCount },
-              { status: "sellD", label: "Sell D", count: stats.sellDCount / 2 },
-              { status: "sellD", label: "Sell D", count: stats.sellDCount / 2 },
-            ].map((tab, i) => (
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
+            {tabs.map(tab => (
               <button
-                key={i}
-                onClick={() => setFilterStatus(tab.status)}
-                className={`px-4 lg:px-6 py-2 rounded-xl font-bold whitespace-nowrap text-sm flex items-center gap-1 ${getStatusStyle(tab.status)}`}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200 flex items-center gap-2 ${
+                  activeTab === tab.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white text-gray-700 hover:bg-blue-50 border border-gray-200'
+                }`}
               >
                 {tab.label}
-                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getBadgeStyle(tab.status)}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  activeTab === tab.id
+                    ? 'bg-white text-blue-600'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
                   {tab.count}
                 </span>
               </button>
             ))}
           </div>
+          <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+            <Plus size={20} />
+            <span>Add Request</span>
+          </button>
+        </div>
 
-          <div className="flex flex-col gap-4">
-            {filteredBookings.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-md p-12 text-center border border-gray-200">
-                <p className="text-gray-500 font-medium">No {filterStatus} bookings found.</p>
+        <div className="space-y-4">
+          {filteredRequests.map((request) => (
+            <div key={request.id} className="relative">
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
+                <div className="px-4 sm:px-6 py-3 bg-gray-50 border-b border-gray-200">
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600">
+                    <span className="font-medium">• Order ID: {request.id}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} />
+                      {request.time}
+                    </span>
+                    <span>•</span>
+                    <span>{request.type}</span>
+                  </div>
+                  {request.orderType && (
+                    <p className="text-sm text-gray-700 mt-1 font-medium">{request.orderType}</p>
+                  )}
+                </div>
+
+                <div className="p-4 sm:p-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <div className="flex items-start gap-3">
+                        {request.patient.image ? (
+                          <img src={request.patient.image} alt={request.patient.name} className="w-12 h-12 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
+                            <User size={24} className="text-white" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg text-gray-900">{request.patient.name}</h3>
+                          <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-600">
+                            <span>{request.patient.gender}</span>
+                            <span>•</span>
+                            <span>{request.patient.age} years</span>
+                            {request.patient.bloodGroup && (
+                              <>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <Droplet size={14} className="text-red-500" />
+                                  Blood Group {request.patient.bloodGroup}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-flex">
+                            <Calendar size={14} />
+                            <span className="font-medium">Slot: {request.slot}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-6">
+                      <p className="text-sm text-gray-600 mb-2">Booking for</p>
+                      <div className="flex items-start gap-3">
+                        {request.doctor.image ? (
+                          <img src={request.doctor.image} alt={request.doctor.name} className="w-12 h-12 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                            <User size={24} className="text-white" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-bold text-gray-900">{request.doctor.name}</h4>
+                              <p className="text-sm text-gray-600">{request.doctor.qualification}</p>
+                            </div>
+                            {request.doctor.available && (
+                              <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full whitespace-nowrap flex-shrink-0">
+                                Available
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 mt-1">
+                            {request.doctor.specialty} • Exp ~ {request.doctor.experience}
+                          </p>
+                          <div className="flex items-center gap-1 mt-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                size={16}
+                                className={i < request.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {request.status === 'pending' && (
+                    <div className="flex items-center gap-4 mt-6 pt-4 border-t border-gray-200">
+                      <button onClick={() => handleAccept(request.id)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-base transition-colors">Accept</button>
+                      <button onClick={() => handleRejectClick(request)} className="text-red-500 hover:text-red-600 font-semibold text-base transition-colors">Reject</button>
+                    </div>
+                  )}
+
+                  {request.status === 'accepted' && (
+                    <div className="flex items-center gap-3 mt-6 pt-4 border-t border-gray-200">
+                      <button onClick={() => handleCompleteClick(request)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-base transition-colors">Complete</button>
+                      <button onClick={() => handleAbsentClick(request)} className="text-red-500 hover:text-red-600 font-semibold text-base transition-colors">Absent</button>
+                      <button onClick={() => handleCancel(request.id)} className="text-yellow-600 hover:text-yellow-700 font-semibold text-base transition-colors">Cancel</button>
+                    </div>
+                  )}
+
+                  {request.status === 'completed' && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg font-medium text-center">✓ Appointment Finalized</div>
+                    </div>
+                  )}
+                  {request.status === 'absent' && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg font-medium text-center">Marked as Absent</div>
+                    </div>
+                  )}
+                  {request.status === 'cancelled' && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="bg-yellow-50 text-yellow-700 px-4 py-3 rounded-lg font-medium text-center">Appointment Cancelled</div>
+                    </div>
+                  )}
+                  {request.status === 'rejected' && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg font-medium text-center">✗ Appointment Closed</div>
+                    </div>
+                  )}
+                  {request.status === 'follow-up' && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="bg-blue-50 text-blue-700 px-4 py-3 rounded-lg font-medium text-center">📋 Follow-up Required</div>
+                    </div>
+                  )}
+                  {request.status === 'sold' && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="bg-purple-50 text-purple-700 px-4 py-3 rounded-lg font-medium text-center">💰 Sold</div>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : (
-              filteredBookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  handleAccept={handleAcceptBooking}
-                  handleReject={handleRejectBooking}
+            </div>
+          ))}
+        </div>
+      </main>
+
+      {/* Complete Modal */}
+      {showCompleteModal && selectedRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-xl font-bold text-gray-900">Complete</h2>
+              <button onClick={() => setShowCompleteModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                <X size={24} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="border-b border-gray-200 pb-4">
+                <p className="text-sm text-blue-600 font-medium mb-2">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</p>
+                <div className="flex items-center gap-3 mt-4">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
+                      {selectedRequest.patient.initials}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-gray-900">{selectedRequest.patient.name}</h3>
+                    <p className="text-sm text-gray-600">{selectedRequest.patient.gender} • {selectedRequest.patient.age} years</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mt-3">Slot: {selectedRequest.slot}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-2">Booking for</p>
+                <div className="flex items-center gap-3">
+                  {selectedRequest.doctor.image ? (
+                    <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <User size={20} className="text-blue-600" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-gray-900">{selectedRequest.doctor.name}</h4>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.qualification}</p>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={12}
+                          className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {!paymentReceived && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Follow Up</h4>
+                  <div className="space-y-2">
+                    {['not-interested', 'sell', 'interested'].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => setFollowUpStatus(status)}
+                        className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all capitalize ${
+                          followUpStatus === status ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {status.replace('-', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!paymentReceived ? (
+                <div className="bg-emerald-50 rounded-lg p-4 border-2 border-dashed border-emerald-200">
+                  <p className="text-sm text-emerald-700 font-medium mb-1">Please Collect Cash</p>
+                  <p className="text-3xl font-bold text-emerald-700">₹{selectedRequest.amount}</p>
+                </div>
+              ) : (
+                <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <Check size={20} className="bg-blue-600 text-white rounded-full p-0.5" />
+                    <p className="font-semibold">Online Payment Received</p>
+                  </div>
+                  <p className="text-3xl font-bold text-blue-600">₹{selectedRequest.amount}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter notes..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none resize-none"
+                  rows={3}
                 />
-              ))
-            )}
+              </div>
+
+              <button
+                onClick={!paymentReceived ? handleMarkCompletePaid : handleFinalizeAppointment}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg flex items-center justify-center gap-2"
+              >
+                <Check size={20} />
+                {!paymentReceived ? 'Mark as Completed & Paid' : 'Finalize Appointment'}
+              </button>
+            </div>
           </div>
-        </main>
-      </div>
+        </div>
+      )}
+
+      {/* Reject Card Modal - First Screen when clicking "Reject" */}
+      {showRejectCard && selectedRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
+            <div className="space-y-6">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-start gap-3">
+                    {selectedRequest.patient.image ? (
+                      <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
+                        <User size={24} className="text-white" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-lg text-gray-900">{selectedRequest.patient.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-600">
+                        <span>{selectedRequest.patient.gender}</span>
+                        <span>•</span>
+                        <span>{selectedRequest.patient.age} years</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3 text-sm text-gray-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-flex">
+                        <Calendar size={14} />
+                        <span className="font-medium">Slot: {selectedRequest.slot}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-6">
+                  <p className="text-sm text-gray-600 mb-2">Booking for</p>
+                  <div className="flex items-start gap-3">
+                    {selectedRequest.doctor.image ? (
+                      <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                        <User size={24} className="text-white" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-gray-900">{selectedRequest.doctor.name}</h4>
+                          <p className="text-sm text-gray-600">{selectedRequest.doctor.qualification}</p>
+                        </div>
+                        {selectedRequest.doctor.available && (
+                          <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full whitespace-nowrap flex-shrink-0">
+                            Available
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700 mt-1">
+                        {selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}
+                      </p>
+                      <div className="flex items-center gap-1 mt-2">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={16}
+                            className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                <button onClick={() => handleAccept(selectedRequest.id)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-base transition-colors">Complete</button>
+                <button onClick={handleRejectFromCard} className="text-red-500 hover:text-red-600 font-semibold text-base transition-colors">Absent</button>
+                <button onClick={() => setShowRejectCard(false)} className="text-yellow-600 hover:text-yellow-700 font-semibold text-base transition-colors">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal - Second Screen (popup) */}
+      {showRejectModal && selectedRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Reject</h2>
+                <button onClick={() => setShowRejectModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                  <X size={24} className="text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="border-b border-gray-200 pb-4">
+                <p className="text-sm text-blue-600 font-medium mb-2">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</p>
+                <div className="flex items-center gap-3 mt-4">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
+                      {selectedRequest.patient.initials}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-gray-900">{selectedRequest.patient.name}</h3>
+                    <p className="text-sm text-gray-600">{selectedRequest.patient.gender} • {selectedRequest.patient.age} years</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mt-3">Slot: {selectedRequest.slot}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-2">Booking for</p>
+                <div className="flex items-center gap-3">
+                  {selectedRequest.doctor.image ? (
+                    <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <User size={20} className="text-blue-600" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-gray-900">{selectedRequest.doctor.name}</h4>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.qualification}</p>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={12}
+                          className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter any notes about the consultation..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none resize-none"
+                  rows={3}
+                />
+              </div>
+              <button
+                onClick={handleCloseRejectAppointment}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 rounded-lg flex items-center justify-center gap-2"
+              >
+                <Check size={20} /> Close Appointment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Absent Modal */}
+      {showAbsentModal && selectedRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Reject</h2>
+                <button onClick={() => setShowAbsentModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                  <X size={24} className="text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="border-b border-gray-200 pb-4">
+                <p className="text-sm text-blue-600 font-medium mb-2">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</p>
+                <div className="flex items-center gap-3 mt-4">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
+                      {selectedRequest.patient.initials}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-gray-900">{selectedRequest.patient.name}</h3>
+                    <p className="text-sm text-gray-600">{selectedRequest.patient.gender} • {selectedRequest.patient.age} years</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mt-3">Slot: {selectedRequest.slot}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-2">Booking for</p>
+                <div className="flex items-center gap-3">
+                  {selectedRequest.doctor.image ? (
+                    <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <User size={20} className="text-blue-600" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-gray-900">{selectedRequest.doctor.name}</h4>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.qualification}</p>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={12}
+                          className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter any notes about the consultation..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none resize-none"
+                  rows={3}
+                />
+              </div>
+              <button
+                onClick={handleCloseAbsentAppointment}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 rounded-lg flex items-center justify-center gap-2"
+              >
+                <Check size={20} /> Close Appointment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default HospitalDashboard;
