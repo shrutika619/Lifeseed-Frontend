@@ -9,7 +9,7 @@ const ROUTE_PERMISSIONS = {
   '/super-admin': ['super_admin'],
   '/admin':       ['admin', 'super_admin'],
   // '/clinic':      ['clinic_admin', 'doctor'],
-  // '/hospitaldashboard': ['clinic_admin', 'doctor'],
+  '/hospitaldashboard': ['clinic_admin', 'doctor'],
   '/profile':     ['patient', 'clinic_admin', 'doctor', 'admin', 'super_admin'], 
   '/bookappointment': ['patient'], 
 };
