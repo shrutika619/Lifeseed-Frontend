@@ -1,11 +1,9 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation"; // ✅ Navigation
-import { useDispatch } from "react-redux"; // ✅ Redux
-import { logoutSuccess } from "@/redux/slices/authSlice"; // ✅ Redux Action (adjust path if needed)
-import api from "@/lib/axios"; // ✅ API Client
-import { Constants } from "@/app/utils/constants"; // ✅ Constants
-import { toast } from "sonner"; // ✅ Toasts
+import { useRouter } from "next/navigation"; 
+import { useDispatch } from "react-redux"; 
+import { logoutSuccess } from "@/redux/slices/authSlice"; 
+import { toast } from "sonner"; 
 import { Bell, Menu, User, LogOut, ChevronDown } from "lucide-react";
 
 const AdminHeaderPage = ({ 
@@ -15,14 +13,13 @@ const AdminHeaderPage = ({
   userPhone = "9999999999",
   notificationCount = 10,
   onMenuToggle,
-  onLogout, // Optional prop if parent wants to handle extra cleanup
+  onLogout,
   onProfileClick,
   onNotificationClick
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   
-  // ✅ Initialize Hooks
   const router = useRouter();
   const dispatch = useDispatch();
 
@@ -36,29 +33,30 @@ const AdminHeaderPage = ({
     setIsDropdownOpen(!isDropdownOpen);
   };
 
-  // ✅ INTEGRATED LOGOUT LOGIC
+  // ✅ UPDATED LOGOUT LOGIC
   const handleLogout = async () => {
-    setIsDropdownOpen(false); // Close dropdown immediately
+    setIsDropdownOpen(false); 
 
     try {
-      // 1. Call Backend to clear HttpOnly cookies
-      await api.post(Constants.urlEndPoints.ADMIN_LOGOUT);
+      // 1. Call YOUR Next.js API Route (Proxy)
+      // We use 'fetch' here because it's a simple internal call
+      await fetch("/api/auth/logout", { method: "POST" });
+      
       toast.success("Logged out successfully");
     } catch (error) {
-      console.error("Logout API failed:", error);
-      // Optional: Inform user, but we proceed to force logout anyway
+      console.error("Logout failed:", error);
       toast.info("Logging out..."); 
     } finally {
-      // 2. Clear Redux Store (Client-side state)
+      // 2. Clear Redux Store
       dispatch(logoutSuccess());
 
-      // 3. Trigger parent prop callback if provided
+      // 3. Trigger parent callback
       if (onLogout) {
         onLogout();
       }
 
       // 4. Redirect to Admin Login
-      router.push("/login-admin");
+      router.push("/admin/login");
     }
   };
 
@@ -75,7 +73,6 @@ const AdminHeaderPage = ({
     }
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -183,7 +180,7 @@ const AdminHeaderPage = ({
         }
       `}</style>
     </header>
-  )
+  );
 };
 
 export default AdminHeaderPage;

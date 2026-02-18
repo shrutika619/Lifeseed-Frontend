@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { Lock, Mail, Eye, EyeOff, Shield, CheckCircle, ArrowRight } from "lucide-react";
 
 // ✅ Import Services & Redux
-import { adminLogin } from "@/app/services/auth.service";
+import axios from "axios"; // ✅ Import Axios
+import { adminLogin } from "@/app/services/auth.service"; // (You can remove this if no longer used)
 import { setCredentials, logoutSuccess, selectIsAuthenticated, selectUserRole, selectUser } from "@/redux/slices/authSlice";
 import api from "@/lib/axios";
 
@@ -110,27 +111,43 @@ const LoginAdminPage = () => {
     setIsLoading(true);
 
     try {
-      const data = await adminLogin(email, password);
-      const { accessToken, user } = data;
+      // ✅ Call your Next.js API Route
+      const response = await axios.post('/api/auth/login', {
+        type: 'password', // Triggers the Admin Logic in your API
+        username: email,  // Maps your 'email' state to 'username' expected by API
+        password: password
+      });
 
-      dispatch(setCredentials({ 
-        accessToken, 
-        user, 
-        role: user.role 
-      }));
+      const data = response.data;
 
-      toast.success(`Welcome back, ${user.username || 'Admin'}`);
+      // Check success flag from your API response
+      if (data.success) {
+        const { accessToken, user } = data;
 
-      // Explicit Redirect
-      if (user.role === 'super_admin') {
-        router.push('/super-admin/dashboard');
+        // ✅ Save to Redux
+        dispatch(setCredentials({ 
+          accessToken, 
+          user, 
+          role: user.role 
+        }));
+
+        toast.success(`Welcome back, ${user.username || 'Admin'}`);
+
+        // ✅ Redirect based on Role
+        if (user.role === 'super_admin') {
+          router.push('/super-admin/dashboard');
+        } else {
+          router.push('/admin/dashboard');
+        }
       } else {
-        router.push('/admin/dashboard');
+        // Handle API returning success: false
+        throw new Error(data.message || "Login failed");
       }
 
     } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Invalid credentials. Access Denied.");
+      console.error("Login Error:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Invalid credentials. Access Denied.";
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
