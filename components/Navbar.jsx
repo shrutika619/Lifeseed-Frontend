@@ -44,17 +44,12 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  /* ============================================================
-      ✅ PROFILE FETCHING LOGIC
-     ============================================================ */
   useEffect(() => {
-    // Only fetch if authenticated AND we don't have profile details yet
     if (isAuthenticated && !user?.fullName) {
       dispatch(fetchProfileDetails());
     }
   }, [dispatch, isAuthenticated, user?.fullName]); 
 
-  // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -80,17 +75,14 @@ const Navbar = () => {
     "Low Sperm Count": "low-sperm-count",
   };
 
-  // Fetch Cities
   useEffect(() => {
     const fetchCityData = async () => {
       try {
         const response = await getAllCities();
-        // Handle various response structures safely
         const data = response?.data || response; 
         
         if (Array.isArray(data)) {
           const formattedLinks = data.reduce((acc, city) => {
-            // Ensure city.name exists
             if (city?.name) {
                 acc[city.name] = city.name.toLowerCase();
             }
@@ -105,19 +97,14 @@ const Navbar = () => {
     fetchCityData();
   }, []);
 
-  // ✅ LOGOUT HANDLER (UPDATED)
   const handleLogout = async () => {
     try {
-      // 1. Call Backend to delete HTTP-Only Cookie
       await axios.post('/api/auth/logout');
     } catch (error) {
       console.error("Logout API call failed", error);
     } finally {
-      // 2. Clear Redux State (Client Side)
       dispatch(logoutSuccess());
       closeDropdown();
-      
-      // 3. Redirect
       router.push("/");
       router.refresh();
     }
@@ -126,7 +113,7 @@ const Navbar = () => {
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm">
       <div className="flex items-center justify-between px-6 py-4">
-        {/* Logo */}
+        
         <Link href="/" onClick={closeDropdown}>
           <img
             src="/Images/MEN10.svg"
@@ -202,19 +189,27 @@ const Navbar = () => {
               </ul>
             )}
           </li>
+
+          {/* ✅ Contact Us Added */}
+          <li>
+            <Link
+              href="/contact"
+              onClick={closeDropdown}
+              className="hover:text-blue-600"
+            >
+              Contact Us
+            </Link>
+          </li>
         </ul>
 
         {/* Right Section Desktop */}
         <div className="hidden md:flex items-center gap-4">
-          
           {isAuthenticated ? (
             <div ref={profileDropdownRef} className="relative">
-              {/* Profile Trigger Button */}
               <button
                 onClick={() => toggleDropdown("profile")}
                 className="flex items-center gap-2 hover:bg-gray-50 p-1 pr-2 rounded-full transition-colors border border-transparent hover:border-gray-100"
               >
-                {/* Avatar */}
                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-blue-50 flex-shrink-0">
                    {user?.profileImageUrl ? (
                       <img 
@@ -227,7 +222,6 @@ const Navbar = () => {
                     )}
                 </div>
 
-                {/* Name Display */}
                 <div className="flex flex-col items-start">
                    <span className="text-sm font-semibold text-gray-700 max-w-[100px] truncate leading-tight">
                      {user?.fullName || "User"}
@@ -237,9 +231,8 @@ const Navbar = () => {
                 <ChevronDown size={14} className="text-gray-400" />
               </button>
 
-              {/* Dropdown Menu */}
               {openDropdown === "profile" && (
-                <ul className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+                <ul className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 border border-gray-100">
                   <li className="px-4 py-2 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-800 truncate">{user?.fullName || "User"}</p>
                     <p className="text-xs text-gray-500 truncate">{user?.mobileNo || user?.email}</p>
@@ -304,97 +297,12 @@ const Navbar = () => {
               </Link>
             </li>
 
-            {/* Conditions Mobile Dropdown */}
+            {/* ✅ Contact Us Mobile */}
             <li>
-              <button
-                onClick={() => toggleMobileDropdown("conditions")}
-                className="flex items-center justify-between w-full py-1"
-              >
-                <span>Conditions We Treat</span>
-                <span>▾</span>
-              </button>
-              {mobileDropdown === "conditions" && (
-                <div className="mt-2 ml-4 bg-[#F3F6FF] rounded-lg shadow-md p-3 space-y-2">
-                  {Object.entries(conditionLinks).map(([label, path]) => (
-                    <Link
-                      key={path}
-                      href={`/conditionswetreat/${path}`}
-                      className="block py-2 px-3 hover:bg-white rounded-md transition-colors text-sm"
-                      onClick={closeDropdown}
-                    >
-                      {label}
-                    </Link>
-                  ))}
-                </div>
-              )}
+              <Link href="/contact" onClick={closeDropdown} className="block py-1">
+                Contact Us
+              </Link>
             </li>
-
-            {/* Clinic Mobile Dropdown */}
-            <li>
-              <button
-                onClick={() => toggleMobileDropdown("clinic")}
-                className="flex items-center justify-between w-full py-1"
-              >
-                <span>Clinic</span>
-                <span>▾</span>
-              </button>
-              {mobileDropdown === "clinic" && (
-                <div className="mt-2 ml-4 bg-[#F3F6FF] rounded-lg shadow-md p-3 space-y-2">
-                  {Object.entries(clinicLinks).map(([label, path]) => (
-                    <Link
-                      key={path}
-                      href={`/clinic/${path}`}
-                      className="block py-2 px-3 hover:bg-white rounded-md transition-colors text-sm"
-                      onClick={closeDropdown}
-                    >
-                      {label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </li>
-
-            {/* Login/Profile Mobile */}
-            {isAuthenticated ? (
-              <li>
-                <button
-                  onClick={() => toggleMobileDropdown("profile")}
-                  className="flex items-center justify-between w-full py-1"
-                >
-                  <span className="flex items-center gap-2">
-                    <User size={18} /> {user?.fullName || "User"}
-                  </span>
-                  <span>▾</span>
-                </button>
-                {mobileDropdown === "profile" && (
-                  <div className="mt-2 ml-4 bg-[#F3F6FF] rounded-lg shadow-md p-3 space-y-2">
-                    <Link
-                      href="/profile"
-                      onClick={closeDropdown}
-                      className="block py-2 px-3 hover:bg-white rounded-md transition-colors text-sm"
-                    >
-                      My Profile
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left py-2 px-3 text-red-600 hover:bg-white rounded-md transition-colors text-sm flex items-center gap-2"
-                    >
-                      <LogOut size={14} /> Logout
-                    </button>
-                  </div>
-                )}
-              </li>
-            ) : (
-              <li>
-                <Link 
-                  href="/login" 
-                  onClick={closeDropdown} 
-                  className="block py-1 text-blue-600"
-                >
-                  Login
-                </Link>
-              </li>
-            )}
 
             <li>
               <Link

@@ -1,36 +1,265 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  ChevronDown, 
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import {
+  Search,
+  Filter,
+  ChevronDown,
   Plus,
-  Bell
+  Bell,
+  Phone,
+  User,
+  MoreVertical,
+  Calendar,
+  Download,
+  FileText,
+  MapPin,
+  X,
+  PhoneCall,
 } from "lucide-react";
 
-const AdminInClinicConsultationPage = () => {
-  // --- State Management ---
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [primaryDate, setPrimaryDate] = useState("Today");
-  const [secondaryDate, setSecondaryDate] = useState("Today");
-  const [tertiaryDate, setTertiaryDate] = useState("Today");
+/* ─────────────────────────────────────────────
+   MODALS
+───────────────────────────────────────────── */
 
-  // --- Sample Data based on image ---
+const CallModal = ({ patient, onClose }) => {
+  if (!patient) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-slate-800 text-lg">Call Patient</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl mb-5">
+          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+            <User className="w-6 h-6 text-blue-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-800">{patient.name}</p>
+            <p className="text-sm text-slate-500">Age {patient.age}</p>
+            <p className="text-base font-bold text-blue-600 mt-0.5">{patient.phone}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <a
+            href={`tel:${patient.phone}`}
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors"
+          >
+            <Phone className="w-4 h-4" /> Call Now
+          </a>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProfileModal = ({ item, onClose }) => {
+  if (!item) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-slate-800 text-lg">Patient Profile</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl mb-4">
+          <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
+            {item.customer.name.charAt(0)}
+          </div>
+          <div>
+            <p className="font-bold text-slate-800 text-base">{item.customer.name}</p>
+            <p className="text-sm text-slate-500">Age {item.customer.age} · {item.customer.location}</p>
+            <span className="mt-1 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              {item.status}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Phone</p>
+            <p className="text-sm font-semibold text-slate-700">{item.customer.phone}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Request ID</p>
+            <p className="text-sm font-semibold text-slate-700">{item.id}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl col-span-2">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Email</p>
+            <p className="text-sm font-semibold text-slate-700">{item.customer.email}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</p>
+            <p className="text-sm font-semibold text-slate-700">{item.agent}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Payment</p>
+            <p className="text-sm font-semibold text-slate-700">{item.paymentMode}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl col-span-2">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Hospital · Doctor · Fee</p>
+            <p className="text-sm font-semibold text-slate-700">{item.hospital} · {item.doctor}</p>
+            <p className="text-sm font-extrabold text-slate-800 mt-0.5 uppercase">{item.price}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl col-span-2">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Appointment</p>
+            <p className="text-sm font-semibold text-slate-700">{item.appointment}</p>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   THREE-DOT DROPDOWN
+───────────────────────────────────────────── */
+
+const ActionDropdown = ({ item, onClose }) => {
+  const actions = [
+    { icon: X,         label: "Cancel",        color: "text-red-600",     bg: "hover:bg-red-50"     },
+    { icon: PhoneCall, label: "Call Clinic",    color: "text-slate-600",   bg: "hover:bg-slate-50"   },
+    { icon: FileText,  label: "Profile & CRM", color: "text-indigo-600",  bg: "hover:bg-indigo-50"  },
+    { icon: Calendar,  label: "Reschedule",     color: "text-orange-600",  bg: "hover:bg-orange-50"  },
+    { icon: Phone,     label: "Call Patient",   color: "text-blue-600",    bg: "hover:bg-blue-50"    },
+    { icon: Download,  label: "Download",       color: "text-emerald-600", bg: "hover:bg-emerald-50" },
+    { icon: MapPin,    label: "Tracking",       color: "text-purple-600",  bg: "hover:bg-purple-50"  },
+    { icon: FileText,  label: "Ticket",         color: "text-cyan-600",    bg: "hover:bg-cyan-50"    },
+  ];
+
+  return (
+    <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 z-40 min-w-[185px] py-1">
+      {actions.map(({ icon: Icon, label, color, bg }) => (
+        <button
+          key={label}
+          onClick={() => { alert(`${label} — ${item.id}`); onClose(); }}
+          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors`}
+        >
+          <Icon className="w-4 h-4 shrink-0" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   HYBRID ACTION CELL  📞 👤 ⋮
+───────────────────────────────────────────── */
+
+const ActionCell = ({ item }) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [callModal,    setCallModal]    = useState(false);
+  const [profileModal, setProfileModal] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+        setShowDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <>
+      {callModal    && <CallModal    patient={item.customer} onClose={() => setCallModal(false)}    />}
+      {profileModal && <ProfileModal item={item}             onClose={() => setProfileModal(false)} />}
+
+      <div className="flex items-center justify-center gap-1.5">
+        {/* 📞 Call */}
+        <button
+          onClick={() => setCallModal(true)}
+          title="Call Patient"
+          className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-all hover:scale-110 border border-blue-200 shadow-sm"
+        >
+          <Phone className="w-4 h-4" />
+        </button>
+
+        {/* 👤 Profile */}
+        <button
+          onClick={() => setProfileModal(true)}
+          title="View Profile"
+          className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white flex items-center justify-center transition-all hover:scale-110 border border-indigo-200 shadow-sm"
+        >
+          <User className="w-4 h-4" />
+        </button>
+
+        {/* ⋮ More */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setShowDropdown((p) => !p)}
+            title="More Actions"
+            className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center transition-all border border-slate-200 shadow-sm"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          {showDropdown && (
+            <ActionDropdown item={item} onClose={() => setShowDropdown(false)} />
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   MAIN PAGE
+───────────────────────────────────────────── */
+
+const AdminInClinicConsultationPage = () => {
+  const [searchTerm,    setSearchTerm]    = useState("");
+  const [activeFilter,  setActiveFilter]  = useState("All");
+  const [primaryDate,   setPrimaryDate]   = useState("Today");
+  const [secondaryDate, setSecondaryDate] = useState("Today");
+  const [tertiaryDate,  setTertiaryDate]  = useState("Today");
+
   const bookingData = [
     {
       id: "#AMB2914",
       bookingDate: "Today, 10:30 AM",
       paymentMode: "Cash",
       customer: { name: "Sheetal Dayal", age: 50, phone: "9973827100", email: "sheetald@xyz.com", location: "Nagpur" },
-      agent: "Pranjal - 0012",
+      agent: "Pranjal -0012",
       hospital: "Care Hospital",
       doctor: "Dr Sudhir Jain",
       price: "RS:299 RS",
       status: "New",
-      appointment: "25 Apr, 10:30 AM"
+      appointment: "25 Apr, 10:30 AM",
     },
     {
       id: "#AMB2915",
@@ -42,43 +271,40 @@ const AdminInClinicConsultationPage = () => {
       doctor: "Dr Sudhir Jain",
       price: "RS:299 RS",
       status: "New",
-      appointment: "25 Apr, 10:30 AM"
+      appointment: "25 Apr, 10:30 AM",
     },
     {
       id: "#AMB2916",
       bookingDate: "Today, 10:30 AM",
       paymentMode: "Cash",
       customer: { name: "Rajesh Kumar", age: 45, phone: "9973827100", email: "rajesh@xyz.com", location: "Mumbai" },
-      agent: "Alfiya - 0011",
+      agent: "Alfiya-0011",
       hospital: "Care Hospital",
       doctor: "Dr Sudhir Jain",
       price: "RS:299 RS",
       status: "New",
-      appointment: "25 Apr, 10:30 AM"
-    }
+      appointment: "25 Apr, 10:30 AM",
+    },
   ];
 
-  // --- Filtering Logic ---
   const filteredData = useMemo(() => {
-    return bookingData.filter(item => {
-      const matchesSearch = 
-        item.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    return bookingData.filter((item) => {
+      const matchesSearch =
+        item.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.agent.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const matchesStatus = activeFilter === "All" || item.status === activeFilter;
-      
       return matchesSearch && matchesStatus;
     });
   }, [searchTerm, activeFilter]);
 
   return (
     <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans">
-      
-      {/* --- Top Row: Date Selector & Status Badges --- */}
+
+      {/* ── Row 1 ── */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 mb-6">
         <div className="relative w-full sm:w-auto">
-          <select 
+          <select
             value={primaryDate}
             onChange={(e) => setPrimaryDate(e.target.value)}
             className="w-full sm:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -90,18 +316,18 @@ const AdminInClinicConsultationPage = () => {
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>
 
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <StatusBadge count="06" label="New" color="bg-slate-50 text-slate-600" active={activeFilter === "New"} onClick={() => setActiveFilter("New")} />
-          <StatusBadge count="03" label="Accept" color="bg-cyan-50 text-cyan-600 border-cyan-100" active={activeFilter === "Accept"} onClick={() => setActiveFilter("Accept")} />
-          <StatusBadge count="00" label="Pending" color="bg-orange-50 text-orange-600 border-orange-100" active={activeFilter === "Pending"} onClick={() => setActiveFilter("Pending")} />
-          <StatusBadge count="00" label="Patient Absent" color="bg-yellow-50 text-yellow-600 border-yellow-100" active={activeFilter === "Patient Absent"} onClick={() => setActiveFilter("Patient Absent")} />
-          <StatusBadge count="00" label="Canceled" color="bg-pink-50 text-pink-600 border-pink-100" active={activeFilter === "Canceled"} onClick={() => setActiveFilter("Canceled")} />
-          <StatusBadge count="03" label="Complete" color="bg-emerald-50 text-emerald-600 border-emerald-100" active={activeFilter === "Complete"} onClick={() => setActiveFilter("Complete")} />
-          <StatusBadge count="00" label="Sell" color="bg-green-100 text-green-700" active={activeFilter === "Sell"} onClick={() => setActiveFilter("Sell")} />
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge count="06" label="New"            color="bg-amber-50 text-amber-700 border border-amber-200"       active={activeFilter==="New"}            onClick={()=>setActiveFilter("New")} />
+          <StatusBadge count="03" label="Accept"         color="bg-cyan-50 text-cyan-700 border border-cyan-200"          active={activeFilter==="Accept"}         onClick={()=>setActiveFilter("Accept")} />
+          <StatusBadge count="00" label="Pending"        color="bg-rose-50 text-rose-600 border border-rose-200"          active={activeFilter==="Pending"}        onClick={()=>setActiveFilter("Pending")} />
+          <StatusBadge count="00" label="Patient Absent" color="bg-slate-100 text-slate-600 border border-slate-200"      active={activeFilter==="Patient Absent"} onClick={()=>setActiveFilter("Patient Absent")} />
+          <StatusBadge count="00" label="Canceled"       color="bg-rose-100 text-rose-700 border border-rose-300"         active={activeFilter==="Canceled"}       onClick={()=>setActiveFilter("Canceled")} />
+          <StatusBadge count="03" label="Complete"       color="bg-emerald-50 text-emerald-700 border border-emerald-200" active={activeFilter==="Complete"}       onClick={()=>setActiveFilter("Complete")} />
+          <StatusBadge count="00" label="Sell"           color="bg-green-500 text-white border border-green-600"          active={activeFilter==="Sell"}           onClick={()=>setActiveFilter("Sell")} />
         </div>
       </div>
 
-      {/* --- Middle Row: Search, Add Booking, Notifications --- */}
+      {/* ── Row 2 ── */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 mb-4">
         <div className="flex items-center gap-2 w-full md:flex-1">
           <button className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50">
@@ -111,35 +337,35 @@ const AdminInClinicConsultationPage = () => {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search patients, request ID, phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-10 pl-4 py-2 bg-white border border-slate-200 rounded-lg text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full pr-10 pl-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-          <button className="w-full sm:flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md flex items-center justify-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition-all">
             <Plus className="w-4 h-4" /> Add Booking
           </button>
-          <button className="w-full sm:flex-1 md:flex-none bg-indigo-50 text-indigo-600 border border-indigo-100 px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+          <button className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
             <Bell className="w-4 h-4" /> 03 Notification
           </button>
         </div>
       </div>
 
-      {/* --- Third Row: Secondary Filters --- */}
+      {/* ── Row 3 ── */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex items-center gap-2 w-full sm:flex-1">
           <div className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm">
             <Filter className="w-5 h-5 text-slate-500" />
           </div>
           <div className="relative flex-1">
-            <select 
+            <select
               value={secondaryDate}
               onChange={(e) => setSecondaryDate(e.target.value)}
-              className="w-full appearance-none bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium shadow-sm focus:outline-none"
+              className="w-full appearance-none bg-white border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm focus:outline-none"
             >
               <option>Today</option>
               <option>Tomorrow</option>
@@ -148,10 +374,10 @@ const AdminInClinicConsultationPage = () => {
           </div>
         </div>
         <div className="relative w-full sm:flex-1">
-          <select 
+          <select
             value={tertiaryDate}
             onChange={(e) => setTertiaryDate(e.target.value)}
-            className="w-full appearance-none bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium shadow-sm focus:outline-none"
+            className="w-full appearance-none bg-white border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm focus:outline-none"
           >
             <option>Today</option>
             <option>Select Range</option>
@@ -160,61 +386,71 @@ const AdminInClinicConsultationPage = () => {
         </div>
       </div>
 
-      {/* --- Desktop Table View --- */}
+      {/* ─────────── DESKTOP TABLE ─────────── */}
       <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Request Id</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Booking Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Request by</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Agent</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hospital</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Appointment</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
+              <tr className="border-b border-slate-200 bg-slate-50/60">
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Request Id</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Booking Date</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Request by</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Agent</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hospital</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Appointment</th>
+                <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredData.map((item, index) => (
-                <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-slate-600">{item.id}</td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs text-slate-500 leading-relaxed">
-                      <p>{item.bookingDate.split(", ")[0]}</p>
-                      <p>{item.bookingDate.split(", ")[1]}</p>
-                      <p className="font-semibold text-slate-600">{item.paymentMode}</p>
-                    </div>
+            <tbody>
+              {filteredData.map((item, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/20 transition-colors">
+
+                  {/* Request ID */}
+                  <td className="px-5 py-5 text-sm font-bold text-slate-700 whitespace-nowrap">
+                    {item.id}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs">
-                      <p className="font-bold text-slate-800 text-sm">{item.customer.name} Age {item.customer.age}</p>
-                      <p className="text-slate-500">{item.customer.phone}</p>
-                      <p className="text-slate-400 italic">{item.customer.email}</p>
-                      <p className="text-slate-500">{item.customer.location}</p>
-                    </div>
+
+                  {/* Booking Date — exactly like screenshot */}
+                  <td className="px-5 py-5">
+                    <p className="text-sm text-slate-700 leading-relaxed">Today,</p>
+                    <p className="text-sm text-slate-700 leading-relaxed">10:30 AM</p>
+                    <p className="text-sm text-slate-700 leading-relaxed">{item.paymentMode}</p>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 font-medium">{item.agent}</td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs">
-                      <p className="font-bold text-slate-700">{item.hospital}</p>
-                      <p className="text-slate-500">{item.doctor}</p>
-                      <p className="font-black text-slate-800 mt-1 uppercase">{item.price}</p>
-                    </div>
+
+                  {/* Request by — exactly like screenshot */}
+                  <td className="px-5 py-5">
+                    <p className="text-sm text-slate-800">{item.customer.name} Age {item.customer.age}</p>
+                    <p className="text-sm text-slate-600">{item.customer.phone}</p>
+                    <p className="text-sm text-slate-500">{item.customer.email}</p>
+                    <p className="text-sm text-slate-500">{item.customer.location}</p>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[10px] font-black uppercase border border-slate-200">
+
+                  {/* Agent */}
+                  <td className="px-5 py-5 text-sm text-slate-700">{item.agent}</td>
+
+                  {/* Hospital — price bold black like screenshot */}
+                  <td className="px-5 py-5">
+                    <p className="text-sm text-slate-700">{item.hospital}</p>
+                    <p className="text-sm text-slate-700">{item.doctor}</p>
+                    <p className="text-sm font-extrabold text-slate-800 mt-1 uppercase">{item.price}</p>
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-5 py-5">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                       {item.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+
+                  {/* Appointment */}
+                  <td className="px-5 py-5 text-sm text-slate-700 whitespace-nowrap">
                     {item.appointment}
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <button className="p-2 hover:bg-slate-100 rounded-full transition-colors inline-flex border border-slate-100 shadow-sm">
-                      <MoreVertical className="w-4 h-4 text-slate-400" />
-                    </button>
+
+                  {/* ✅ Actions */}
+                  <td className="px-5 py-5">
+                    <ActionCell item={item} />
                   </td>
                 </tr>
               ))}
@@ -223,66 +459,56 @@ const AdminInClinicConsultationPage = () => {
         </div>
       </div>
 
-      {/* --- Mobile/Tablet Card View --- */}
+      {/* ─────────── MOBILE CARDS ─────────── */}
       <div className="lg:hidden space-y-4">
-        {filteredData.map((item, index) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
-            {/* Header Row */}
-            <div className="flex items-start justify-between mb-4">
+        {filteredData.map((item, i) => (
+          <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-xs font-bold text-slate-600">{item.id}</span>
-                  <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-black uppercase border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700">{item.id}</span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase">
                     {item.status}
                   </span>
-                  <span className="bg-slate-50 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600">
                     {item.paymentMode}
                   </span>
                 </div>
-                <h3 className="font-bold text-slate-800 text-base">
-                  {item.customer.name} <span className="text-slate-500 font-normal text-sm">Age {item.customer.age}</span>
-                </h3>
+                <p className="font-bold text-slate-800">
+                  {item.customer.name}{" "}
+                  <span className="text-slate-500 font-normal text-sm">Age {item.customer.age}</span>
+                </p>
               </div>
-              <button className="p-2 hover:bg-slate-50 rounded-lg transition-colors">
-                <MoreVertical className="w-5 h-5 text-slate-400" />
-              </button>
+              <ActionCell item={item} />
             </div>
 
-            {/* Contact Info */}
-            <div className="space-y-1 mb-4 pb-4 border-b border-slate-100">
+            <div className="space-y-0.5 mb-3 pb-3 border-b border-slate-100">
               <p className="text-sm text-slate-600">{item.customer.phone}</p>
               <p className="text-sm text-slate-500 italic">{item.customer.email}</p>
               <p className="text-sm text-slate-500">{item.customer.location}</p>
             </div>
 
-            {/* Grid Info - Booking & Agent */}
-            <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
-              {/* Booking Date */}
+            <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Booking Date</span>
-                <p className="text-xs text-slate-600 font-medium">{item.bookingDate.split(", ")[0]}</p>
-                <p className="text-xs text-slate-500">{item.bookingDate.split(", ")[1]}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Booking Date</p>
+                <p className="text-xs text-slate-700 font-medium">{item.bookingDate}</p>
               </div>
-
-              {/* Agent */}
               <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Agent</span>
-                <p className="text-sm text-slate-700 font-medium">{item.agent}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</p>
+                <p className="text-sm text-slate-700">{item.agent}</p>
               </div>
             </div>
 
-            {/* Hospital Details */}
-            <div className="mb-4 pb-4 border-b border-slate-100">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Hospital</span>
-              <p className="text-sm text-slate-700 font-bold">{item.hospital}</p>
+            <div className="mb-3 pb-3 border-b border-slate-100">
+              <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Hospital</p>
+              <p className="text-sm font-bold text-slate-700">{item.hospital}</p>
               <p className="text-sm text-slate-600">{item.doctor}</p>
-              <p className="text-sm text-slate-800 font-black uppercase mt-1">{item.price}</p>
+              <p className="text-sm font-extrabold text-slate-800 uppercase mt-0.5">{item.price}</p>
             </div>
 
-            {/* Appointment Details */}
             <div>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Appointment</span>
-              <p className="text-sm text-slate-700 font-bold">{item.appointment}</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Appointment</p>
+              <p className="text-sm font-bold text-slate-700">{item.appointment}</p>
             </div>
           </div>
         ))}
@@ -291,16 +517,19 @@ const AdminInClinicConsultationPage = () => {
   );
 };
 
-// --- Helper Component ---
+/* ─────────────────────────────────────────────
+   STATUS BADGE
+───────────────────────────────────────────── */
+
 const StatusBadge = ({ count, label, color, active, onClick }) => (
-  <button 
+  <button
     onClick={onClick}
-    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all border ${
-      active ? 'ring-2 ring-blue-400 border-transparent shadow-md' : 'border-transparent'
+    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+      active ? "ring-2 ring-blue-400 shadow-md" : ""
     } ${color}`}
   >
     <span className="text-sm leading-none">{count}</span>
-    <span className="whitespace-nowrap uppercase tracking-tight">{label}</span>
+    <span className="whitespace-nowrap">{label}</span>
   </button>
 );
 

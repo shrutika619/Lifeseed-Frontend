@@ -155,7 +155,7 @@ const AdminHeaderPage = ({
         }
       `}</style>
     </header>
-  );
+  )
 };
 
 export default AdminHeaderPage;
