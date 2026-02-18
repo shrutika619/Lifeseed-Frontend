@@ -1,5 +1,5 @@
 import React from 'react'
-import HospitalDashboardDoctorsPage from '@/components/HospitalDashboardTime-TablePage/HospitalDashboardDoctorsPage/HospitalDashboardDoctorsPage'
+import HospitalDashboardDoctorsPage from '@/components/HospitalDashboardDoctorsPage/HospitalDashboardDoctorsPage'
 
 const page = () => {
   return (

@@ -114,7 +114,7 @@ const DoctorsPage = () => {
 
   const handleAddDoctor = () => {
     // setShowForm(true); // Uncomment to use your form logic
-    router.push("/add-doctor"); // Or redirect to page
+    router.push("/hospitaldashboard/add-doctors"); // Or redirect to page
   };
 
   return (
