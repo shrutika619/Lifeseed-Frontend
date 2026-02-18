@@ -1,5 +1,11 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation"; // ✅ Navigation
+import { useDispatch } from "react-redux"; // ✅ Redux
+import { logoutSuccess } from "@/redux/slices/authSlice"; // ✅ Redux Action (adjust path if needed)
+import api from "@/lib/axios"; // ✅ API Client
+import { Constants } from "@/app/utils/constants"; // ✅ Constants
+import { toast } from "sonner"; // ✅ Toasts
 import { Bell, Menu, User, LogOut, ChevronDown } from "lucide-react";
 
 const AdminHeaderPage = ({ 
@@ -9,15 +15,18 @@ const AdminHeaderPage = ({
   userPhone = "9999999999",
   notificationCount = 10,
   onMenuToggle,
-  onLogout,
+  onLogout, // Optional prop if parent wants to handle extra cleanup
   onProfileClick,
   onNotificationClick
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  
+  // ✅ Initialize Hooks
+  const router = useRouter();
+  const dispatch = useDispatch();
 
   const handleMenuClick = () => {
-    console.log("Hamburger clicked");
     if (onMenuToggle) {
       onMenuToggle();
     }
@@ -27,10 +36,29 @@ const AdminHeaderPage = ({
     setIsDropdownOpen(!isDropdownOpen);
   };
 
-  const handleLogout = () => {
-    setIsDropdownOpen(false);
-    if (onLogout) {
-      onLogout();
+  // ✅ INTEGRATED LOGOUT LOGIC
+  const handleLogout = async () => {
+    setIsDropdownOpen(false); // Close dropdown immediately
+
+    try {
+      // 1. Call Backend to clear HttpOnly cookies
+      await api.post(Constants.urlEndPoints.ADMIN_LOGOUT);
+      toast.success("Logged out successfully");
+    } catch (error) {
+      console.error("Logout API failed:", error);
+      // Optional: Inform user, but we proceed to force logout anyway
+      toast.info("Logging out..."); 
+    } finally {
+      // 2. Clear Redux Store (Client-side state)
+      dispatch(logoutSuccess());
+
+      // 3. Trigger parent prop callback if provided
+      if (onLogout) {
+        onLogout();
+      }
+
+      // 4. Redirect to Admin Login
+      router.push("/login-admin");
     }
   };
 
