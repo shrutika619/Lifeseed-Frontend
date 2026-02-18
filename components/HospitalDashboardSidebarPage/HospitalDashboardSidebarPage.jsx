@@ -11,6 +11,11 @@ import {
   X,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
+import { useDispatch } from "react-redux";
+import { logoutSuccess } from "@/redux/slices/authSlice"; 
+
+
+import axios from "axios";
 
 const menuItems = [
   { label: "Time Table", icon: Clock, path: "time-table" },
@@ -23,6 +28,8 @@ const menuItems = [
 const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) => {
   const router = useRouter();
   const pathname = usePathname();
+    const dispatch = useDispatch();
+
 
   const basePath = "/hospitaldashboard";
 
@@ -31,9 +38,18 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) =
     onClose?.();
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("hospital_token");
-    router.push("/");
+   const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+
+      await axios.post('/api/auth/logout');
+    } catch (error) {
+      console.error("Logout API call failed", error);
+    } finally {
+      dispatch(logoutSuccess());
+      router.push("/");
+      router.refresh();
+    }
   };
 
   const isActive = (path) => pathname.startsWith(`${basePath}/${path}`);
