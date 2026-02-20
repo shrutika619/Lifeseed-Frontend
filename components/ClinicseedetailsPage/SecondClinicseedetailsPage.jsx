@@ -157,6 +157,9 @@ const MapEmbed = ({ address }) => {
 // ---------- Page-specific components ----------
 
 const DoctorCard = ({ doctor, onBook }) => {
+  // Extract specialty name securely whether it's populated or just a string
+  const specialtyName = doctor.primarySpecialty?.name || doctor.primarySpecialty || "General Specialist";
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm mb-6">
       <div className="flex flex-col sm:flex-row items-start gap-6">
@@ -172,9 +175,12 @@ const DoctorCard = ({ doctor, onBook }) => {
                 {doctor.name}
                 <Check className="w-4 h-4 ml-2 text-green-500" />
               </h3>
-              <div className="text-sm text-gray-600">{doctor.primarySpecialty}</div>
+              
+              {/* ✅ FIX IS HERE: Render the safely extracted string instead of an object */}
+              <div className="text-sm text-gray-600">{specialtyName}</div>
+              
               <div className="text-sm text-gray-500 mt-1">
-                Experience: {doctor.experience}
+                Experience: {doctor.experience ? `${doctor.experience} Years` : "N/A"}
               </div>
 
               <div className="flex flex-wrap items-center gap-3 mt-3">
@@ -183,7 +189,7 @@ const DoctorCard = ({ doctor, onBook }) => {
                 <div className="text-sm text-gray-500">
                   Languages:{" "}
                   <span className="font-medium text-gray-700">
-                    {doctor.languages?.join(", ")}
+                    {Array.isArray(doctor.languages) ? doctor.languages.join(", ") : "English"}
                   </span>
                 </div>
               </div>
@@ -191,7 +197,7 @@ const DoctorCard = ({ doctor, onBook }) => {
 
             <div className="flex sm:flex-row lg:flex-col items-start gap-3 lg:text-right">
               <div className="bg-indigo-50 text-indigo-700 font-semibold px-3 py-1 rounded-md whitespace-nowrap">
-                ₹{doctor.consultationFee}
+                ₹{doctor.consultationFee || 0}
               </div>
               <button
                 onClick={onBook}
@@ -346,7 +352,7 @@ export default function SecondClinicseedetailsPage({ clinic, doctors }) {
           <MapEmbed address={clinic?.fulladdress || "Nagpur, India"} />
           <SidebarCard
             clinic={{
-              name: "MEN10 Clinic",
+              name: clinic?.clinicName || "MEN10 Clinic",
               address: clinic?.fulladdress || "Address Unavailable",
               googleMapsLink: clinic?.googleMapsLink,
             }}

@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { ClinicStatusService } from "@/app/services/clinicStatus.service"; 
-// ✅ IMPORT THE NEW SERVICE
-import { getAllClinics } from "@/app/services/adminClinic.service"; 
+// ✅ IMPORT BOTH SERVICES
+import { getAllClinics, getClinicById } from "@/app/services/adminClinic.service"; 
 import { toast } from "sonner"; 
 import {
   Filter,
@@ -25,7 +25,10 @@ export default function AdminClinicsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("City");
+  
   const [selectedClinic, setSelectedClinic] = useState(null);
+  const [isClinicLoading, setIsClinicLoading] = useState(false); // ✅ Added loading state for details
+
   const [activeTab, setActiveTab] = useState("Doctors");
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
@@ -44,17 +47,16 @@ export default function AdminClinicsPage() {
     
     const result = await getAllClinics(signal);
     
-    if (result.canceled) return; // Ignore if component unmounted
+    if (result.canceled) return; 
 
     if (result.success) {
-      // Assuming the backend returns the array inside result.data.clinics
-      const clinicsArray = result.data?.clinics || [];
+      const clinicsArray = result.data?.clinics || result.data || [];
       
       const mappedData = clinicsArray.map((c) => ({
         id: `#${c._id.slice(-5).toUpperCase()}`,
         dbId: c._id,
         name: c.clinicName,
-        subtitle: "Sexual Health Clinic", // Placeholder/Default
+        subtitle: "Sexual Health Clinic", 
         contact: c.mobileNo,
         email: c.clinicEmail,
         address: c.areaName || "Nagpur",
@@ -85,7 +87,7 @@ export default function AdminClinicsPage() {
           phone: c.ownerContactNo || "N/A",
           email: c.clinicEmail,
         },
-        doctorsList: [],
+        doctorsList: [], // Will be populated when clicked
       }));
 
       setClinics(mappedData);
@@ -112,24 +114,51 @@ export default function AdminClinicsPage() {
   };
 
   const filteredClinics = clinics.filter((clinic) => {
-    const matchesStatus =
-      statusFilter === "All" || clinic.status === statusFilter;
-    const matchesSearch =
-      clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      clinic.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "All" || clinic.status === statusFilter;
+    const matchesSearch = clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) || clinic.id.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
+
+  // ✅ HANDLE CLINIC CLICK (FETCH DOCTORS)
+  const handleClinicClick = async (clinic) => {
+    setSelectedClinic(clinic); // Set immediately for fast UI transition
+    setIsClinicLoading(true);
+    setActiveTab("Doctors");
+
+    try {
+      const result = await getClinicById(clinic.dbId);
+      console.log(result);
+      if (result.success) {
+        // Based on backend returning { clinic, doctors }
+        const doctors = result.data?.doctors || [];
+        
+        // Update the selected clinic with the real doctors count and list
+        setSelectedClinic(prev => ({
+          ...prev,
+          doctors: `${doctors.length} Doctors`,
+          doctorsList: doctors
+        }));
+
+        // Also update the main array so the "Doctors" count updates on the table
+        setClinics(prevClinics => prevClinics.map(c => 
+          c.dbId === clinic.dbId ? { ...c, doctors: `${doctors.length} Doctors` } : c
+        ));
+      } else {
+        toast.error(result.message || "Failed to load clinic details");
+      }
+    } catch (error) {
+      toast.error("Error loading doctors for this clinic");
+    } finally {
+      setIsClinicLoading(false);
+    }
+  };
 
   // ✅ Open Modal
   const openActionModal = (type, dbId, e) => {
     e.stopPropagation();
     setOpenDropdownId(null); 
     setActionReason(""); 
-    setModalConfig({
-      isOpen: true,
-      type: type,
-      clinicId: dbId
-    });
+    setModalConfig({ isOpen: true, type: type, clinicId: dbId });
   };
 
   const closeActionModal = () => {
@@ -146,7 +175,6 @@ export default function AdminClinicsPage() {
         toast.success("Clinic approved successfully!");
         fetchClinics();
       } catch (error) {
-        console.error(`Error accepting:`, error);
         toast.error(error.message || `Failed to accept clinic`);
       }
     } 
@@ -171,8 +199,8 @@ export default function AdminClinicsPage() {
       }
       fetchClinics(); 
       closeActionModal();
+      if(selectedClinic?.dbId === clinicId) setSelectedClinic(null); // Close details if open
     } catch (error) {
-      console.error(`Error performing ${type}:`, error);
       toast.error(error.message || `Failed to ${type.toLowerCase()} clinic`);
     } finally {
       setIsSubmitting(false);
@@ -205,7 +233,6 @@ export default function AdminClinicsPage() {
                 </button>
                 <h2 className="text-lg font-semibold text-gray-800">Details</h2>
               </div>
-              
             </div>
           </div>
 
@@ -213,10 +240,8 @@ export default function AdminClinicsPage() {
           <div className="flex-1 p-6 overflow-auto">
             <div className="flex gap-6 items-start">
               
-              {/* ✅ SIDEBAR - Full Length (No Scrollbar, No Cut) */}
+              {/* SIDEBAR */}
               <div className="w-[340px] flex-shrink-0 bg-white rounded-lg p-5 border border-gray-200 shadow-sm h-fit">
-                
-                {/* Top Card: Logo & Call */}
                 <div className="flex justify-between items-start mb-4">
                   <div className="w-20 h-20 rounded-lg bg-[#5B4D8D] flex items-center justify-center">
                     <Building2 size={32} className="text-white" />
@@ -226,7 +251,6 @@ export default function AdminClinicsPage() {
                   </button>
                 </div>
 
-                {/* Clinic Info */}
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-gray-900 leading-tight">{selectedClinic.name}</h3>
                   <p className="text-gray-600 font-medium text-sm mt-1">{selectedClinic.subtitle}</p>
@@ -237,10 +261,7 @@ export default function AdminClinicsPage() {
 
                 <hr className="border-gray-100 mb-6" />
 
-                {/* Details Grid - 2 Columns */}
                 <div className="space-y-6">
-                  
-                  {/* Contact Person */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Contact Person</p>
@@ -253,20 +274,14 @@ export default function AdminClinicsPage() {
                     </div>
                   </div>
 
-                  {/* Attendant */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Attendant</p>
                       <p className="text-sm font-bold text-gray-900">{selectedClinic.attendant.name}</p>
                       <p className="text-sm text-gray-600">{selectedClinic.attendant.phone}</p>
                     </div>
-                    {/* <div>
-                      <p className="text-gray-500 text-xs mb-1">Email</p>
-                      <p className="text-sm text-gray-800 break-words">{selectedClinic.attendant.email}</p>
-                    </div> */}
                   </div>
 
-                  {/* Hospital / Public */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Hospital/Public</p>
@@ -278,7 +293,6 @@ export default function AdminClinicsPage() {
                     </div>
                   </div>
 
-                  {/* Owner */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Owner</p>
@@ -291,25 +305,21 @@ export default function AdminClinicsPage() {
                     </div>
                   </div>
 
-                  {/* Address & Link */}
                   <div>
                     <p className="text-gray-500 text-xs mb-1">Address</p>
                     <p className="text-sm font-medium text-gray-900 mb-2">{selectedClinic.address}, {selectedClinic.fullAddress}</p>
-                    
                     <p className="text-gray-500 text-xs mb-1">Address Google link</p>
                     <a href={selectedClinic.googleLink} target="_blank" rel="noreferrer" className="text-blue-600 text-xs hover:underline break-all block">
                       {selectedClinic.googleLink || "No link available"}
                     </a>
                   </div>
 
-                  {/* Status */}
                   <div>
                     <p className="text-gray-500 text-xs mb-1">Status</p>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${selectedClinic.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
                       {selectedClinic.status}
                     </span>
                   </div>
-
                 </div>
               </div>
 
@@ -321,19 +331,15 @@ export default function AdminClinicsPage() {
                       <button
                         onClick={() => setActiveTab("Doctors")}
                         className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                          activeTab === "Doctors"
-                            ? "border-blue-600 text-blue-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700"
+                          activeTab === "Doctors" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        Doctors <span className="font-bold">{selectedClinic.doctors.split(" ")[0]}</span>
+                        Doctors <span className="font-bold">{selectedClinic.doctorsList?.length || 0}</span>
                       </button>
                       <button
                         onClick={() => setActiveTab("Transactions")}
                         className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                          activeTab === "Transactions"
-                            ? "border-blue-600 text-blue-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700"
+                          activeTab === "Transactions" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                       >
                         Total Transactions <span className="font-bold">{selectedClinic.transactions}</span>
@@ -341,28 +347,33 @@ export default function AdminClinicsPage() {
                       <button
                         onClick={() => setActiveTab("Images")}
                         className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                          activeTab === "Images"
-                            ? "border-blue-600 text-blue-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700"
+                          activeTab === "Images" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        Images <span className="font-bold">10</span>
+                        Images <span className="font-bold">0</span>
                       </button>
                       <button
                         onClick={() => setActiveTab("Billing")}
                         className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                          activeTab === "Billing"
-                            ? "border-blue-600 text-blue-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700"
+                          activeTab === "Billing" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        Billing <span className="font-bold">10</span>
+                        Billing <span className="font-bold">0</span>
                       </button>
                     </div>
                   </div>
                   
                   {/* Tab Content */}
-                  <div className="flex-1 overflow-auto bg-white">
+                  <div className="flex-1 overflow-auto bg-white relative">
+                    
+                    {/* ✅ Spinner Overlay for Details Fetch */}
+                    {isClinicLoading && (
+                      <div className="absolute inset-0 bg-white/70 z-10 flex flex-col items-center justify-center">
+                         <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
+                         <p className="text-sm text-gray-500 font-medium">Loading details...</p>
+                      </div>
+                    )}
+
                     {activeTab === "Doctors" && (
                       <div className="min-w-full inline-block align-middle">
                         <table className="min-w-full divide-y divide-gray-200">
@@ -379,19 +390,57 @@ export default function AdminClinicsPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {selectedClinic.doctorsList.length > 0 ? (
-                              selectedClinic.doctorsList.map((doctor, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                  <td className="py-3 px-4 text-sm text-gray-900">{doctor.id}</td>
-                                  {/* Doctor Details would go here */}
-                                </tr>
-                              ))
+                            {selectedClinic.doctorsList?.length > 0 ? (
+                              selectedClinic.doctorsList.map((doctor, idx) => {
+                                // Extract Qualifications securely
+                                const ug = doctor.underGraduationDegree?.name || "";
+                                const pg = doctor.postGraduationDegree?.name || "";
+                                const qualification = [ug, pg].filter(Boolean).join(", ") || "MBBS";
+
+                                return (
+                                  <tr key={doctor._id || idx} className="hover:bg-gray-50 transition-colors">
+                                    <td className="py-3 px-4 text-sm text-gray-900">
+                                      #{doctor._id?.slice(-5).toUpperCase() || "N/A"}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                                          {doctor.profileImage ? (
+                                            <img src={doctor.profileImage} alt={doctor.name} className="w-full h-full object-cover" />
+                                          ) : (
+                                            <User size={16} className="text-gray-400 m-auto mt-2" />
+                                          )}
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-900">{doctor.name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">{doctor.superSpecialization?.name || "Consultant"}</td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">{doctor.experience ? `${doctor.experience} Yrs` : "N/A"}</td>
+                                    <td className="py-3 px-4 text-sm text-gray-600 max-w-[150px] truncate" title={qualification}>
+                                      {qualification}
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {doctor.primarySpecialty?.name || doctor.primarySpecialty || "General"}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${doctor.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
+                                        {doctor.isActive ? "Active" : "Inactive"}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                      {Array.isArray(doctor.languages) ? doctor.languages.join(", ") : "English"}
+                                    </td>
+                                  </tr>
+                                );
+                              })
                             ) : (
-                              <tr>
-                                <td colSpan="8" className="py-12 text-center text-gray-500">
-                                  No doctors available
-                                </td>
-                              </tr>
+                              !isClinicLoading && (
+                                <tr>
+                                  <td colSpan="8" className="py-12 text-center text-gray-500">
+                                    No doctors registered for this clinic
+                                  </td>
+                                </tr>
+                              )
                             )}
                           </tbody>
                         </table>
@@ -430,6 +479,7 @@ export default function AdminClinicsPage() {
             </div>
           </div>
         </div>
+        
         {/* Filters */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -465,6 +515,7 @@ export default function AdminClinicsPage() {
             </div>
           </div>
         </div>
+
         {/* Table */}
         <div className="flex-1 p-6">
           <div className="bg-white rounded-lg border border-gray-200 overflow-visible pb-24"> 
@@ -484,7 +535,7 @@ export default function AdminClinicsPage() {
                 {filteredClinics.map((clinic, idx) => (
                   <tr
                     key={`${clinic.id}-${idx}`}
-                    onClick={() => setSelectedClinic(clinic)}
+                    onClick={() => handleClinicClick(clinic)}
                     className="hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <td className="py-4 px-4 text-sm text-gray-900">{clinic.id}</td>
