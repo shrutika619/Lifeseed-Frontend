@@ -6,6 +6,9 @@ import { logoutSuccess } from "@/redux/slices/authSlice";
 import { toast } from "sonner"; 
 import { Bell, Menu, User, LogOut, ChevronDown } from "lucide-react";
 
+// ✅ Import the centralized Logout Service
+import { logoutUser } from "@/app/services/auth.service"; 
+
 const AdminHeaderPage = ({ 
   role = "Admin", 
   title = "Dashboard", 
@@ -33,19 +36,22 @@ const AdminHeaderPage = ({
     setIsDropdownOpen(!isDropdownOpen);
   };
 
-  // ✅ UPDATED LOGOUT LOGIC
+  // ✅ UPDATED LOGOUT LOGIC (Using Service)
   const handleLogout = async () => {
     setIsDropdownOpen(false); 
 
     try {
-      // 1. Call YOUR Next.js API Route (Proxy)
-      // We use 'fetch' here because it's a simple internal call
-      await fetch("/api/auth/logout", { method: "POST" });
+      // 1. Call the service to clear HttpOnly cookies and notify backend
+      const result = await logoutUser();
       
-      toast.success("Logged out successfully");
+      if (result.success) {
+        toast.success("Logged out successfully");
+      } else {
+        console.warn("Server logout returned false, forcing local logout");
+      }
     } catch (error) {
       console.error("Logout failed:", error);
-      toast.info("Logging out..."); 
+      toast.info("Logging out locally..."); 
     } finally {
       // 2. Clear Redux Store
       dispatch(logoutSuccess());

@@ -37,7 +37,7 @@ export class Constants {
     SUBMIT_ASSESSMENT: `${this.API_BASE_URL}/assessment/submit`,
     GET_MY_ASSESSMENT: `${this.API_BASE_URL}/assessment/my-assessment`,
     
-    // --- ASSESSMENT ---
+    // --- ADMIN ---
     GET_ALL_CLINICS: `${this.API_BASE_URL}/admin/clinics`,
 
     //--SLOTS & DOCTOR--

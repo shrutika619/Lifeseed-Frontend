@@ -2,9 +2,10 @@ import axios from "axios"; // Use standard axios for Proxy calls to avoid interc
 import api from "@/lib/axios"; // Use your configured instance for direct backend calls
 import { Constants } from "@/app/utils/constants";
 
-// ✅ Define Proxy Endpoint Constant
-// We define this locally because it points to Next.js (Client Side), not the External Backend.
+// ✅ Define Proxy Endpoint Constants
+// We define these locally because they point to Next.js (Client Side), not the External Backend.
 const LOGIN_PROXY_ROUTE = "/api/auth/login";
+const LOGOUT_PROXY_ROUTE = "/api/auth/logout";
 
 /**
  * Send OTP for Login
@@ -55,17 +56,47 @@ export const verifyLoginOtp = async (mobileNo, otp) => {
  * ✅ Admin Login
  * Calls Next.js Proxy to set HTTP-Only cookie
  */
-export const adminLogin = async (username, password) => {
+export const adminLogin = async (email, password) => {
   try {
     const response = await axios.post(LOGIN_PROXY_ROUTE, {
       type: 'password', // 👈 Flag for Proxy
-      username,
-      password
+      username: email,  // API expects 'username'
+      password: password
     });
     
-    return response.data;
+    if (response.data.success) {
+      return { success: true, data: response.data };
+    }
+
+    return { success: false, message: response.data.message || "Login failed" };
   } catch (error) {
     console.error("Admin login error:", error);
-    throw error.response?.data || error;
+    return {
+      success: false,
+      message: error.response?.data?.message || "Invalid credentials. Access Denied."
+    };
+  }
+};
+
+/**
+ * ✅ Logout
+ * Calls the Next.js API route to clear HttpOnly cookies,
+ * which in turn forwards the request to the backend to clear the refresh token.
+ */
+export const logoutUser = async () => {
+  try {
+    // We use `api` so the interceptor attaches the Authorization header (from Redux),
+    // but we override the `baseURL` to "/" so it hits the Next.js proxy instead of the backend.
+    const response = await api.post(LOGOUT_PROXY_ROUTE, {}, { 
+      baseURL: "/" 
+    });
+    
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Logout error:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Failed to logout completely",
+    };
   }
 };

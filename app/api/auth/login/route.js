@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import axios from "axios";
-import { Constants } from "@/app/utils/constants"; // ✅ Import Constants
+import { Constants } from "@/app/utils/constants"; 
 
 export async function POST(request) {
   try {
@@ -10,37 +10,47 @@ export async function POST(request) {
 
     let response;
     
+    // 🛡️ Helper to ensure absolute URL on the server side
+    // (If Constants already includes the base URL, this won't break it)
+    const getAbsoluteUrl = (endpoint) => {
+      if (endpoint.startsWith("http")) return endpoint;
+      return `${Constants.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL}${endpoint}`;
+    };
+    
     // 🔀 SWITCH ENDPOINT BASED ON LOGIN TYPE
     if (type === 'password') {
-      // ✅ Use Constant for Admin Login
-      response = await axios.post(Constants.urlEndPoints.ADMIN_LOGIN, { username, password });
+      response = await axios.post(getAbsoluteUrl(Constants.urlEndPoints.ADMIN_LOGIN), { 
+        username, 
+        password 
+      });
     } else {
-      // ✅ Use Constant for OTP Verify
-      response = await axios.post(Constants.urlEndPoints.VERIFY_OTP, { mobileNo, otp });
+      response = await axios.post(getAbsoluteUrl(Constants.urlEndPoints.VERIFY_OTP), { 
+        mobileNo, 
+        otp 
+      });
     }
 
-    // 2. Handle Response Data
+    // Handle Response Data
     const resData = response.data.data || response.data;
     const { accessToken, refreshToken, user, isNewUser } = resData;
 
     if (!accessToken || !refreshToken) {
-      return NextResponse.json({ success: false, message: "Tokens missing" }, { status: 401 });
+      return NextResponse.json({ success: false, message: "Tokens missing from backend response" }, { status: 401 });
     }
 
     const cookieStore = await cookies();
 
-    // 3. Set Refresh Token Cookie
+    // Set Refresh Token Cookie (Secure, HttpOnly)
     cookieStore.set("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: "lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60, 
+      maxAge: 7 * 24 * 60 * 60, // 7 Days
     });
 
-    // 4. Set User Role Cookie
-    const roleToSave = user.role || (type === 'password' ? 'super_admin' : 'patient');
-
+    // Set User Role Cookie (Accessible by Client/Middleware for UI rendering)
+    const roleToSave = user?.role || (type === 'password' ? 'super_admin' : 'patient');
     cookieStore.set("user_role", roleToSave, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
@@ -61,10 +71,11 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("❌ Login Proxy Error:", error.response?.data || error.message);
+    
     return NextResponse.json(
       { 
         success: false, 
-        message: error.response?.data?.message || "Login failed" 
+        message: error.response?.data?.message || "Login failed on server proxy" 
       },
       { status: error.response?.status || 500 }
     );

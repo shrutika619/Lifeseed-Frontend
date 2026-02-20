@@ -6,11 +6,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 import { Lock, Mail, Eye, EyeOff, Shield, CheckCircle, ArrowRight } from "lucide-react";
 
-// ✅ Import Services & Redux
-import axios from "axios"; // ✅ Import Axios
-import { adminLogin } from "@/app/services/auth.service"; // (You can remove this if no longer used)
+// ✅ Import Combined Auth Service & Redux
+import { adminLogin, logoutUser } from "@/app/services/auth.service";
 import { setCredentials, logoutSuccess, selectIsAuthenticated, selectUserRole, selectUser } from "@/redux/slices/authSlice";
-import api from "@/lib/axios";
 
 const LoginAdminPage = () => {
   const router = useRouter();
@@ -30,7 +28,6 @@ const LoginAdminPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // ✅ 1. Auto-Redirect for existing Admins
-  // If they are already an Admin/Super Admin, just send them to their dashboard.
   useEffect(() => {
     if (isAuthenticated && (userRole === 'admin' || userRole === 'super_admin')) {
       const dest = userRole === 'super_admin' ? '/super-admin/dashboard' : '/admin/dashboard';
@@ -40,15 +37,12 @@ const LoginAdminPage = () => {
 
   // ✅ 2. Logout Logic (For the Blocker UI)
   const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      dispatch(logoutSuccess());
-      toast.success("Logged out successfully");
-      router.refresh();
-    }
+    // Call service (we don't await/block the UI on failure, we force clear state anyway)
+    await logoutUser();
+    
+    dispatch(logoutSuccess());
+    toast.success("Logged out successfully");
+    router.refresh();
   };
 
   /* -------------------------------------------------------------
@@ -73,7 +67,6 @@ const LoginAdminPage = () => {
           </p>
 
           <div className="space-y-3">
-             {/* Option 1: Go back to their Dashboard */}
              <button
               onClick={() => {
                 const dest = userRole === 'clinic_admin' ? '/clinic/dashboard' : '/dashboard';
@@ -84,7 +77,6 @@ const LoginAdminPage = () => {
               Return to My Dashboard
             </button>
 
-            {/* Option 2: Logout */}
             <button
               onClick={handleLogout}
               className="w-full border border-red-200 text-red-600 bg-red-50 py-3 rounded-xl font-medium hover:bg-red-100 transition"
@@ -110,47 +102,33 @@ const LoginAdminPage = () => {
 
     setIsLoading(true);
 
-    try {
-      // ✅ Call your Next.js API Route
-      const response = await axios.post('/api/auth/login', {
-        type: 'password', // Triggers the Admin Logic in your API
-        username: email,  // Maps your 'email' state to 'username' expected by API
-        password: password
-      });
+    // ✅ Call the new Service Function
+    const result = await adminLogin(email, password);
 
-      const data = response.data;
+    if (result.success) {
+      const { accessToken, user } = result.data;
 
-      // Check success flag from your API response
-      if (data.success) {
-        const { accessToken, user } = data;
+      // Save to Redux
+      dispatch(setCredentials({ 
+        accessToken, 
+        user, 
+        role: user.role 
+      }));
 
-        // ✅ Save to Redux
-        dispatch(setCredentials({ 
-          accessToken, 
-          user, 
-          role: user.role 
-        }));
+      toast.success(`Welcome back, ${user.username || 'Admin'}`);
 
-        toast.success(`Welcome back, ${user.username || 'Admin'}`);
-
-        // ✅ Redirect based on Role
-        if (user.role === 'super_admin') {
-          router.push('/super-admin/dashboard');
-        } else {
-          router.push('/admin/dashboard');
-        }
+      // Redirect based on Role
+      if (user.role === 'super_admin') {
+        router.push('/super-admin/dashboard');
       } else {
-        // Handle API returning success: false
-        throw new Error(data.message || "Login failed");
+        router.push('/admin/dashboard');
       }
-
-    } catch (err) {
-      console.error("Login Error:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Invalid credentials. Access Denied.";
-      toast.error(errorMsg);
-    } finally {
-      setIsLoading(false);
+    } else {
+      // Error handling via service response
+      toast.error(result.message);
     }
+
+    setIsLoading(false);
   };
 
   return (

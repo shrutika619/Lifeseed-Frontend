@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import api from "@/lib/axios";
-import { Constants } from "@/app/utils/constants";
 import { ClinicStatusService } from "@/app/services/clinicStatus.service"; 
+// ✅ IMPORT THE NEW SERVICE
+import { getAllClinics } from "@/app/services/adminClinic.service"; 
 import { toast } from "sonner"; 
 import {
   Filter,
@@ -38,62 +38,69 @@ export default function AdminClinicsPage() {
   const [actionReason, setActionReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ FETCH DATA
-  const fetchClinics = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(Constants.urlEndPoints.GET_ALL_CLINICS);
+  // ✅ FETCH DATA USING SERVICE
+  const fetchClinics = async (signal) => {
+    setLoading(true);
+    
+    const result = await getAllClinics(signal);
+    
+    if (result.canceled) return; // Ignore if component unmounted
 
-      if (response.data.success) {
-        const mappedData = response.data.data.clinics.map((c) => ({
-          id: `#${c._id.slice(-5).toUpperCase()}`,
-          dbId: c._id,
-          name: c.clinicName,
-          subtitle: "Sexual Health Clinic", // Placeholder/Default
-          contact: c.mobileNo,
+    if (result.success) {
+      // Assuming the backend returns the array inside result.data.clinics
+      const clinicsArray = result.data?.clinics || [];
+      
+      const mappedData = clinicsArray.map((c) => ({
+        id: `#${c._id.slice(-5).toUpperCase()}`,
+        dbId: c._id,
+        name: c.clinicName,
+        subtitle: "Sexual Health Clinic", // Placeholder/Default
+        contact: c.mobileNo,
+        email: c.clinicEmail,
+        address: c.areaName || "Nagpur",
+        fullAddress: c.fulladdress,
+        googleLink: c.googleMapsLink,
+        doctors: "0 Doctors", 
+        transactions: "00",   
+        status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : 
+                (c.status === "pending" || c.status === "PENDING") ? "New" : 
+                (c.status === "rejected" || c.status === "REJECTED") ? "Inactive" : "Block",
+        
+        contactPerson: {
+          name: c.contactPersonName || "N/A",
+          phone: c.mobileNo,
+          email: c.contactPersonEmail || c.clinicEmail,
+        },
+        attendant: {
+          name: c.attendantName || "N/A",
+          phone: c.attendantNumber || "N/A",
+          email: "N/A",
+        },
+        hospitalPublic: {
+          phone: c.officeCallingNo || "N/A",
           email: c.clinicEmail,
-          address: c.areaName || "Nagpur",
-          fullAddress: c.fulladdress,
-          googleLink: c.googleMapsLink,
-          doctors: "0 Doctors", 
-          transactions: "00",   
-          status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : 
-                  (c.status === "pending" || c.status === "PENDING") ? "New" : 
-                  (c.status === "rejected" || c.status === "REJECTED") ? "Inactive" : "Block",
-          
-          contactPerson: {
-            name: c.contactPersonName || "N/A",
-            phone: c.mobileNo,
-            email: c.contactPersonEmail || c.clinicEmail,
-          },
-          attendant: {
-            name: c.attendantName || "N/A",
-            phone: c.attendantNumber || "N/A",
-            email: "N/A",
-          },
-          hospitalPublic: {
-            phone: c.officeCallingNo || "N/A",
-            email: c.clinicEmail,
-          },
-          owner: {
-            name: c.ownerName || "N/A",
-            phone: c.ownerContactNo || "N/A",
-            email: c.clinicEmail,
-          },
-          doctorsList: [],
-        }));
+        },
+        owner: {
+          name: c.ownerName || "N/A",
+          phone: c.ownerContactNo || "N/A",
+          email: c.clinicEmail,
+        },
+        doctorsList: [],
+      }));
 
-        setClinics(mappedData);
-      }
-    } catch (error) {
-      console.error("Failed to fetch clinics:", error);
-    } finally {
-      setLoading(false);
+      setClinics(mappedData);
+    } else {
+      toast.error(result.message);
     }
+    
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchClinics();
+    const controller = new AbortController();
+    fetchClinics(controller.signal);
+    
+    return () => controller.abort();
   }, []);
 
   const counts = {
@@ -198,13 +205,7 @@ export default function AdminClinicsPage() {
                 </button>
                 <h2 className="text-lg font-semibold text-gray-800">Details</h2>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Bell size={20} className="text-gray-600" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
-              </div>
+              
             </div>
           </div>
 
@@ -425,14 +426,7 @@ export default function AdminClinicsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Menu size={20} className="text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-800">Setup</h2>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Bell size={20} className="text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
+              <h2 className="text-lg font-semibold text-gray-800">Clinics</h2>
             </div>
           </div>
         </div>
