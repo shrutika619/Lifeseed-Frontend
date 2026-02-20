@@ -45,7 +45,13 @@ export class Constants {
     GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/clinicDoctor`, 
     
     //--HOSPITAL DASHBOARD--
-    GET_DOCTORS: `${this.API_BASE_URL}/doctors`,
+    HOSPITAL_DOCTORS: `${this.API_BASE_URL}/doctors`,
+    
+    // Master Data Endpoints
+    GET_UG_DEGREES: `/master/ug-degrees`,
+    GET_PG_DEGREES: `/master/pg-degrees`,
+    GET_SUPER_SPECIALIZATIONS: `/master/super-specializations`,
+    GET_PRIMARY_SPECIALTIES: `/master/primary-specialties`,
 
   };
 }
