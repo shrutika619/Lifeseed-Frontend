@@ -27,7 +27,11 @@ const HospitalDashboardHeaderPage = ({
             <Menu className="w-6 h-6 text-gray-700" />
           </button>
 
-          <h1 className="text-2xl font-bold text-blue-600">MEN10</h1>
+          <img
+            src="/Images/MEN10.svg"
+            alt="MEN10 Logo"
+            className="h-8 w-auto"
+          />
         </div>
 
         {/* Right: Notification & Profile */}

@@ -78,7 +78,12 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) =
         `}
       >
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h1 className="text-blue-600 font-bold text-2xl">MEN10</h1>
+        <img
+          src="/Images/MEN10.svg"
+          alt="MEN10 Logo"
+          className="h-8 w-auto cursor-pointer"
+          onClick={() => router.push("/hospitaldashboard/profile")}
+        />
           <button
             onClick={onClose}
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
@@ -89,7 +94,10 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) =
         </div>
 
         <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+          <div
+            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+            onClick={() => router.push("/hospitaldashboard/profile")}
+          >
             <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center">
               <span className="text-blue-600 font-semibold text-lg">
                 {hospitalData?.name?.charAt(0) || "C"}
