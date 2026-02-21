@@ -116,6 +116,12 @@ export default function ClinicAuth() {
       const message = err.response?.data?.message || "";
       if (message.includes("Please login") || message.includes("already exists") || message.includes("already approved")) {
         toast.error(message);
+        cookieStore.delete("refreshToken");
+        cookieStore.delete("user_role");
+  
+          // If you also store the accessToken in cookies, delete it here:
+        cookieStore.delete("accessToken"); 
+        console.log("cookies cleared");
         setTimeout(() => router.push("/login"), 1500);
         return;
       }
