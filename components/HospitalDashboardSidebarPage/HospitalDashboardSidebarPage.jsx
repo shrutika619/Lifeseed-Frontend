@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Clock,
   Settings,
@@ -13,9 +13,11 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { logoutSuccess } from "@/redux/slices/authSlice"; 
+import { toast } from "sonner"; 
 
-
-import axios from "axios";
+// ✅ Import Services
+import { logoutUser } from "@/app/services/auth.service"; 
+import { getMeClinicProfile } from "@/app/services/hospitalProfile.service"; // ⬅️ NEW IMPORT
 
 const menuItems = [
   { label: "Time Table", icon: Clock, path: "time-table" },
@@ -25,26 +27,66 @@ const menuItems = [
   { label: "Terms & Conditions", icon: FileText, path: "terms-conditions" },
 ];
 
-const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) => {
+const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
   const router = useRouter();
   const pathname = usePathname();
-    const dispatch = useDispatch();
-
+  const dispatch = useDispatch();
 
   const basePath = "/hospitaldashboard";
+
+  // ✅ State to hold the dynamically fetched clinic info
+  const [clinicInfo, setClinicInfo] = useState({
+    name: "Loading...",
+    location: "Loading...",
+    initial: "C"
+  });
+
+  // ✅ Fetch Clinic Data on Mount
+  useEffect(() => {
+    const fetchSidebarData = async () => {
+      try {
+        const response = await getMeClinicProfile();
+        if (response.success && response.data) {
+          const clinic = response.data;
+          
+          // Clean up location format (e.g. "Sitaburdi, Nagpur")
+          const area = clinic.areaName || "";
+          const city = clinic.city || "";
+          const formattedLocation = [area, city].filter(Boolean).join(", ");
+
+          setClinicInfo({
+            name: clinic.clinicName || "MEN10 Clinic",
+            location: formattedLocation || "Location Unavailable",
+            initial: (clinic.clinicName || "M").charAt(0).toUpperCase()
+          });
+        } else {
+          setClinicInfo({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
+        }
+      } catch (error) {
+        console.error("Failed to load sidebar clinic data", error);
+        setClinicInfo({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
+      }
+    };
+
+    fetchSidebarData();
+  }, []);
 
   const handleNavigation = (path) => {
     router.push(`${basePath}/${path}`);
     onClose?.();
   };
 
-   const handleLogout = async () => {
+  const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
-
-      await axios.post('/api/auth/logout');
+      const result = await logoutUser();
+      if (result.success) {
+        toast.success("Logged out successfully");
+      } else {
+        console.warn("Server logout returned false, forcing local logout");
+      }
     } catch (error) {
-      console.error("Logout API call failed", error);
+      console.error("Logout failed:", error);
+      toast.info("Logging out locally..."); 
     } finally {
       dispatch(logoutSuccess());
       router.push("/");
@@ -78,12 +120,12 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) =
         `}
       >
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-        <img
-          src="/Images/MEN10.svg"
-          alt="MEN10 Logo"
-          className="h-8 w-auto cursor-pointer"
-          onClick={() => router.push("/hospitaldashboard/profile")}
-        />
+          <img
+            src="/Images/MEN10.svg"
+            alt="MEN10 Logo"
+            className="h-8 w-auto cursor-pointer"
+            onClick={() => router.push("/hospitaldashboard/profile")}
+          />
           <button
             onClick={onClose}
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
@@ -98,19 +140,24 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) =
             className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
             onClick={() => router.push("/hospitaldashboard/profile")}
           >
-            <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center">
+            {/* ✅ Dynamic Initial */}
+            <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center flex-shrink-0">
               <span className="text-blue-600 font-semibold text-lg">
-                {hospitalData?.name?.charAt(0) || "C"}
+                {clinicInfo.initial}
               </span>
             </div>
+            
             <div className="flex-1 min-w-0">
+              {/* ✅ Dynamic Name */}
               <h3 className="font-semibold text-gray-900 truncate">
-                {hospitalData?.name || "Care Hospital"}
+                {clinicInfo.name}
               </h3>
+              {/* ✅ Dynamic Location (Area, City) */}
               <p className="text-sm text-gray-500 truncate">
-                {hospitalData?.location || "Sitaburdi, Nagpur"}
+                {clinicInfo.location}
               </p>
             </div>
+            
             <svg
               className="w-5 h-5 text-gray-400 flex-shrink-0"
               fill="none"
@@ -166,8 +213,11 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose, hospitalData }) =
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
           >
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">N</span>
+            {/* ✅ Dynamic Initial for Logout button too */}
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm">
+                {clinicInfo.initial}
+              </span>
             </div>
             <span>Logout</span>
           </button>

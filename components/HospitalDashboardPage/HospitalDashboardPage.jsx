@@ -1,6 +1,7 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Star, Clock, User, Calendar, Droplet, X, Check } from 'lucide-react';
+import { getMeClinicProfile } from "@/app/services/hospitalProfile.service"; // ✅ IMPORT SERVICE
 
 const HospitalDashboard = () => {
   const [activeTab, setActiveTab] = useState('all');
@@ -12,6 +13,14 @@ const HospitalDashboard = () => {
   const [followUpStatus, setFollowUpStatus] = useState('');
   const [paymentReceived, setPaymentReceived] = useState(false);
   const [notes, setNotes] = useState('');
+  
+  // ✅ STATE FOR CLINIC HEADER
+  const [clinicHeader, setClinicHeader] = useState({
+    name: "Loading...",
+    location: "Loading...",
+    initial: "C"
+  });
+
   const [requests, setRequests] = useState([
     {
       id: 'ED#0298848',
@@ -65,6 +74,36 @@ const HospitalDashboard = () => {
       status: 'pending'
     }
   ]);
+
+  // ✅ FETCH CLINIC DATA ON MOUNT
+  useEffect(() => {
+    const fetchHeaderData = async () => {
+      try {
+        const response = await getMeClinicProfile();
+        if (response.success && response.data) {
+          const clinic = response.data;
+          
+          const area = clinic.areaName || "";
+          const city = clinic.city || "";
+          const formattedLocation = [area, city].filter(Boolean).join(", ");
+
+          setClinicHeader({
+            name: clinic.clinicName || "MEN10 Clinic",
+            location: formattedLocation || "Location Unavailable",
+            initial: (clinic.clinicName || "M").charAt(0).toUpperCase()
+          });
+        } else {
+          setClinicHeader({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
+        }
+      } catch (error) {
+        console.error("Failed to load header clinic data", error);
+        setClinicHeader({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
+      }
+    };
+
+    fetchHeaderData();
+  }, []);
+
 
   const tabs = [
     { id: 'all', label: 'All', count: requests.length },
@@ -158,21 +197,21 @@ const HospitalDashboard = () => {
       });
 
   return (
-    // ✅ FIX: Same as timetable page — renders inside sidebar layout, so no min-h-screen.
-    // Use h-full + overflow-y-auto to scroll within the content panel.
     <div className="h-full overflow-y-auto bg-gray-50">
 
-      {/* ✅ FIX: Removed sticky top-0 z-40 — header now flows naturally, no sidebar overlap. */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                <div className="w-6 h-6 bg-white rounded" style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}></div>
+              {/* ✅ DYNAMIC INITIAL */}
+              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center font-bold text-white text-lg">
+                {clinicHeader.initial}
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900">Care Hospital Nagpur</h1>
-                <p className="text-xs sm:text-sm text-gray-500">Wardha Rd, Jhansi Rani Sq, Nagpur</p>
+                {/* ✅ DYNAMIC NAME */}
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900">{clinicHeader.name}</h1>
+                {/* ✅ DYNAMIC LOCATION */}
+                <p className="text-xs sm:text-sm text-gray-500">{clinicHeader.location}</p>
               </div>
             </div>
           </div>
@@ -256,7 +295,7 @@ const HospitalDashboard = () => {
                               </>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-flex">
+                          <div className="items-center gap-2 mt-2 text-sm text-gray-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-flex">
                             <Calendar size={14} />
                             <span className="font-medium">Slot: {request.slot}</span>
                           </div>

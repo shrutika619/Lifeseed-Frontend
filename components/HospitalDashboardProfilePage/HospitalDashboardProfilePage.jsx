@@ -1,5 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
+// ✅ IMPORT YOUR API SERVICES
+import { getMeClinicProfile, updateClinicProfile } from "@/app/services/hospitalProfile.service";
 
 /* ── ICONS ── */
 const EditIcon = () => (
@@ -66,26 +71,98 @@ const StarIcon = () => (
 );
 
 export default function ClinicProfileDesktop() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  
   const [data, setData] = useState({
-    name: "MEN10 SEXUAL HEALTH CLINIC -",
-    branch: "Kothrud",
+    name: "MEN10 SEXUAL HEALTH CLINIC",
+    branch: "",
     role: "Administrator",
-    email: "admin@wellnessharmony.com",
-    phone: "7020229934",
-    location: "123 Wellness Street, Suite 200, Los Angeles, CA 90001",
+    email: "",
+    phone: "",
+    location: "",
     workingHours: "Mon - Fri: 9:00 AM - 6:00 PM",
     doctors: "8 Specialist Doctors",
     appointments: "1,234",
     patients: "892",
     rating: "4.8",
   });
+  
   const [temp, setTemp] = useState(data);
 
+  // ✅ FETCH CLINIC DATA ON MOUNT
+  useEffect(() => {
+    const fetchClinicData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await getMeClinicProfile();
+        
+        if (response.success && response.data) {
+          const clinic = response.data;
+          
+          setData(prev => ({
+            ...prev,
+            name: clinic.clinicName || "MEN10 CLINIC",
+            branch: clinic.areaName || "",
+            email: clinic.clinicEmail || "",
+            phone: clinic.officeCallingNo || "",
+            location: clinic.fulladdress || "",
+            // Mock data overrides:
+            appointments: clinic.appointmentsCount || prev.appointments,
+            patients: clinic.patientsCount || prev.patients,
+          }));
+        } else {
+          toast.error(response.message || "Failed to load clinic details");
+        }
+      } catch (error) {
+        toast.error("Error connecting to server");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClinicData();
+  }, []);
+
+
   const onChange = (e) => setTemp(p => ({ ...p, [e.target.name]: e.target.value }));
-  const onEdit = () => { setTemp(data); setIsEditing(true); };
-  const onSave = () => { setData(temp); setIsEditing(false); };
+  
+  const onEdit = () => { 
+    setTemp(data); 
+    setIsEditing(true); 
+  };
+  
   const onCancel = () => setIsEditing(false);
+  
+  // ✅ SAVE DATA API CALL
+  const onSave = async () => {
+    setIsSaving(true);
+    
+    // Create FormData since your backend router uses multer upload.fields
+    const formData = new FormData();
+    formData.append("clinicName", temp.name);
+    formData.append("areaName", temp.branch);
+    formData.append("clinicEmail", temp.email);
+    formData.append("officeCallingNo", temp.phone);
+    formData.append("fulladdress", temp.location);
+
+    try {
+      const response = await updateClinicProfile(formData);
+      
+      if (response.success) {
+        setData(temp); // Update local state with new changes
+        setIsEditing(false);
+        toast.success("Profile updated successfully!");
+      } else {
+        toast.error(response.message || "Failed to update profile");
+      }
+    } catch (error) {
+      toast.error("Error updating profile");
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   // Actionable Back Function
   const onBack = () => {
@@ -99,6 +176,14 @@ export default function ClinicProfileDesktop() {
   };
 
   const cur = isEditing ? temp : data;
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-100">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -143,7 +228,6 @@ export default function ClinicProfileDesktop() {
         }
         .cpd-btn-edit:hover { background: #fef9c3; border-color: #d1d5db; }
         
-        /* UPDATED: Save Changes Button - Blue Color */
         .cpd-btn-save {
           display: inline-flex; align-items: center; gap: 7px;
           background: #2563eb; border: none;
@@ -152,6 +236,7 @@ export default function ClinicProfileDesktop() {
           cursor: pointer; font-family: inherit; transition: background 0.15s;
         }
         .cpd-btn-save:hover { background: #1d4ed8; }
+        .cpd-btn-save:disabled { background: #93c5fd; cursor: not-allowed; }
         
         .cpd-btn-cancel {
           display: inline-flex; align-items: center; gap: 6px;
@@ -311,8 +396,11 @@ export default function ClinicProfileDesktop() {
           <div className="cpd-btn-group">
             {isEditing ? (
               <>
-                <button className="cpd-btn-cancel" onClick={onCancel}><XIcon /> Cancel</button>
-                <button className="cpd-btn-save" onClick={onSave}><SaveIcon /> Save Changes</button>
+                <button className="cpd-btn-cancel" onClick={onCancel} disabled={isSaving}><XIcon /> Cancel</button>
+                <button className="cpd-btn-save" onClick={onSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 size={14} className="animate-spin" /> : <SaveIcon />}
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
               </>
             ) : (
               <button className="cpd-btn-edit" onClick={onEdit}><EditIcon /> Edit Profile</button>
@@ -338,8 +426,8 @@ export default function ClinicProfileDesktop() {
                   </div>
                   {isEditing ? (
                     <>
-                      <input className="cpd-name-input" name="name" value={cur.name} onChange={onChange} />
-                      <input className="cpd-name-input" name="branch" value={cur.branch} onChange={onChange} />
+                      <input className="cpd-name-input" name="name" value={cur.name} onChange={onChange} placeholder="Clinic Name" />
+                      <input className="cpd-name-input" name="branch" value={cur.branch} onChange={onChange} placeholder="Branch / Area Name" />
                     </>
                   ) : (
                     <>
@@ -363,8 +451,8 @@ export default function ClinicProfileDesktop() {
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Email</div>
                     {isEditing
-                      ? <input className="cpd-input" name="email" value={cur.email} onChange={onChange} />
-                      : <div className="cpd-val">{data.email}</div>}
+                      ? <input type="email" className="cpd-input" name="email" value={cur.email} onChange={onChange} />
+                      : <div className="cpd-val">{data.email || "Not Provided"}</div>}
                   </div>
                 </div>
                 <div className="cpd-row">
@@ -372,8 +460,8 @@ export default function ClinicProfileDesktop() {
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Phone</div>
                     {isEditing
-                      ? <input className="cpd-input" name="phone" value={cur.phone} onChange={onChange} />
-                      : <div className="cpd-val">{data.phone}</div>}
+                      ? <input type="tel" className="cpd-input" name="phone" value={cur.phone} onChange={onChange} />
+                      : <div className="cpd-val">{data.phone || "Not Provided"}</div>}
                   </div>
                 </div>
                 <div className="cpd-row">
@@ -382,7 +470,7 @@ export default function ClinicProfileDesktop() {
                     <div className="cpd-lbl">Location</div>
                     {isEditing
                       ? <textarea className="cpd-textarea" name="location" value={cur.location} onChange={onChange} />
-                      : <div className="cpd-val">{data.location}</div>}
+                      : <div className="cpd-val">{data.location || "Not Provided"}</div>}
                   </div>
                 </div>
               </div>
@@ -422,7 +510,7 @@ export default function ClinicProfileDesktop() {
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Working Hours</div>
                     {isEditing
-                      ? <input className="cpd-input" name="workingHours" value={cur.workingHours} onChange={onChange} />
+                      ? <input className="cpd-input" name="workingHours" value={cur.workingHours} onChange={onChange} readOnly title="Working hours managed via Timings Module" />
                       : <div className="cpd-val">{data.workingHours}</div>}
                   </div>
                 </div>
@@ -431,7 +519,7 @@ export default function ClinicProfileDesktop() {
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Doctors</div>
                     {isEditing
-                      ? <input className="cpd-input" name="doctors" value={cur.doctors} onChange={onChange} />
+                      ? <input className="cpd-input" name="doctors" value={cur.doctors} onChange={onChange} readOnly title="Doctors managed via Team Module" />
                       : <div className="cpd-val">{data.doctors}</div>}
                   </div>
                 </div>
