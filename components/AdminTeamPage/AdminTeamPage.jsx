@@ -17,11 +17,11 @@ export const AdminTeamPage = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentView, setCurrentView] = useState('list'); // 'list', 'form', or 'permissions'
+  const [currentView, setCurrentView] = useState('list'); 
   
   const [teamMembers, setTeamMembers] = useState([]);
   const [editingMember, setEditingMember] = useState(null);
-  const [allModules, setAllModules] = useState([]); // Dynamically loaded from backend
+  const [allModules, setAllModules] = useState([]); 
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -30,7 +30,7 @@ export const AdminTeamPage = () => {
     password: '',
     confirmPassword: '',
     address: '',
-    teamRole: 'admin' // default
+    teamRole: 'admin' 
   });
 
   const [permissions, setPermissions] = useState({});
@@ -40,7 +40,7 @@ export const AdminTeamPage = () => {
     setLoading(true);
     try {
       const [adminsRes, modulesRes] = await Promise.all([
-        getAllAdmins({ limit: 100 }), // Fetching a larger limit to allow client-side filtering
+        getAllAdmins({ limit: 100 }), 
         getModulePermissions()
       ]);
 
@@ -52,7 +52,6 @@ export const AdminTeamPage = () => {
 
       if (modulesRes.success) {
         setAllModules(modulesRes.data || []);
-        // Initialize an empty permissions object based on available modules
         const initPerms = {};
         (modulesRes.data || []).forEach(m => initPerms[m.key] = false);
         setPermissions(initPerms);
@@ -70,9 +69,16 @@ export const AdminTeamPage = () => {
   }, []);
 
   const handleChange = (e) => {
+    // Basic real-time sanitize (e.g., prevent non-numbers in mobile field)
+    let value = e.target.value;
+    if (e.target.name === 'mobileNo') {
+      value = value.replace(/\D/g, ''); // Remove non-digits
+      if (value.length > 10) value = value.slice(0, 10);
+    }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: value
     });
   };
 
@@ -90,13 +96,12 @@ export const AdminTeamPage = () => {
       fullName: member.profile?.fullName || '',
       email: member.profile?.email || '',
       mobileNo: member.mobileNo || '',
-      password: '', // Hidden/ignored during edit
+      password: '', 
       confirmPassword: '',
       address: member.profile?.address || '',
       teamRole: member.role || 'admin'
     });
 
-    // Populate active permissions
     const currentPerms = {};
     allModules.forEach(m => {
       currentPerms[m.key] = member.modulePermissions?.includes(m.key) || false;
@@ -106,18 +111,50 @@ export const AdminTeamPage = () => {
     setCurrentView('form');
   };
 
-  // ✅ Handle Submit (Create or Update Profile)
-  const handleFormSubmit = async () => {
-    if (!formData.fullName || !formData.email || !formData.mobileNo) {
-      toast.error('Please fill required fields (Name, Email, Mobile)');
-      return;
+  // ✅ Strict Form Validation
+  const validateForm = () => {
+    const { fullName, email, mobileNo, password, confirmPassword } = formData;
+    
+    if (!fullName.trim() || fullName.length < 3) {
+      toast.error("Please enter a valid full name (min 3 characters).");
+      return false;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return false;
+    }
+
+    if (mobileNo.length !== 10) {
+      toast.error("Mobile number must be exactly 10 digits.");
+      return false;
+    }
+
+    // Only validate passwords if creating a new user OR if they are trying to update the password
+    if (!editingMember) {
+      if (!password || password.length < 6) {
+        toast.error("Password is required and must be at least 6 characters.");
+        return false;
+      }
+      if (password !== confirmPassword) {
+        toast.error("Passwords do not match.");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // ✅ Handle Submit
+  const handleFormSubmit = async () => {
+    if (!validateForm()) return; // Stop if validation fails
 
     setIsSubmitting(true);
 
     try {
       if (editingMember) {
-        // UPDATE EXISTING (Profile details only)
+        // UPDATE EXISTING
         const res = await updateAdminProfile(editingMember._id, {
           fullName: formData.fullName,
           email: formData.email,
@@ -135,13 +172,7 @@ export const AdminTeamPage = () => {
         }
 
       } else {
-        // CREATE NEW MEMBER
-        if (!formData.password || formData.password !== formData.confirmPassword) {
-          toast.error('Passwords are required and must match');
-          setIsSubmitting(false);
-          return;
-        }
-
+        // CREATE NEW
         const activePermissionsArray = Object.keys(permissions).filter(k => permissions[k]);
 
         const res = await registerTeamMember({
@@ -159,23 +190,21 @@ export const AdminTeamPage = () => {
           loadData();
           setCurrentView('list');
           
-          // Reset form
           setFormData({ fullName: '', email: '', mobileNo: '', password: '', confirmPassword: '', address: '', teamRole: 'admin' });
         } else {
           toast.error(res.message);
         }
       }
     } catch (error) {
-      toast.error("Something went wrong");
+      toast.error("Something went wrong processing your request.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // ✅ Handle Submit Permissions (For Existing Users Only)
+  // ✅ Handle Permissions Submit
   const handlePermissionsSubmit = async () => {
     if (!editingMember) {
-      // If we are creating a new user, just switch back to the form to finish creation
       setCurrentView('form');
       return;
     }
@@ -200,7 +229,6 @@ export const AdminTeamPage = () => {
     }
   };
 
-  // ✅ Delete Admin
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this team member?')) {
       const res = await deleteAdmin(id);
@@ -260,7 +288,6 @@ export const AdminTeamPage = () => {
               onClick={() => {
                 setEditingMember(null);
                 setFormData({ fullName: '', email: '', mobileNo: '', password: '', confirmPassword: '', address: '', teamRole: 'admin' });
-                // Reset perms to false
                 const resetPerms = {};
                 allModules.forEach(m => resetPerms[m.key] = false);
                 setPermissions(resetPerms);
@@ -302,7 +329,6 @@ export const AdminTeamPage = () => {
                   <tr key={member._id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-4 text-sm font-semibold text-gray-700">{index + 1}</td>
                     <td className="px-4 py-4">
-                      {/* Active toggle mock */}
                       <div className={`w-9 h-5 flex items-center rounded-full p-1 cursor-not-allowed transition-colors bg-blue-100`}>
                         <div className={`bg-white w-3.5 h-3.5 rounded-full shadow-md transform transition-transform translate-x-3.5`}></div>
                       </div>
@@ -392,6 +418,7 @@ export const AdminTeamPage = () => {
                   value={formData.fullName}
                   onChange={handleChange}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                  placeholder="John Doe"
                 />
               </div>
               <div>
@@ -402,6 +429,7 @@ export const AdminTeamPage = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                  placeholder="admin@example.com"
                 />
               </div>
               <div>
@@ -412,6 +440,7 @@ export const AdminTeamPage = () => {
                   value={formData.mobileNo}
                   onChange={handleChange}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                  placeholder="10-digit number"
                 />
               </div>
             </div>
@@ -427,6 +456,7 @@ export const AdminTeamPage = () => {
                     value={formData.password}
                     onChange={handleChange}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                    placeholder="Min. 6 characters"
                   />
                 </div>
                 <div>
@@ -437,6 +467,7 @@ export const AdminTeamPage = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                    placeholder="Must match password"
                   />
                 </div>
               </div>
