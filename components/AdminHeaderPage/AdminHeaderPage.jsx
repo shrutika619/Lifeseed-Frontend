@@ -1,19 +1,16 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation"; 
-import { useDispatch } from "react-redux"; 
-import { logoutSuccess } from "@/redux/slices/authSlice"; 
+import { useDispatch, useSelector } from "react-redux"; 
+// ✅ Import Redux Selectors
+import { logoutSuccess, selectUser, selectUserRole } from "@/redux/slices/authSlice"; 
 import { toast } from "sonner"; 
-import { Bell, Menu, User, LogOut, ChevronDown } from "lucide-react";
+import { Bell, Menu, User, LogOut, ChevronDown, ShieldCheck } from "lucide-react";
 
-// ✅ Import the centralized Logout Service
 import { logoutUser } from "@/app/services/auth.service"; 
 
 const AdminHeaderPage = ({ 
-  role = "Admin", 
   title = "Dashboard", 
-  userName = "User",
-  userPhone = "9999999999",
   notificationCount = 10,
   onMenuToggle,
   onLogout,
@@ -26,6 +23,15 @@ const AdminHeaderPage = ({
   const router = useRouter();
   const dispatch = useDispatch();
 
+  // ✅ Pull current user data from Redux
+  const currentUser = useSelector(selectUser);
+  const userRole = useSelector(selectUserRole);
+
+  // ✅ Dynamically determine what to display based on Role & Data
+  const displayName = currentUser?.profile?.fullName || currentUser?.username || "Admin User";
+  const displayPhone = currentUser?.mobileNo || "9999999999";
+  const displayRole = userRole === "super_admin" || userRole === "SUPER_ADMIN" ? "Super Admin" : "Admin";
+
   const handleMenuClick = () => {
     if (onMenuToggle) {
       onMenuToggle();
@@ -36,14 +42,11 @@ const AdminHeaderPage = ({
     setIsDropdownOpen(!isDropdownOpen);
   };
 
-  // ✅ UPDATED LOGOUT LOGIC (Using Service)
   const handleLogout = async () => {
     setIsDropdownOpen(false); 
 
     try {
-      // 1. Call the service to clear HttpOnly cookies and notify backend
       const result = await logoutUser();
-      
       if (result.success) {
         toast.success("Logged out successfully");
       } else {
@@ -53,30 +56,19 @@ const AdminHeaderPage = ({
       console.error("Logout failed:", error);
       toast.info("Logging out locally..."); 
     } finally {
-      // 2. Clear Redux Store
       dispatch(logoutSuccess());
-
-      // 3. Trigger parent callback
-      if (onLogout) {
-        onLogout();
-      }
-
-      // 4. Redirect to Admin Login
+      if (onLogout) onLogout();
       router.push("/admin/login");
     }
   };
 
   const handleProfileClick = () => {
     setIsDropdownOpen(false);
-    if (onProfileClick) {
-      onProfileClick();
-    }
+    if (onProfileClick) onProfileClick();
   };
 
   const handleNotificationClick = () => {
-    if (onNotificationClick) {
-      onNotificationClick();
-    }
+    if (onNotificationClick) onNotificationClick();
   };
 
   useEffect(() => {
@@ -85,7 +77,6 @@ const AdminHeaderPage = ({
         setIsDropdownOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -130,8 +121,8 @@ const AdminHeaderPage = ({
               onClick={toggleDropdown}
               className="flex items-center gap-2 hover:bg-gray-50 rounded-lg transition-colors p-1"
             >
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm sm:text-base">
-                {userName.charAt(0).toUpperCase()}
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white ${userRole === 'super_admin' ? 'bg-indigo-600' : 'bg-blue-600'}`}>
+                {displayName.charAt(0).toUpperCase()}
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform hidden sm:block ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -140,20 +131,28 @@ const AdminHeaderPage = ({
             {isDropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 animate-dropdown">
                 {/* User Info */}
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-800">{userName}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{userPhone}</p>
+                <div className="px-4 py-4 border-b border-gray-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-sm font-bold text-gray-800 truncate">{displayName}</h2>
+                    {userRole === 'super_admin' && (
+                      <ShieldCheck className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 font-medium">{displayPhone}</p>
+                  <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${userRole === 'super_admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                    {displayRole}
+                  </span>
                 </div>
 
                 {/* Menu Items */}
                 <div className="py-1">
-                  <button
+                  {/* <button
                     onClick={handleProfileClick}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <User className="w-4 h-4 text-gray-500" />
                     <span>My Profile</span>
-                  </button>
+                  </button> */}
 
                   <button
                     onClick={handleLogout}
@@ -180,7 +179,6 @@ const AdminHeaderPage = ({
             transform: translateY(0);
           }
         }
-
         .animate-dropdown {
           animation: dropdown 0.2s ease-out;
         }

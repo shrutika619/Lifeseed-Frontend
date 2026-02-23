@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -13,30 +13,76 @@ import {
   X,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
+import { useSelector } from "react-redux";
+import { selectUser } from "@/redux/slices/authSlice";
+
+// ✅ Import the service
+import { getAdminById } from "@/app/services/adminUsers.service";
 
 const menuItems = [
-  { label: " Dashboard", icon: LayoutDashboard, path: "dashboard" },
-  { label: "First Time User", icon: MessageSquare, path: "first-time-user" },
-  { label: "Log In User", icon: MessageSquare, path: "log-in-user" },
-  { label: "In-clinic Consultation", icon: Building2, path: "in-clinic-consultation" },
-  { label: "Teleconsultation", icon: Video, path: "teleconsultation" },
-  { label: "Clinics", icon: Stethoscope, path: "clinics" },
-  { label: "Setup", icon: Settings, path: "setup" },
-  { label: "Audit Logs", icon: ScrollText, path: "auditlogs" },
-  { label: "Team", icon: Users, path: "team" },
+  { label: " Dashboard", icon: LayoutDashboard, path: "dashboard", moduleKey: "dashboard" },
+  { label: "First Time User", icon: MessageSquare, path: "first-time-user", moduleKey: "inquiry" },
+  { label: "Log In User", icon: MessageSquare, path: "log-in-user", moduleKey: "inquiry" },
+  { label: "In-clinic Consultation", icon: Building2, path: "in-clinic-consultation", moduleKey: "inclinic" },
+  { label: "Teleconsultation", icon: Video, path: "teleconsultation", moduleKey: "teleconsultation" },
+  { label: "Clinics", icon: Stethoscope, path: "clinics", moduleKey: "super_admin_only" }, 
+  { label: "Setup", icon: Settings, path: "setup", moduleKey: "super_admin_only" }, 
+  { label: "Audit Logs", icon: ScrollText, path: "auditlogs", moduleKey: "audit_logs" },
+  { label: "Team", icon: Users, path: "team", moduleKey: "team" },
 ];
 
 const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ BASE PATH (ADMIN vs SUPER ADMIN)
-  const basePath = role === "SUPER_ADMIN" ? "/super-admin" : "/admin";
+  // ✅ Get the current user ID from Redux
+  const currentUser = useSelector(selectUser);
 
-  // ✅ Role based filtering
+  // ✅ State to hold fresh permissions from the API (fallback to Redux initially to prevent UI flickering)
+  const [activePermissions, setActivePermissions] = useState(currentUser?.modulePermissions || []);
+
+  // ✅ Fetch Fresh Permissions on Mount
+  useEffect(() => {
+    // Super Admins don't need to fetch permissions to filter the sidebar
+    if (role === "SUPER_ADMIN" || role === "super_admin") return;
+
+    const fetchFreshPermissions = async () => {
+      if (currentUser?._id) {
+        try {
+          const res = await getAdminById(currentUser._id);
+          if (res.success) {
+            // Your service already handles the "message" vs "data" quirk.
+            // The response structure gives us: res.data.admin.modulePermissions
+            const fetchedPermissions = res.data?.admin?.modulePermissions || [];
+            setActivePermissions(fetchedPermissions);
+          }
+        } catch (error) {
+          console.error("Failed to fetch fresh permissions", error);
+        }
+      }
+    };
+
+    fetchFreshPermissions();
+  }, [currentUser?._id, role]);
+
+
+  // ✅ BASE PATH
+  const basePath = role === "SUPER_ADMIN" || role === "super_admin" ? "/super-admin" : "/admin";
+
+  // ✅ Role & Permission based filtering
   const filteredMenu = menuItems.filter((item) => {
-    if (role === "ADMIN" && item.label === "Setup") return false;
-    return true;
+    // 1. Super Admins see everything
+    if (role === "SUPER_ADMIN" || role === "super_admin") {
+      return true;
+    }
+
+    // 2. Standard Admins only see what is in their API permissions array
+    if (role === "ADMIN" || role === "admin") {
+      if (item.moduleKey === "super_admin_only") return false;
+      return activePermissions.includes(item.moduleKey);
+    }
+
+    return false;
   });
 
   const handleNavigation = (path) => {
@@ -44,9 +90,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
     onClose?.();
   };
 
-  // ✅ FINAL ACTIVE FIX (IMPORTANT)
-  const isActive = (path) =>
-    pathname.startsWith(`${basePath}/${path}`);
+  const isActive = (path) => pathname.startsWith(`${basePath}/${path}`);
 
   return (
     <>
@@ -92,7 +136,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
               key={label}
               onClick={() => handleNavigation(path)}
               className={`
-                w-full flex items-center gap-6 px-4 py-6.5 rounded-lg text-left
+                w-full flex items-center gap-6 px-4 py-3.5 rounded-lg text-left
                 transition-all duration-200 font-medium
                 ${
                   isActive(path)
@@ -105,6 +149,13 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
               <span>{label}</span>
             </button>
           ))}
+
+          {/* Show a message if admin has 0 permissions */}
+          {filteredMenu.length === 0 && (
+            <div className="text-sm text-gray-500 text-center py-4 px-2">
+              No modules assigned. Please contact Super Admin.
+            </div>
+          )}
         </nav>
       </aside>
     </>

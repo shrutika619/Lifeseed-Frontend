@@ -24,6 +24,16 @@ export class Constants {
     ADMIN_REGISTER: `${this.API_BASE_URL}/adminregister`,
     ADMIN_DASHBOARD: `${this.API_BASE_URL}/admindashboard`,
 
+    //--- ADMIN TEAM MEMBER ---
+    REGISTER_TEAM: "/admin/register/teammember",
+    GET_ALL_ADMINS: "/users/admins",
+    GET_MODULES: "/users/modules",
+    
+    // Dynamic endpoints (Functions)
+    ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE
+    ADMIN_PERMISSIONS: (id) => `/users/admin/${id}/permissions`, // PUT
+    ADMIN_PROFILE: (id) => `/users/admin/${id}/profile`,
+
     // --- CLINIC ---
     CLINIC_SEND_OTP: `${this.API_BASE_URL}/clinic/send-otp`,
     CLINIC_VERIFY_OTP: `${this.API_BASE_URL}/clinic/verify-otp`,
