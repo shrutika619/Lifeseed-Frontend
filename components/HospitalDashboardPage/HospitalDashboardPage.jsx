@@ -158,8 +158,12 @@ const HospitalDashboard = () => {
       });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-40">
+    // ✅ FIX: Same as timetable page — renders inside sidebar layout, so no min-h-screen.
+    // Use h-full + overflow-y-auto to scroll within the content panel.
+    <div className="h-full overflow-y-auto bg-gray-50">
+
+      {/* ✅ FIX: Removed sticky top-0 z-40 — header now flows naturally, no sidebar overlap. */}
+      <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -464,7 +468,7 @@ const HospitalDashboard = () => {
         </div>
       )}
 
-      {/* Reject Card Modal - First Screen when clicking "Reject" */}
+      {/* Reject Card Modal */}
       {showRejectCard && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
@@ -547,7 +551,7 @@ const HospitalDashboard = () => {
         </div>
       )}
 
-      {/* Reject Modal - Second Screen (popup) */}
+      {/* Reject Modal */}
       {showRejectModal && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">

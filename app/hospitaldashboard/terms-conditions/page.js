@@ -1,5 +1,5 @@
 import React from "react";
-import Men10TermandConditionPage from "@/components/Men10TermandConditionPage/Men10TermandConditionPage";
+import Men10TermandConditionPage from "@/components/HospitaldashboardTermsconditionsPage/HospitaldashboardTermsconditionPage";
 
 const TermsAndConditionsPage = () => {
   return <Men10TermandConditionPage />;

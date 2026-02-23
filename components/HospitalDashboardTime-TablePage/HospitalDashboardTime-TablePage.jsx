@@ -28,7 +28,6 @@ const HospitalDashboardTimeTablePage = () => {
 
   const sessions = ['morning', 'afternoon', 'evening'];
 
-  // Generate time options
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -90,11 +89,11 @@ const HospitalDashboardTimeTablePage = () => {
           <span>{value}</span>
           <ChevronDown size={20} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
-        
+
         {isOpen && (
           <>
-            <div 
-              className="fixed inset-0 z-10" 
+            <div
+              className="fixed inset-0 z-10"
               onClick={() => setOpenDropdown(null)}
             />
             <div className="absolute z-20 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -118,21 +117,26 @@ const HospitalDashboardTimeTablePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    // ✅ FIX: Removed min-h-screen wrapper — this component renders INSIDE the sidebar layout.
+    // The parent layout already provides the full-height container.
+    // Using h-full and overflow-y-auto so it scrolls within the content area.
+    <div className="h-full overflow-y-auto bg-gray-50">
+
+      {/* ✅ FIX: Header is no longer sticky/fixed (which caused it to overlap the sidebar).
+          It now flows naturally at the top of this content panel. */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
           <div className="flex items-center gap-3">
             <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <ArrowLeft size={24} className="text-gray-700" />
+              <ArrowLeft size={22} className="text-gray-700" />
             </button>
-            <h1 className="text-xl font-bold text-gray-900">Profile</h1>
+            <h1 className="text-xl font-bold text-gray-900">Time Table</h1>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Hospital Timing</h2>
 
@@ -172,15 +176,15 @@ const HospitalDashboardTimeTablePage = () => {
 
                 {timings[activeDay][session].enabled && (
                   <div className="grid grid-cols-2 gap-4">
-                    <TimeDropdown 
-                      session={session} 
-                      field="start" 
-                      value={timings[activeDay][session].start} 
+                    <TimeDropdown
+                      session={session}
+                      field="start"
+                      value={timings[activeDay][session].start}
                     />
-                    <TimeDropdown 
-                      session={session} 
-                      field="end" 
-                      value={timings[activeDay][session].end} 
+                    <TimeDropdown
+                      session={session}
+                      field="end"
+                      value={timings[activeDay][session].end}
                     />
                   </div>
                 )}
