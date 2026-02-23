@@ -47,11 +47,11 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
       try {
         const response = await getMeClinicProfile();
         if (response.success && response.data) {
-          const clinic = response.data;
+          const clinic = response.data.clinic;
           
           // Clean up location format (e.g. "Sitaburdi, Nagpur")
           const area = clinic.areaName || "";
-          const city = clinic.city || "";
+          const city = response.data.cityName || "";
           const formattedLocation = [area, city].filter(Boolean).join(", ");
 
           setClinicInfo({

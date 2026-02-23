@@ -81,10 +81,11 @@ const HospitalDashboard = () => {
       try {
         const response = await getMeClinicProfile();
         if (response.success && response.data) {
-          const clinic = response.data;
+          console.log(response.data)
+          const clinic = response.data.clinic;
           
           const area = clinic.areaName || "";
-          const city = clinic.city || "";
+          const city = response.data.cityName || "";
           const formattedLocation = [area, city].filter(Boolean).join(", ");
 
           setClinicHeader({

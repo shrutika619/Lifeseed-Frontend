@@ -99,7 +99,7 @@ export default function ClinicProfileDesktop() {
         const response = await getMeClinicProfile();
         
         if (response.success && response.data) {
-          const clinic = response.data;
+          const clinic = response.data.clinic;
           
           setData(prev => ({
             ...prev,
@@ -109,6 +109,7 @@ export default function ClinicProfileDesktop() {
             phone: clinic.officeCallingNo || "",
             location: clinic.fulladdress || "",
             // Mock data overrides:
+            doctors: response.data.totalDoctors,
             appointments: clinic.appointmentsCount || prev.appointments,
             patients: clinic.patientsCount || prev.patients,
           }));
@@ -518,9 +519,7 @@ export default function ClinicProfileDesktop() {
                   <div className="cpd-icon ic-p"><DocIcon /></div>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Doctors</div>
-                    {isEditing
-                      ? <input className="cpd-input" name="doctors" value={cur.doctors} onChange={onChange} readOnly title="Doctors managed via Team Module" />
-                      : <div className="cpd-val">{data.doctors}</div>}
+                      <div className="cpd-val">{data.doctors} Doctor</div>
                   </div>
                 </div>
               </div>
