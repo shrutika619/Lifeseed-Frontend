@@ -9,14 +9,16 @@ export const registerTeamMember = async (adminData) => {
   try {
     const response = await api.post(Constants.urlEndPoints.REGISTER_TEAM, adminData);
     if (response.data.success) {
-      // POST returns object in `data`
       return { success: true, data: response.data.data, message: response.data.message };
     }
     return { success: false, message: response.data.message || "Registration failed" };
   } catch (error) {
-    console.error("Register Team Member Error:", error);
-    return { success: false, message: error.response?.data?.message || "Failed to register team member" };
-  }
+  return { 
+    success: false, 
+    message: error.response?.data?.message || "Request failed",
+    status: error.response?.status // <-- Make sure to pass the status back!
+  };
+}
 };
 
 /**

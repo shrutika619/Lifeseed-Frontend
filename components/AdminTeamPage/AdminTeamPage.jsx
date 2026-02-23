@@ -162,13 +162,19 @@ export const AdminTeamPage = () => {
           address: formData.address
         });
 
+        // ✅ Properly handle success/failure from the service
         if (res.success) {
           toast.success("Profile updated successfully!");
           loadData();
           setCurrentView('list');
           setEditingMember(null);
         } else {
-          toast.error(res.message);
+          // Explicitly catch 409 or duplicate errors for updates
+          if (res.status === 409 || res.message?.toLowerCase().includes("use") || res.message?.toLowerCase().includes("exist")) {
+            toast.error("Team member with same mobile no/email already exists");
+          } else {
+            toast.error(res.message || "Failed to update profile");
+          }
         }
 
       } else {
@@ -185,6 +191,7 @@ export const AdminTeamPage = () => {
           role: formData.teamRole
         });
 
+        // ✅ Properly handle success/failure from the service
         if (res.success) {
           toast.success("Team member created successfully!");
           loadData();
@@ -192,7 +199,12 @@ export const AdminTeamPage = () => {
           
           setFormData({ fullName: '', email: '', mobileNo: '', password: '', confirmPassword: '', address: '', teamRole: 'admin' });
         } else {
-          toast.error(res.message);
+          // Explicitly catch 409 or duplicate errors for new registrations
+          if (res.status === 409 || res.message?.toLowerCase().includes("exist")) {
+            toast.error("Team member with same mobile no/email already exists");
+          } else {
+            toast.error(res.message || "Failed to create team member");
+          }
         }
       }
     } catch (error) {
