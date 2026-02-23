@@ -4,15 +4,13 @@ import axios from "axios";
 
 /**
  * Get the profile details of the currently logged-in clinic admin
+ * Backend returns: { clinic: {...}, totalDoctors: X, cityName: "Y" }
  */
 export const getMeClinicProfile = async () => {
   try {
     const response = await api.get(Constants.urlEndPoints.GET_ME_CLINIC_PROFILE);
     if (response.data.success) {
-      // Backend returns { clinic: { ... } } inside data
-
-
-
+      // ✅ Return the entire data object so you get totalDoctors and cityName too
       return { success: true, data: response.data.data };
     }
     return { success: false, message: response.data.message || "Failed to fetch clinic details" };
@@ -78,12 +76,15 @@ export const updateClinicProfile = async (formData) => {
 
 /**
  * Update Clinic Timings
+ * @param {string} clinicId - The MongoDB _id of the clinic
  * @param {Array} timingsArray - Array of timing objects
  */
-export const updateClinicTimings = async (timingsArray) => {
+export const updateClinicTimings = async (clinicId, timingsArray) => {
   try {
-    // Send as JSON. The backend expects { timings: [...] } or a stringified version
-    const response = await api.patch(Constants.urlEndPoints.UPDATE_CLINIC_TIMINGS, {
+    // ✅ Include clinicId dynamically in the route matching your backend
+    const endpoint = `/clinic-profile/${clinicId}/timings`;
+    
+    const response = await api.patch(endpoint, {
       timings: timingsArray 
     });
 

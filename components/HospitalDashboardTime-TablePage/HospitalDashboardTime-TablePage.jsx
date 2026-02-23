@@ -1,16 +1,42 @@
 "use client";
-import React, { useState } from 'react';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, ChevronDown, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+// ✅ IMPORT GLOBAL TIME SLOTS HOOK & API SERVICES
+// (Ensure this path matches exactly where you saved useTimeSlot.js)
+import { useTimeSlot } from '@/app/hooks/useTimeslot'; 
+import { getMeClinicProfile, updateClinicTimings } from '@/app/services/hospitalProfile.service';
+
+// ✅ HELPER: Convert "10:30 AM" into minutes (0 - 1440)
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const [time, period] = timeStr.split(" ");
+  let [hours, minutes] = time.split(":").map(Number);
+  
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+};
 
 const HospitalDashboardTimeTablePage = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [clinicId, setClinicId] = useState(null);
+
+  // Fetch master time slots
+  const { allSlots, isLoadingSlots } = useTimeSlot();
+
+  // Base default state
   const [timings, setTimings] = useState({
-    monday: { morning: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } },
-    tuesday: { morning: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } },
-    wednesday: { morning: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } },
-    thursday: { morning: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } },
-    friday: { morning: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } },
-    saturday: { morning: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: true, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } },
-    sunday: { morning: { enabled: false, start: '10:00 AM', end: '06:30 PM' }, afternoon: { enabled: false, start: '10:00 AM', end: '06:30 PM' }, evening: { enabled: false, start: '10:00 AM', end: '06:30 PM' } }
+    monday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
+    tuesday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
+    wednesday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
+    thursday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
+    friday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
+    saturday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
+    sunday: { morning: { enabled: false, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: false, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: true }
   });
 
   const [activeDay, setActiveDay] = useState('monday');
@@ -28,20 +54,43 @@ const HospitalDashboardTimeTablePage = () => {
 
   const sessions = ['morning', 'afternoon', 'evening'];
 
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-        const formattedMinute = minute.toString().padStart(2, '0');
-        times.push(`${displayHour.toString().padStart(2, '0')}:${formattedMinute} ${period}`);
-      }
-    }
-    return times;
-  };
+  useEffect(() => {
+    const fetchTimings = async () => {
+      try {
+        const response = await getMeClinicProfile();
+        
+        if (response.success && response.data?.clinic) {
+          setClinicId(response.data.clinic._id);
 
-  const timeOptions = generateTimeOptions();
+          const existingTimings = response.data.clinic.timings;
+          
+          if (existingTimings && existingTimings.length > 0) {
+            const newTimings = { ...timings }; 
+            
+            existingTimings.forEach(t => {
+              if (newTimings[t.day]) {
+                newTimings[t.day] = {
+                  isClosed: t.isClosed || false,
+                  morning: t.sections?.morning || newTimings[t.day].morning,
+                  afternoon: t.sections?.afternoon || newTimings[t.day].afternoon,
+                  evening: t.sections?.evening || newTimings[t.day].evening,
+                };
+              }
+            });
+            
+            setTimings(newTimings);
+          }
+        }
+      } catch (error) {
+        toast.error("Failed to fetch existing timings");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTimings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggle = (session) => {
     setTimings({
@@ -52,6 +101,21 @@ const HospitalDashboardTimeTablePage = () => {
           ...timings[activeDay][session],
           enabled: !timings[activeDay][session].enabled
         }
+      }
+    });
+  };
+
+  const handleDayClosedToggle = () => {
+    setTimings({
+      ...timings,
+      [activeDay]: {
+        ...timings[activeDay],
+        isClosed: !timings[activeDay].isClosed,
+        ...( !timings[activeDay].isClosed ? {
+          morning: { ...timings[activeDay].morning, enabled: false },
+          afternoon: { ...timings[activeDay].afternoon, enabled: false },
+          evening: { ...timings[activeDay].evening, enabled: false }
+        } : {})
       }
     });
   };
@@ -70,21 +134,129 @@ const HospitalDashboardTimeTablePage = () => {
     setOpenDropdown(null);
   };
 
-  const handleSave = () => {
-    console.log('Saved timings:', timings);
-    alert('Hospital timings saved successfully!');
+  const validateTimings = () => {
+    for (const [dayKey, dayData] of Object.entries(timings)) {
+      if (dayData.isClosed) continue;
+
+      for (const session of sessions) {
+        if (dayData[session].enabled) {
+          const startMins = timeToMinutes(dayData[session].start);
+          const endMins = timeToMinutes(dayData[session].end);
+
+          if (startMins >= endMins) {
+            const d = dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
+            const s = session.charAt(0).toUpperCase() + session.slice(1);
+            
+            toast.error(`Invalid Time on ${d} (${s}): Start time must be before End time.`);
+            setActiveDay(dayKey);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  };
+
+  // ✅ HELPER: Formats "9:30 AM" into "09:30 AM" to pass backend Regex
+  const formatTimeForBackend = (timeStr) => {
+    if (!timeStr) return "";
+    const [time, period] = timeStr.split(" ");
+    if (!time || !period) return timeStr;
+    
+    let [h, m] = time.split(":");
+    if (h.length === 1) {
+      h = "0" + h;
+    }
+    return `${h}:${m} ${period}`;
+  };
+
+  const handleSave = async () => {
+    if (!validateTimings()) return; 
+    
+    if (!clinicId) {
+      toast.error("Clinic ID is missing. Please refresh the page.");
+      return;
+    }
+
+    setIsSaving(true);
+    
+    // ✅ FORMAT EXACTLY AS BACKEND EXPECTS
+    const timingsArray = Object.keys(timings).map(day => {
+      const dayData = timings[day];
+      const isClosed = dayData.isClosed;
+
+      // Helper to format each section
+      const formatSection = (sectionData) => {
+        // If the day is closed OR the section is disabled, send empty strings
+        if (isClosed || !sectionData.enabled) {
+          return { enabled: false, start: "", end: "" };
+        }
+        
+        // Otherwise, send the formatted time with leading zeros (e.g., "09:30 AM")
+        return {
+          enabled: true,
+          start: formatTimeForBackend(sectionData.start),
+          end: formatTimeForBackend(sectionData.end)
+        };
+      };
+
+      return {
+        day: day,
+        isClosed: isClosed,
+        sections: {
+          morning: formatSection(dayData.morning),
+          afternoon: formatSection(dayData.afternoon),
+          evening: formatSection(dayData.evening)
+        }
+      };
+    });
+
+    try {
+      const response = await updateClinicTimings(clinicId, timingsArray);
+      
+      if (response.success) {
+        toast.success("Hospital timings saved successfully!");
+      } else {
+        toast.error(response.message || "Failed to save timings.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while saving.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const TimeDropdown = ({ session, field, value }) => {
     const dropdownId = `${session}-${field}`;
     const isOpen = openDropdown === dropdownId;
 
+    // ✅ STRICT TIME BOUNDARIES
+    const sessionSlots = allSlots.filter((time) => {
+      const mins = timeToMinutes(time);
+      
+      if (session === 'morning') {
+        // Morning: 6:00 AM (360) to 12:00 PM (720)
+        return mins >= 360 && mins <= 720;
+      }
+      if (session === 'afternoon') {
+        // Afternoon: 12:00 PM (720) to 5:00 PM (1020)
+        return mins >= 720 && mins <= 1020;
+      }
+      if (session === 'evening') {
+        // Evening: 5:00 PM (1020) to 11:30 PM (1410)
+        return mins >= 1020 && mins <= 1440;
+      }
+      return true;
+    });
+
     return (
       <div className="relative">
         <button
           type="button"
           onClick={() => setOpenDropdown(isOpen ? null : dropdownId)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-900 font-medium bg-white flex items-center justify-between hover:border-gray-400 transition-colors"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none text-gray-900 font-medium bg-white flex items-center justify-between transition-colors ${
+            isOpen ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-300 hover:border-gray-400'
+          }`}
         >
           <span>{value}</span>
           <ChevronDown size={20} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -92,18 +264,15 @@ const HospitalDashboardTimeTablePage = () => {
 
         {isOpen && (
           <>
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setOpenDropdown(null)}
-            />
-            <div className="absolute z-20 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {timeOptions.map((time) => (
+            <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
+            <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+              {sessionSlots.map((time) => (
                 <button
                   key={time}
                   type="button"
                   onClick={() => handleTimeChange(session, field, time)}
-                  className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 transition-colors ${
-                    value === time ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700'
+                  className={`w-full px-4 py-2.5 text-left transition-colors ${
+                    value === time ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   {time}
@@ -116,18 +285,20 @@ const HospitalDashboardTimeTablePage = () => {
     );
   };
 
-  return (
-    // ✅ FIX: Removed min-h-screen wrapper — this component renders INSIDE the sidebar layout.
-    // The parent layout already provides the full-height container.
-    // Using h-full and overflow-y-auto so it scrolls within the content area.
-    <div className="h-full overflow-y-auto bg-gray-50">
+  if (isLoading || isLoadingSlots) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
-      {/* ✅ FIX: Header is no longer sticky/fixed (which caused it to overlap the sidebar).
-          It now flows naturally at the top of this content panel. */}
+  return (
+    <div className="h-full overflow-y-auto bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
           <div className="flex items-center gap-3">
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <button onClick={() => window.history.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <ArrowLeft size={22} className="text-gray-700" />
             </button>
             <h1 className="text-xl font-bold text-gray-900">Time Table</h1>
@@ -135,12 +306,25 @@ const HospitalDashboardTimeTablePage = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Hospital Timing</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">Hospital Timing</h2>
+            
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">Closed on {activeDay}?</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={timings[activeDay].isClosed}
+                  onChange={handleDayClosedToggle}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+          </div>
 
-          {/* Days Tabs */}
           <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
             {days.map(day => (
               <button
@@ -157,47 +341,46 @@ const HospitalDashboardTimeTablePage = () => {
             ))}
           </div>
 
-          {/* Time Slots */}
-          <div className="space-y-6">
-            {sessions.map((session) => (
-              <div key={session} className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-gray-900 capitalize">{session}</h3>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={timings[activeDay][session].enabled}
-                      onChange={() => handleToggle(session)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                {timings[activeDay][session].enabled && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <TimeDropdown
-                      session={session}
-                      field="start"
-                      value={timings[activeDay][session].start}
-                    />
-                    <TimeDropdown
-                      session={session}
-                      field="end"
-                      value={timings[activeDay][session].end}
-                    />
+          {!timings[activeDay].isClosed ? (
+            <div className="space-y-6">
+              {sessions.map((session) => (
+                <div key={session} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-gray-900 capitalize">{session}</h3>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={timings[activeDay][session].enabled}
+                        onChange={() => handleToggle(session)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
 
-          {/* Save Button */}
+                  {timings[activeDay][session].enabled && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <TimeDropdown session={session} field="start" value={timings[activeDay][session].start} />
+                      <TimeDropdown session={session} field="end" value={timings[activeDay][session].end} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 bg-red-50 rounded-xl border border-red-100 text-center">
+              <h3 className="text-red-600 font-semibold text-lg">Hospital is marked as Closed on {activeDay}s</h3>
+              <p className="text-red-500 text-sm mt-1">No appointments can be booked on this day.</p>
+            </div>
+          )}
+
           <button
             onClick={handleSave}
-            className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition-colors shadow-sm"
+            disabled={isSaving}
+            className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            Save
+            {isSaving && <Loader2 size={18} className="animate-spin" />}
+            {isSaving ? "Saving..." : "Save Timings"}
           </button>
         </div>
       </main>

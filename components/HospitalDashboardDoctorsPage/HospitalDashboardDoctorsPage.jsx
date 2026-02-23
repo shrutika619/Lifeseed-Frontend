@@ -1,9 +1,11 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { Search, Filter, MoreVertical, ArrowLeft, Loader2, Edit2 } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Search, Filter, MoreVertical, ArrowLeft, Loader2, Edit2, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { getDoctors, toggleDoctorStatus } from "@/app/services/hospitalDashboard.service"; // ✅ Import Service
+
+// ✅ REVERTED BACK TO YOUR WORKING SERVICE
+import { getDoctors, toggleDoctorStatus } from "@/app/services/hospitalDashboard.service"; 
 
 // --- Helper Components ---
 const ToggleSwitch = ({ id, checked, onChange, disabled }) => (
@@ -23,10 +25,14 @@ const DoctorsPage = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
+  
+  const filterRef = useRef(null);
 
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!e.target.closest('.dropdown-container')) setOpenMenuId(null);
+      if (filterRef.current && !filterRef.current.contains(e.target)) setIsFilterOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -38,32 +44,55 @@ const DoctorsPage = () => {
     const fetchDoctorsList = async () => {
       setIsLoading(true);
       
-      // ✅ Call Service
+      // ✅ USING YOUR ORIGINAL WORKING API CALL
       const result = await getDoctors(controller.signal);
       
-      if (result.canceled) return; // Ignore if component unmounted
+      if (result.canceled) return;
       
       if (result.success) {
         const docsData = Array.isArray(result.data) ? result.data : [];
+        const currentDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
         const formattedDoctors = docsData.map((doc) => {
           const degrees = [doc.underGraduationDegree?.name || doc.underGraduationDegree, doc.postGraduationDegree?.name || doc.postGraduationDegree].filter(Boolean);
           const qualificationString = degrees.length > 0 ? degrees.join(", ") : "MBBS";
+
+          // 1. Calculate Active Days
+          const activeDays = doc.timings 
+            ? doc.timings
+                .filter(t => !t.isOff && t.slots && t.slots.length > 0)
+                .map(t => ({ day: t.day, active: true })) 
+            : (Array.isArray(doc.days) ? doc.days : []); // Fallback to old format if timings array is missing
+
+          // 2. Dynamically calculate TODAY'S Shift
+          let todaysTime = "Off Today";
+          if (doc.timings) {
+             const todaySchedule = doc.timings.find(t => t.day === currentDayName && !t.isOff && t.slots?.length > 0);
+             if (todaySchedule) {
+               const firstSlot = todaySchedule.slots[0];
+               const lastSlot = todaySchedule.slots[todaySchedule.slots.length - 1];
+               todaysTime = `${firstSlot.start} - ${lastSlot.end}`;
+             }
+          } else {
+             // Fallback if backend doesn't have nested slots yet
+             todaysTime = doc.todayTiming || "09:00 AM - 05:00 PM";
+          }
 
           return {
             id: doc._id,
             name: doc.name,
             qualification: qualificationString, 
-            specialty: doc.primarySpecialty?.name || doc.primarySpecialty || "General",
-            experience: doc.experience || "N/A",
-            time: doc.todayTiming || "09:00 AM - 05:00 PM",
-            days: Array.isArray(doc.days) ? doc.days : [], 
+            specialty: doc.primarySpecialty?.name || doc.primarySpecialty || "General Physician",
+            experience: doc.experience ? `${doc.experience} Years` : "N/A",
+            time: todaysTime, 
+            days: activeDays, 
             available: doc.isActive ?? true,
             profileImage: doc.profileImage
           };
         });
         setDoctors(formattedDoctors);
       } else {
-        toast.error(result.message);
+        toast.error(result.message || "Failed to fetch doctors");
       }
       setIsLoading(false);
     };
@@ -71,6 +100,9 @@ const DoctorsPage = () => {
     fetchDoctorsList();
     return () => controller.abort();
   }, []);
+
+  // Extract unique specialties for the filter dropdown
+  const uniqueSpecialties = ["All", ...new Set(doctors.map(d => d.specialty))];
 
   const filteredDoctors = doctors.filter((doc) => {
     const matchesSearch = doc.name.toLowerCase().includes(search.toLowerCase());
@@ -82,20 +114,22 @@ const DoctorsPage = () => {
     setDoctors((prev) => prev.map((doc) => (doc.id === id ? { ...doc, available: !doc.available } : doc)));
     setUpdatingId(id);
 
-    // ✅ Call Service
+    // ✅ USING YOUR ORIGINAL TOGGLE SERVICE
     const result = await toggleDoctorStatus(id, !currentStatus);
 
     if (result.success) {
-      toast.success(result.message);
+      toast.success(result.message || "Status updated");
     } else {
-      toast.error(result.message);
+      toast.error(result.message || "Failed to update status");
       // Revert UI on failure
       setDoctors((prev) => prev.map((doc) => (doc.id === id ? { ...doc, available: currentStatus } : doc)));
     }
+    
     setUpdatingId(null);
   };
 
   const handleAddDoctor = () => router.push("/hospitaldashboard/add-doctors");
+  
   const handleEditDoctor = (id) => {
     setOpenMenuId(null);
     router.push(`/hospitaldashboard/add-doctors?id=${id}`);
@@ -110,7 +144,7 @@ const DoctorsPage = () => {
             <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-800 transition-colors">
               <ArrowLeft size={20} />
             </button>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Hospital</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Hospital Doctors</h1>
           </div>
           <button onClick={handleAddDoctor} className="bg-blue-600 text-white text-xs sm:text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-95 whitespace-nowrap">
             Add Doctor
@@ -122,12 +156,38 @@ const DoctorsPage = () => {
           <div className="flex items-center space-x-3">
             <div className="flex items-center bg-white rounded-lg px-3 py-2.5 shadow-sm border border-gray-100 flex-grow focus-within:ring-2 focus-within:ring-blue-100 transition-all">
               <Search className="w-5 h-5 text-gray-400" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search doctor..." className="ml-2 w-full text-sm outline-none bg-transparent placeholder-gray-400 text-gray-700" />
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search doctor by name..." className="ml-2 w-full text-sm outline-none bg-transparent placeholder-gray-400 text-gray-700" />
             </div>
-            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={`p-2.5 rounded-lg shadow-sm border transition-colors relative ${isFilterOpen || selectedSpecialty !== "All" ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-gray-100 hover:bg-gray-50 text-gray-600"}`}>
-              <Filter className="w-5 h-5" />
-              {selectedSpecialty !== "All" && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>}
-            </button>
+            
+            {/* Filter Dropdown Container */}
+            <div className="relative" ref={filterRef}>
+              <button 
+                onClick={() => setIsFilterOpen(!isFilterOpen)} 
+                className={`p-2.5 rounded-lg shadow-sm border transition-colors relative ${isFilterOpen || selectedSpecialty !== "All" ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-gray-100 hover:bg-gray-50 text-gray-600"}`}
+              >
+                <Filter className="w-5 h-5" />
+                {selectedSpecialty !== "All" && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>}
+              </button>
+
+              {/* The filter menu dropdown */}
+              {isFilterOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-2">
+                  <p className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Filter by Specialty</p>
+                  {uniqueSpecialties.map((spec) => (
+                    <button
+                      key={spec}
+                      onClick={() => {
+                        setSelectedSpecialty(spec);
+                        setIsFilterOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${selectedSpecialty === spec ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
+                    >
+                      {spec}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -143,7 +203,13 @@ const DoctorsPage = () => {
               <div key={doc.id} className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 sm:p-5 flex flex-col md:flex-row md:items-start md:justify-between gap-4 hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row items-start gap-4 flex-1">
                   <div className="relative w-16 h-16 sm:w-[70px] sm:h-[70px] flex-shrink-0">
-                    <img src={doc.profileImage || "https://placehold.co/70x70/e2e8f0/1e293b?text=Dr"} alt={doc.name} className="w-full h-full rounded-full object-cover border border-gray-100" />
+                    {doc.profileImage ? (
+                      <img src={doc.profileImage} alt={doc.name} className="w-full h-full rounded-full object-cover border border-gray-100" />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
+                        <User size={30} className="text-blue-500" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 w-full">
                     <div className="flex justify-between items-start md:block">
@@ -165,21 +231,27 @@ const DoctorsPage = () => {
                         )}
                       </div>
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">{doc.specialty} • <span className="text-gray-700">Exp {doc.experience}</span></p>
+                    <p className="text-sm text-gray-500 mt-2">{doc.specialty} • <span className="text-gray-700">{doc.experience}</span></p>
+                    
                     <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${doc.available ? 'bg-green-500' : 'bg-gray-300'} inline-block`}></span>
-                        {doc.time}
+                        <span className={`w-2 h-2 rounded-full ${doc.time === "Off Today" ? 'bg-gray-300' : 'bg-green-500'} inline-block`}></span>
+                        {doc.time === "Off Today" ? "Off Today" : `Today: ${doc.time}`}
                     </p>
+
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {doc.days.map((dayObj, index) => {
-                        const dayName = dayObj?.day || ""; 
-                        if (!dayName) return null; 
-                        return (
-                          <span key={index} className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${dayObj.active ? "bg-teal-50 text-teal-700 border-teal-100" : "bg-gray-50 text-gray-400 border-gray-100"}`}>
-                            {dayName.charAt(0).toUpperCase() + dayName.slice(1)}
-                          </span>
-                        );
-                      })}
+                      {doc.days.length > 0 ? (
+                        doc.days.map((dayObj, index) => {
+                          const dayName = dayObj?.day || ""; 
+                          if (!dayName) return null; 
+                          return (
+                            <span key={index} className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${dayObj.active ? "bg-teal-50 text-teal-700 border-teal-100" : "bg-gray-50 text-gray-400 border-gray-100"}`}>
+                              {dayName.charAt(0).toUpperCase() + dayName.slice(1, 3)}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">No timings assigned</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -204,9 +276,11 @@ const DoctorsPage = () => {
               </div>
             ))
           ) : (
-            <div className="text-center py-10 text-gray-500">
+            <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
               <p>No doctors found.</p>
-              <button onClick={() => { setSearch(""); setSelectedSpecialty("All"); }} className="mt-2 text-blue-600 hover:underline text-sm">Clear all filters</button>
+              {(search || selectedSpecialty !== "All") && (
+                <button onClick={() => { setSearch(""); setSelectedSpecialty("All"); }} className="mt-2 text-blue-600 hover:underline text-sm font-medium">Clear all filters</button>
+              )}
             </div>
           )}
         </div>

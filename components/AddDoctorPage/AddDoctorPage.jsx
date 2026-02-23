@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useDoctorOptions } from '@/app/hooks/useDoctorOptions';
-// ✅ Import Services
+import api from "@/lib/axios";
+import { Constants } from "@/app/utils/constants";
 import { getDoctorById, createDoctor, updateDoctor } from '@/app/services/hospitalDashboard.service';
 
 // --- Helper Components ---
@@ -35,36 +36,33 @@ const ToggleSwitch = ({ id, checked, onChange }) => (
   </label>
 );
 
-const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const timeSlotsData = {
-  "OPD Morning": ["09:00 AM to 12:00 PM", "10:00 AM to 11:00 AM", "11:00 AM to 12:00 PM"],
-  "OPD Afternoon": ["12:00 PM to 01:00 PM", "02:00 PM to 03:00 PM", "04:00 PM to 05:00 PM"],
-  "OPD Evening": ["05:00 PM to 06:00 PM", "06:00 PM to 07:00 PM", "07:00 PM to 08:00 PM"],
-};
+const daysMap = [
+  { short: "Mon", full: "monday" },
+  { short: "Tue", full: "tuesday" },
+  { short: "Wed", full: "wednesday" },
+  { short: "Thu", full: "thursday" },
+  { short: "Fri", full: "friday" },
+  { short: "Sat", full: "saturday" },
+  { short: "Sun", full: "sunday" }
+];
 
-const getInitialAvailability = () => {
-  let availability = {};
-  for (const day of daysOfWeek) {
-    availability[day] = {};
-    for (const category in timeSlotsData) {
-      for (const slot of timeSlotsData[category]) availability[day][slot] = false; 
-    }
-  }
-  return availability;
+const sessionLabels = {
+  morning: "OPD Morning",
+  afternoon: "OPD Afternoon",
+  evening: "OPD Evening",
 };
 
 // Main component
 const AddDoctorPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const doctorId = searchParams.get("id"); 
-  
+  const doctorId = searchParams.get("id");
+
   const { options, isLoading: dropdownsLoading } = useDoctorOptions();
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingInfo, setIsFetchingInfo] = useState(false);
 
-  // States
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [name, setName] = useState("");
@@ -78,18 +76,48 @@ const AddDoctorPage = () => {
   const [superSpecRegNum, setSuperSpecRegNum] = useState("");
   const [primarySpecialty, setPrimarySpecialty] = useState("");
   const [otherSpecialties, setOtherSpecialties] = useState("");
-  const [languages, setLanguages] = useState({ English: false, Hindi: false, Marathi: false, Tamil: false, Telugu: false, Kannada: false, Bengali: false, Gujarati: false });
+  const [languages, setLanguages] = useState({
+    English: false,
+    Hindi: false,
+    Marathi: false,
+    Tamil: false,
+    Telugu: false,
+    Kannada: false,
+    Bengali: false,
+    Gujarati: false
+  });
   const [consultationFee, setConsultationFee] = useState("");
-  const [selectedDay, setSelectedDay] = useState("Mon");
-  const [availability, setAvailability] = useState(getInitialAvailability());
 
-  // ✅ Call Service to Get Doctor Details
+  const [clinicSlots, setClinicSlots] = useState(null);
+  const [selectedDayObj, setSelectedDayObj] = useState(daysMap[0]);
+  const [selectedSlots, setSelectedSlots] = useState({});
+
+  // ✅ Fetch Master Clinic Slots
+  useEffect(() => {
+    const fetchClinicSlots = async () => {
+      try {
+        const endpoint = Constants?.urlEndPoints?.GET_CLINIC_SLOTS || '/doctors/clinic-slots';
+        const response = await api.get(endpoint);
+        if (response.data.success) {
+          setClinicSlots(response.data.data);
+          const firstOpen = daysMap.find(d => !response.data.data[d.full]?.isClosed);
+          if (firstOpen) setSelectedDayObj(firstOpen);
+        }
+      } catch (error) {
+        console.error("Failed to load clinic slots", error);
+        toast.error("Failed to load clinic operating hours.");
+      }
+    };
+    fetchClinicSlots();
+  }, []);
+
+  // ✅ Fetch Doctor Details (Edit Mode)
   useEffect(() => {
     if (doctorId) {
       const fetchDetails = async () => {
         setIsFetchingInfo(true);
         const result = await getDoctorById(doctorId);
-        
+
         if (result.success) {
           const data = result.data;
           setName(data.name || "");
@@ -104,7 +132,7 @@ const AddDoctorPage = () => {
           setPrimarySpecialty(data.primarySpecialty?._id || data.primarySpecialty || "");
           setConsultationFee(data.consultationFee || "");
           if (data.otherSpecialties) setOtherSpecialties(data.otherSpecialties.join(", "));
-          
+
           if (data.languages && Array.isArray(data.languages)) {
             setLanguages(prev => {
               const newLangs = { ...prev };
@@ -114,25 +142,21 @@ const AddDoctorPage = () => {
           }
           if (data.profileImage) setPhotoPreview(data.profileImage);
 
+          // Pre-fill availability
           if (data.weeklyAvailability?.availability) {
             const bAvail = data.weeklyAvailability.availability;
-            const fAvail = getInitialAvailability();
-            const dayMap = { monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun" };
-            
-            Object.keys(bAvail).forEach(bDay => {
-              const uiDay = dayMap[bDay];
-              if (!uiDay) return;
-              Object.keys(bAvail[bDay]).forEach(bSession => {
-                const sessionData = bAvail[bDay][bSession];
-                if (sessionData?.enabled && sessionData.times) {
-                  sessionData.times.forEach(t => {
-                    const slotStr = `${t.start} to ${t.end}`;
-                    if (fAvail[uiDay][slotStr] !== undefined) fAvail[uiDay][slotStr] = true;
+            const prefilled = {};
+            Object.keys(bAvail).forEach(fullDay => {
+              ['morning', 'afternoon', 'evening', 'night'].forEach(session => {
+                if (bAvail[fullDay][session]?.enabled && bAvail[fullDay][session]?.times) {
+                  bAvail[fullDay][session].times.forEach(t => {
+                    const key = `${fullDay}|${session}|${t.start}|${t.end}`;
+                    prefilled[key] = true;
                   });
                 }
               });
             });
-            setAvailability(fAvail);
+            setSelectedSlots(prefilled);
           }
         } else {
           toast.error(result.message);
@@ -152,27 +176,30 @@ const AddDoctorPage = () => {
 
   const handlePhotoChange = (e) => { if (e.target.files && e.target.files[0]) setPhoto(e.target.files[0]); };
   const handleLanguageToggle = (lang) => setLanguages((prev) => ({ ...prev, [lang]: !prev[lang] }));
-  const handleAvailabilityToggle = (day, slot) => setAvailability((prev) => ({ ...prev, [day]: { ...prev[day], [slot]: !prev[day][slot] } }));
 
+  const handleSlotToggle = (slotKey) => {
+    setSelectedSlots(prev => ({ ...prev, [slotKey]: !prev[slotKey] }));
+  };
+
+  // ✅ Includes night session as required by backend
   const formatAvailabilityForBackend = () => {
-    const dayMap = { Mon: "monday", Tue: "tuesday", Wed: "wednesday", Thu: "thursday", Fri: "friday", Sat: "saturday", Sun: "sunday" };
-    const sessionMap = { "OPD Morning": "morning", "OPD Afternoon": "afternoon", "OPD Evening": "evening" };
     const backendAvail = {};
-    
-    Object.keys(availability).forEach(shortDay => {
-      const fullDay = dayMap[shortDay];
-      backendAvail[fullDay] = { morning: { enabled: false, times: [] }, afternoon: { enabled: false, times: [] }, evening: { enabled: false, times: [] } };
-      Object.entries(timeSlotsData).forEach(([category, slots]) => {
-        const sessionKey = sessionMap[category];
-        const activeSlots = slots.filter(slot => availability[shortDay][slot]);
-        if (activeSlots.length > 0) {
-          backendAvail[fullDay][sessionKey].enabled = true;
-          backendAvail[fullDay][sessionKey].times = activeSlots.map(slot => {
-            const [start, end] = slot.split(" to ");
-            return { start: start.trim(), end: end.trim() };
-          });
+    daysMap.forEach(d => {
+      backendAvail[d.full] = {
+        morning: { enabled: false, times: [] },
+        afternoon: { enabled: false, times: [] },
+        evening: { enabled: false, times: [] },
+        night: { enabled: false, times: [] },
+      };
+    });
+    Object.keys(selectedSlots).forEach(key => {
+      if (selectedSlots[key]) {
+        const [day, session, start, end] = key.split('|');
+        if (backendAvail[day] && backendAvail[day][session]) {
+          backendAvail[day][session].enabled = true;
+          backendAvail[day][session].times.push({ start, end });
         }
-      });
+      }
     });
     return backendAvail;
   };
@@ -182,9 +209,7 @@ const AddDoctorPage = () => {
     if (!name || !ugDegree || !primarySpecialty || !consultationFee) {
       return toast.error("Name, UG Degree, Primary Specialty, and Fee are required.");
     }
-
     setIsSubmitting(true);
-
     try {
       const formData = new FormData();
       formData.append("name", name);
@@ -198,14 +223,20 @@ const AddDoctorPage = () => {
       if (superSpecRegNum) formData.append("superSpecializationRegNo", superSpecRegNum);
       formData.append("primarySpecialty", primarySpecialty);
       formData.append("consultationFee", consultationFee);
-      formData.append("languages", JSON.stringify(Object.keys(languages).filter(l => languages[l])));
-      formData.append("otherSpecialties", JSON.stringify(otherSpecialties.split(",").map(s => s.trim()).filter(Boolean)));
-      formData.append("availability", JSON.stringify(formatAvailabilityForBackend()));
-      if (photo) formData.append("profileImage", photo); 
 
-      // ✅ Call Services
-      const result = doctorId 
-        ? await updateDoctor(doctorId, formData) 
+      // ✅ Send languages as array fields: languages[]
+      const selectedLanguages = Object.keys(languages).filter(l => languages[l]);
+      selectedLanguages.forEach(lang => formData.append("languages[]", lang));
+
+      formData.append("otherSpecialties", JSON.stringify(otherSpecialties.split(",").map(s => s.trim()).filter(Boolean)));
+
+      // ✅ Send availability with night session included
+      formData.append("availability", JSON.stringify(formatAvailabilityForBackend()));
+
+      if (photo) formData.append("profileImage", photo);
+
+      const result = doctorId
+        ? await updateDoctor(doctorId, formData)
         : await createDoctor(formData);
 
       if (result.success) {
@@ -221,11 +252,16 @@ const AddDoctorPage = () => {
     }
   };
 
-  if (isFetchingInfo) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><p>Loading details...</p></div>;
+  if (isFetchingInfo) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <p>Loading details...</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-inter">
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+
         {/* === Photo Upload Section === */}
         <div className="flex flex-col items-center p-6 border-b border-gray-200">
           <input type="file" id="photo-upload" accept="image/png, image/jpeg, image/gif" onChange={handlePhotoChange} className="hidden" />
@@ -239,7 +275,9 @@ const AddDoctorPage = () => {
                 </svg>
               </div>
             )}
-            <span className="mt-3 font-medium text-blue-600 hover:text-blue-500">{doctorId && !photo ? "Change Photo" : "Upload Photo"}</span>
+            <span className="mt-3 font-medium text-blue-600 hover:text-blue-500">
+              {doctorId && !photo ? "Change Photo" : "Upload Photo"}
+            </span>
           </label>
         </div>
 
@@ -275,7 +313,12 @@ const AddDoctorPage = () => {
               <label className="block text-sm font-medium mb-2">Languages Spoken</label>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(languages).map((lang) => (
-                  <button type="button" key={lang} onClick={() => handleLanguageToggle(lang)} className={`px-4 py-1.5 rounded-full text-sm ${languages[lang] ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  <button
+                    type="button"
+                    key={lang}
+                    onClick={() => handleLanguageToggle(lang)}
+                    className={`px-4 py-1.5 rounded-full text-sm ${languages[lang] ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                  >
                     {lang}
                   </button>
                 ))}
@@ -288,38 +331,81 @@ const AddDoctorPage = () => {
         {/* === Weekly Availability Section === */}
         <div className="p-6">
           <h2 className="text-xl font-semibold mb-4">Weekly Availability</h2>
+
+          {/* Day Tabs */}
           <div className="mb-4">
             <div className="flex flex-wrap -mb-px border-b border-gray-200">
-              {daysOfWeek.map((day) => (
-                <button type="button" key={day} onClick={() => setSelectedDay(day)} className={`px-4 py-2.5 text-sm font-medium border-b-2 ${selectedDay === day ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500"}`}>{day}</button>
-              ))}
+              {daysMap.map((day) => {
+                const isClosed = clinicSlots ? clinicSlots[day.full]?.isClosed : false;
+                return (
+                  <button
+                    type="button"
+                    key={day.full}
+                    onClick={() => !isClosed && setSelectedDayObj(day)}
+                    disabled={isClosed}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      isClosed
+                        ? "border-transparent text-gray-300 line-through cursor-not-allowed"
+                        : selectedDayObj.full === day.full
+                        ? "border-blue-600 text-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {day.short}
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {/* Slot Content */}
           <div>
-            {Object.entries(timeSlotsData).map(([category, slots]) => (
-              <div key={category} className="mb-4">
-                <h3 className="text-md font-semibold mb-3">{category}</h3>
-                <div className="space-y-3">
-                  {slots.map((slot) => (
-                    <div key={slot} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">{slot}</span>
-                      <ToggleSwitch id={`${selectedDay}-${slot}`} checked={availability[selectedDay][slot]} onChange={() => handleAvailabilityToggle(selectedDay, slot)} />
+            {!clinicSlots ? (
+              <p className="text-sm text-gray-500 py-4">Loading clinic timings...</p>
+            ) : clinicSlots[selectedDayObj.full]?.isClosed ? (
+              <p className="text-sm text-red-500 py-4">Clinic is closed on this day.</p>
+            ) : (
+              ['morning', 'afternoon', 'evening'].map(session => {
+                const sessionSlots = clinicSlots[selectedDayObj.full]?.[session] || [];
+                if (sessionSlots.length === 0) return null;
+
+                return (
+                  <div key={session} className="mb-4">
+                    <h3 className="text-md font-semibold mb-3">{sessionLabels[session]}</h3>
+                    <div className="space-y-3">
+                      {sessionSlots.map((slot) => {
+                        const slotKey = `${selectedDayObj.full}|${session}|${slot.start}|${slot.end}`;
+                        const isChecked = !!selectedSlots[slotKey];
+                        return (
+                          <div key={slot._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-sm text-gray-600">{slot.start} to {slot.end}</span>
+                            <ToggleSwitch id={slotKey} checked={isChecked} onChange={() => handleSlotToggle(slotKey)} />
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
         {/* === Save Button === */}
         <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
-          <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-blue-600 text-white font-medium text-sm rounded-lg disabled:opacity-70 disabled:cursor-not-allowed">
-            {isSubmitting ? (doctorId ? "Updating..." : "Saving...") : (doctorId ? "Update Doctor" : "Save Doctor")}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2.5 bg-blue-600 text-white font-medium text-sm rounded-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isSubmitting
+              ? (doctorId ? "Updating..." : "Saving...")
+              : (doctorId ? "Update Doctor" : "Save Doctor")}
           </button>
         </div>
       </form>
     </div>
   );
 };
+
 export default AddDoctorPage;

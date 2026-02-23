@@ -56,6 +56,7 @@ export class Constants {
     
     //--HOSPITAL DASHBOARD--
     HOSPITAL_DOCTORS: `${this.API_BASE_URL}/doctors`,
+    GET_CLINIC_SLOTS: "/doctors/clinic-slots",
     
     //--- HOSPITAL PROFILE ---
     GET_ME_CLINIC_PROFILE: "/clinic-profile",
@@ -63,6 +64,7 @@ export class Constants {
     UPDATE_CLINIC_PROFILE: "/clinic-profile/update",
 
     // Master Data Endpoints
+    GET_MASTER_TIME_SLOTS: "/master/time-slots",
     GET_UG_DEGREES: `/master/ug-degrees`,
     GET_PG_DEGREES: `/master/pg-degrees`,
     GET_SUPER_SPECIALIZATIONS: `/master/super-specializations`,
