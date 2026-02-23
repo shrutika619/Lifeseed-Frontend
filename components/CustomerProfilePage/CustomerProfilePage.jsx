@@ -8,7 +8,173 @@ import {
   Tag, Pill, X
 } from 'lucide-react';
 
+/* ─────────────────────────────────────────────
+   CITY SELECT MODAL
+───────────────────────────────────────────── */
+const cities = [
+  { name: "NAGPUR",   sub: "Maharashtra, India", slug: "nagpur"   },
+  { name: "MUMBAI",   sub: "Maharashtra",        slug: "mumbai"   },
+  { name: "PUNE",     sub: "Maharashtra",        slug: "pune"     },
+  { name: "NASHIK",   sub: "Maharashtra",        slug: "nashik"   },
+  { name: "AMRAVATI", sub: "Maharashtra",        slug: "amravati" },
+  { name: "KOLHAPUR", sub: "Maharashtra",        slug: "kolhapur" },
+  { name: "DELHI",    sub: "Delhi",              slug: "delhi"    },
+];
+
+const CitySelectModal = ({ onClose }) => {
+  const handleCitySelect = (slug) => {
+    window.location.href = `/clinic/${slug}/`;
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 bg-blue-600">
+          <h3 className="font-bold text-white text-lg">Select Clinic City</h3>
+          <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors">
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
+        <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100">
+          {cities.map((city) => (
+            <button
+              key={city.slug}
+              type="button"
+              onClick={() => handleCitySelect(city.slug)}
+              className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+            >
+              <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
+              <div>
+                <p className="font-bold text-slate-800 text-sm">{city.name}</p>
+                <p className="text-xs text-slate-500">{city.sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="px-6 py-3 border-t border-slate-100">
+          <p className="text-xs text-slate-400 text-center">Can't find your city? Contact Customer Support</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   BOOK CONSULTATION MODAL
+───────────────────────────────────────────── */
+const BookConsultationModal = ({ onClose }) => {
+  const [showCityModal, setShowCityModal] = useState(false);
+
+  if (showCityModal) return <CitySelectModal onClose={onClose} />;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-bold text-slate-800 text-lg">Book Consultation</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-4">
+          <button
+            type="button"
+            onClick={() => setShowCityModal(true)}
+            className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-[#0097A7] hover:bg-[#E0F7FA] transition-all group"
+          >
+            <div className="w-11 h-11 rounded-full bg-[#E0F7FA] flex items-center justify-center group-hover:bg-[#0097A7] transition-all">
+              <MapPin className="w-5 h-5 text-[#0097A7] group-hover:text-white transition-all" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-slate-800 text-sm">In Clinic</p>
+              <p className="text-xs text-slate-500">Physical visit at clinic</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.href = '/free-consultation'; }}
+            className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group"
+          >
+            <div className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-all">
+              <Monitor className="w-5 h-5 text-blue-600 group-hover:text-white transition-all" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-slate-800 text-sm">TeleConsultation</p>
+              <p className="text-xs text-slate-500">Online video/call consultation</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   CREATABLE SELECT (dropdown + custom input)
+───────────────────────────────────────────── */
+const CreatableSelect = ({ field, register, setValue, watch }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const currentValue = watch(field.name);
+
+  return (
+    <div className="relative">
+      {isEditing ? (
+        <div className="flex gap-2">
+          <input
+            autoFocus
+            defaultValue={currentValue}
+            placeholder="Type new name..."
+            onBlur={(e) => { setValue(field.name, e.target.value); setIsEditing(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setValue(field.name, e.target.value); setIsEditing(false); } if (e.key === 'Escape') setIsEditing(false); }}
+            className="flex-1 p-2.5 border-2 border-blue-400 rounded-xl text-sm outline-none bg-white"
+          />
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <select
+              {...register(field.name)}
+              className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500"
+            >
+              {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+              {!field.options.includes(currentValue) && currentValue && (
+                <option value={currentValue}>{currentValue}</option>
+              )}
+            </select>
+            <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            title="Enter custom name"
+            className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-all text-xs font-bold"
+          >
+            Edit
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   MAIN PAGE
+───────────────────────────────────────────── */
 const CustomerProfilePage = () => {
+  const [showBookModal, setShowBookModal] = useState(false);
+
   const { register, handleSubmit, watch, setValue, resetField } = useForm({
     defaultValues: {
       leadSource: 'Website',
@@ -60,6 +226,10 @@ const CustomerProfilePage = () => {
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
+
+      {/* BOOK CONSULTATION MODAL */}
+      {showBookModal && <BookConsultationModal onClose={() => setShowBookModal(false)} />}
+
       <form onSubmit={handleSubmit(onFinalSubmit)} className="max-w-5xl mx-auto space-y-6">
         
         {/* HEADER AREA */}
@@ -87,7 +257,7 @@ const CustomerProfilePage = () => {
           {[
             { label: "Name", name: "name" }, { label: "Age", name: "age" },
             { label: "Contact Number", name: "contact" }, { label: "WhatsApp Number", name: "whatsapp" },
-            { label: "Lead Owner", name: "leadOwner", type: "select", options: ["Pranjal", "Ankit"] },
+            { label: "Lead Owner", name: "leadOwner", type: "creatable", options: ["Pranjal", "Ankit"] },
             { 
                 label: "Lead Stage", 
                 name: "leadStage", 
@@ -106,6 +276,8 @@ const CustomerProfilePage = () => {
                     </select>
                     <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
                 </div>
+              ) : f.type === "creatable" ? (
+                <CreatableSelect field={f} register={register} setValue={setValue} watch={watch} />
               ) : (
                 <input {...register(f.name)} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
               )}
@@ -138,13 +310,18 @@ const CustomerProfilePage = () => {
            <textarea {...register("notes")} className="w-full p-3 border border-slate-200 rounded-xl text-sm h-24 mb-4 outline-none focus:border-blue-400 resize-none" placeholder="Enter patient summary or general observations..."></textarea>
            <div className="flex justify-end gap-3">
              <button type="button" className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-700">Save Notes</button>
-             <button type="button" className="px-6 py-2.5 bg-[#0097A7] text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 flex items-center gap-2 hover:bg-[#00838F]">
+             {/* ✅ Book Consultation → opens modal */}
+             <button
+               type="button"
+               onClick={() => setShowBookModal(true)}
+               className="px-6 py-2.5 bg-[#0097A7] text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 flex items-center gap-2 hover:bg-[#00838F] transition-colors"
+             >
                <Calendar size={16}/> Book Consultation
              </button>
            </div>
         </div>
 
-        {/* ACTIVITY LOG & REMINDERS (PROFESSIONAL VERSION) */}
+        {/* ACTIVITY LOG & REMINDERS */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
           <h3 className="font-bold text-slate-700 text-lg flex items-center gap-2">
             Activity Log & Reminders

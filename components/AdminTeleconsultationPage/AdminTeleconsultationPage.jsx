@@ -69,105 +69,94 @@ const CallModal = ({ patient, onClose }) => {
   );
 };
 
-const ProfileModal = ({ item, onClose }) => {
-  if (!item) return null;
-  return (
-    <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-slate-800 text-lg">Patient Profile</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl mb-4">
-          <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
-            {item.customer.name.charAt(0)}
-          </div>
-          <div>
-            <p className="font-bold text-slate-800 text-base">{item.customer.name}</p>
-            <p className="text-sm text-slate-500">Age {item.customer.age} · {item.customer.location}</p>
-            <span className={`mt-1 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${getConsultStyle(item.consultationStatus)}`}>
-              {item.consultationStatus}
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Phone</p>
-            <p className="text-sm font-semibold text-slate-700">{item.customer.phone}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Booking ID</p>
-            <p className="text-sm font-semibold text-slate-700">{item.id}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl col-span-2">
-            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Email</p>
-            <p className="text-sm font-semibold text-slate-700">{item.customer.email}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</p>
-            <p className="text-sm font-semibold text-slate-700">{item.agent}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Sell Response</p>
-            <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${getSellStyle(item.sellResponse)}`}>
-              {item.sellResponse}
-            </span>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl col-span-2">
-            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Doctor · Appointment</p>
-            <p className="text-sm font-semibold text-slate-700">{item.doctor}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{item.appointment}</p>
-          </div>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-};
-
 /* ─────────────────────────────────────────────
    THREE-DOT DROPDOWN
 ───────────────────────────────────────────── */
 
-const ActionDropdown = ({ item, onClose }) => {
+const ActionDropdown = ({ item, onClose, onCancel, onReschedule }) => {
+
+  const handleDownload = () => {
+    const content = [
+      `Booking ID: ${item.id}`,
+      `Patient: ${item.customer.name}, Age ${item.customer.age}`,
+      `Phone: ${item.customer.phone}`,
+      `Email: ${item.customer.email}`,
+      `Location: ${item.customer.location}`,
+      `Agent: ${item.agent}`,
+      `Doctor: ${item.doctor}`,
+      `Consultation Status: ${item.consultationStatus}`,
+      `Sell Response: ${item.sellResponse}`,
+      `Appointment: ${item.appointment}`,
+    ].join("\n");
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `booking-${item.id.replace("#", "")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    onClose();
+  };
+
   const actions = [
-    { icon: X,         label: "Cancel",        color: "text-red-600",     bg: "hover:bg-red-50"     },
-    { icon: PhoneCall, label: "Call Clinic",    color: "text-slate-600",   bg: "hover:bg-slate-50"   },
-    { icon: FileText,  label: "Profile & CRM", color: "text-indigo-600",  bg: "hover:bg-indigo-50"  },
-    { icon: Calendar,  label: "Reschedule",     color: "text-orange-600",  bg: "hover:bg-orange-50"  },
-    { icon: Phone,     label: "Call Patient",   color: "text-blue-600",    bg: "hover:bg-blue-50"    },
-    { icon: Download,  label: "Download",       color: "text-emerald-600", bg: "hover:bg-emerald-50" },
-    { icon: MapPin,    label: "Tracking",       color: "text-purple-600",  bg: "hover:bg-purple-50"  },
-    { icon: FileText,  label: "Ticket",         color: "text-cyan-600",    bg: "hover:bg-cyan-50"    },
+    {
+      icon: X, label: "Cancel", color: "text-red-600", bg: "hover:bg-red-50",
+      onClick: () => { onCancel && onCancel(); onClose(); },
+    },
+    {
+      icon: PhoneCall, label: "Call Clinic", color: "text-slate-600", bg: "hover:bg-slate-50",
+      onClick: () => { window.location.href = "tel:+911800000000"; onClose(); },
+    },
+    {
+      icon: FileText, label: "Profile & CRM", color: "text-indigo-600", bg: "hover:bg-indigo-50",
+      href: "/super-admin/teleconsultation/customerprofile",
+    },
+    {
+      icon: Calendar, label: "Reschedule", color: "text-orange-600", bg: "hover:bg-orange-50",
+      onClick: () => { onReschedule && onReschedule(); onClose(); },
+    },
+    {
+      icon: Phone, label: "Call Patient", color: "text-blue-600", bg: "hover:bg-blue-50",
+      onClick: () => { window.location.href = `tel:${item.customer.phone}`; onClose(); },
+    },
+    {
+      icon: Download, label: "Download", color: "text-emerald-600", bg: "hover:bg-emerald-50",
+      onClick: handleDownload,
+    },
+    {
+      icon: MapPin, label: "Tracking", color: "text-purple-600", bg: "hover:bg-purple-50",
+      onClick: () => { window.open(`https://maps.google.com/?q=${item.customer.location}`, "_blank"); onClose(); },
+    },
+    {
+      icon: FileText, label: "Ticket", color: "text-cyan-600", bg: "hover:bg-cyan-50",
+      onClick: () => { alert(`Ticket raised for ${item.id}`); onClose(); },
+    },
   ];
+
   return (
     <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 z-40 min-w-[185px] py-1">
-      {actions.map(({ icon: Icon, label, color, bg }) => (
-        <button
-          key={label}
-          onClick={() => { alert(`${label} — ${item.id}`); onClose(); }}
-          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors`}
-        >
-          <Icon className="w-4 h-4 shrink-0" />
-          {label}
-        </button>
-      ))}
+      {actions.map(({ icon: Icon, label, color, bg, onClick, href }) =>
+        href ? (
+          <a
+            key={label}
+            href={href}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors`}
+          >
+            <Icon className="w-4 h-4 shrink-0" />
+            {label}
+          </a>
+        ) : (
+          <button
+            key={label}
+            onClick={onClick}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors`}
+          >
+            <Icon className="w-4 h-4 shrink-0" />
+            {label}
+          </button>
+        )
+      )}
     </div>
   );
 };
@@ -179,7 +168,6 @@ const ActionDropdown = ({ item, onClose }) => {
 const ActionCell = ({ item }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [callModal,    setCallModal]    = useState(false);
-  const [profileModal, setProfileModal] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -193,8 +181,7 @@ const ActionCell = ({ item }) => {
 
   return (
     <>
-      {callModal    && <CallModal    patient={item.customer} onClose={() => setCallModal(false)}    />}
-      {profileModal && <ProfileModal item={item}             onClose={() => setProfileModal(false)} />}
+      {callModal && <CallModal patient={item.customer} onClose={() => setCallModal(false)} />}
 
       <div className="flex items-center justify-center gap-1.5">
         {/* 📞 Call */}
@@ -206,14 +193,14 @@ const ActionCell = ({ item }) => {
           <Phone className="w-4 h-4" />
         </button>
 
-        {/* 👤 Profile */}
-        <button
-          onClick={() => setProfileModal(true)}
+        {/* 👤 Profile → redirect to route */}
+        <a
+          href={`/super-admin/teleconsultation/customerprofile`}
           title="View Profile"
           className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white flex items-center justify-center transition-all hover:scale-110 border border-indigo-200 shadow-sm"
         >
           <User className="w-4 h-4" />
-        </button>
+        </a>
 
         {/* ⋮ More */}
         <div className="relative" ref={dropdownRef}>
@@ -225,7 +212,12 @@ const ActionCell = ({ item }) => {
             <MoreVertical className="w-4 h-4" />
           </button>
           {showDropdown && (
-            <ActionDropdown item={item} onClose={() => setShowDropdown(false)} />
+            <ActionDropdown
+              item={item}
+              onClose={() => setShowDropdown(false)}
+              onCancel={() => alert(`Booking ${item.id} canceled`)}
+              onReschedule={() => alert(`Reschedule ${item.id}`)}
+            />
           )}
         </div>
       </div>
@@ -343,30 +335,22 @@ const AdminTeleconsultationPage = () => {
           </div>
         </div>
 
-        {/* ── Action Buttons — improved frontend ── */}
+        {/* ── Action Buttons ── */}
         <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-
-          {/* Add Booking */}
           <button className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition-all hover:shadow-lg">
             <Plus className="w-4 h-4" />
             Add Booking
           </button>
-
-          {/* Consult Now/Upcoming */}
           <button className="relative bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md hover:border-emerald-400">
             <Video className="w-4 h-4" />
             Consult Now/Upcoming
-            {/* count badge */}
             <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">
               03
             </span>
           </button>
-
-          {/* Consultation Done */}
           <button className="relative bg-white hover:bg-teal-50 text-teal-700 border border-teal-300 px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md hover:border-teal-400">
             <CheckCircle className="w-4 h-4" />
             Consultation Done
-            {/* count badge */}
             <span className="absolute -top-2 -right-2 bg-teal-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">
               03
             </span>
@@ -417,7 +401,6 @@ const AdminTeleconsultationPage = () => {
                   <td className="px-6 py-4 text-[11px] font-bold text-slate-500">
                     {item.appointment}
                   </td>
-                  {/* ✅ Hybrid Action Cell */}
                   <td className="px-6 py-4">
                     <ActionCell item={item} />
                   </td>
@@ -448,7 +431,6 @@ const AdminTeleconsultationPage = () => {
                   <span className="text-slate-500 font-normal text-sm">Age {item.customer.age}</span>
                 </h3>
               </div>
-              {/* ✅ Hybrid Action in mobile too */}
               <ActionCell item={item} />
             </div>
 
