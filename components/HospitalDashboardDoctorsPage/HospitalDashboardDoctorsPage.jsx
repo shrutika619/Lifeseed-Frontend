@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 // ✅ REVERTED BACK TO YOUR WORKING SERVICE
-import { getDoctors, toggleDoctorStatus } from "@/app/services/hospitalDashboard.service"; 
+import { getDoctors, toggleDoctorStatus } from "@/app/services/hospitalDoctor.service"; 
 
 // --- Helper Components ---
 const ToggleSwitch = ({ id, checked, onChange, disabled }) => (

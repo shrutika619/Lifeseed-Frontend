@@ -3,9 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useDoctorOptions } from '@/app/hooks/useDoctorOptions';
-import api from "@/lib/axios";
-import { Constants } from "@/app/utils/constants";
-import { getDoctorById, createDoctor, updateDoctor } from '@/app/services/hospitalDashboard.service';
+import { AlertCircle, Lock } from 'lucide-react'; 
+
+// ✅ ALL API CALLS NOW IMPORTED FROM SERVICE ONLY (No direct Axios calls)
+import { 
+  getDoctorById, 
+  createDoctor, 
+  updateDoctor, 
+  getDoctorSlotConfig,
+  getClinicSlots 
+} from '@/app/services/hospitalDoctor.service'; 
 
 // --- Helper Components ---
 const FormInput = ({ id, label, type = "text", placeholder, value, onChange }) => (
@@ -29,9 +36,9 @@ const FormSelect = ({ id, label, value, onChange, options = [], placeholder, dis
   </div>
 );
 
-const ToggleSwitch = ({ id, checked, onChange }) => (
-  <label htmlFor={id} className="relative inline-flex items-center cursor-pointer">
-    <input type="checkbox" id={id} checked={checked} onChange={onChange} className="sr-only peer" />
+const ToggleSwitch = ({ id, checked, onChange, disabled }) => (
+  <label htmlFor={id} className={`relative inline-flex items-center ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+    <input type="checkbox" id={id} checked={checked} onChange={onChange} disabled={disabled} className="sr-only peer" />
     <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
   </label>
 );
@@ -50,6 +57,7 @@ const sessionLabels = {
   morning: "OPD Morning",
   afternoon: "OPD Afternoon",
   evening: "OPD Evening",
+  night: "Night Shift"
 };
 
 // Main component
@@ -65,6 +73,8 @@ const AddDoctorPage = () => {
 
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [removeImage, setRemoveImage] = useState(false); 
+
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [experience, setExperience] = useState("");
@@ -77,94 +87,106 @@ const AddDoctorPage = () => {
   const [primarySpecialty, setPrimarySpecialty] = useState("");
   const [otherSpecialties, setOtherSpecialties] = useState("");
   const [languages, setLanguages] = useState({
-    English: false,
-    Hindi: false,
-    Marathi: false,
-    Tamil: false,
-    Telugu: false,
-    Kannada: false,
-    Bengali: false,
-    Gujarati: false
+    English: false, Hindi: false, Marathi: false, Tamil: false, Telugu: false, Kannada: false, Bengali: false, Gujarati: false
   });
   const [consultationFee, setConsultationFee] = useState("");
 
   const [clinicSlots, setClinicSlots] = useState(null);
   const [selectedDayObj, setSelectedDayObj] = useState(daysMap[0]);
   const [selectedSlots, setSelectedSlots] = useState({});
+  
+  const [needsReconfig, setNeedsReconfig] = useState(false); 
+  const [originalAvailability, setOriginalAvailability] = useState(null);
 
-  // ✅ Fetch Master Clinic Slots
   useEffect(() => {
-    const fetchClinicSlots = async () => {
+    const loadData = async () => {
+      setIsFetchingInfo(true);
+
       try {
-        const endpoint = Constants?.urlEndPoints?.GET_CLINIC_SLOTS || '/doctors/clinic-slots';
-        const response = await api.get(endpoint);
-        if (response.data.success) {
-          setClinicSlots(response.data.data);
-          const firstOpen = daysMap.find(d => !response.data.data[d.full]?.isClosed);
-          if (firstOpen) setSelectedDayObj(firstOpen);
-        }
-      } catch (error) {
-        console.error("Failed to load clinic slots", error);
-        toast.error("Failed to load clinic operating hours.");
-      }
-    };
-    fetchClinicSlots();
-  }, []);
+        if (doctorId) {
+          // EDIT MODE
+          const [docRes, configRes] = await Promise.all([
+            getDoctorById(doctorId),
+            getDoctorSlotConfig(doctorId)
+          ]);
 
-  // ✅ Fetch Doctor Details (Edit Mode)
-  useEffect(() => {
-    if (doctorId) {
-      const fetchDetails = async () => {
-        setIsFetchingInfo(true);
-        const result = await getDoctorById(doctorId);
+          if (docRes.success) {
+            const data = docRes.data;
+            setName(data.name || "");
+            setAge(data.age || "");
+            setExperience(data.experience || "");
+            setUgDegree(data.underGraduationDegree?._id || data.underGraduationDegree || "");
+            setDegreeRegNum(data.underGraduationRegNo || "");
+            setPgDegree(data.postGraduationDegree?._id || data.postGraduationDegree || "");
+            setPgRegNum(data.postGraduationRegNo || "");
+            setSuperSpecialization(data.superSpecialization?._id || data.superSpecialization || "");
+            setSuperSpecRegNum(data.superSpecializationRegNo || "");
+            setPrimarySpecialty(data.primarySpecialty?._id || data.primarySpecialty || "");
+            setConsultationFee(data.consultationFee || "");
+            if (data.otherSpecialties) setOtherSpecialties(data.otherSpecialties.join(", "));
 
-        if (result.success) {
-          const data = result.data;
-          setName(data.name || "");
-          setAge(data.age || "");
-          setExperience(data.experience || "");
-          setUgDegree(data.underGraduationDegree?._id || data.underGraduationDegree || "");
-          setDegreeRegNum(data.underGraduationRegNo || "");
-          setPgDegree(data.postGraduationDegree?._id || data.postGraduationDegree || "");
-          setPgRegNum(data.postGraduationRegNo || "");
-          setSuperSpecialization(data.superSpecialization?._id || data.superSpecialization || "");
-          setSuperSpecRegNum(data.superSpecializationRegNo || "");
-          setPrimarySpecialty(data.primarySpecialty?._id || data.primarySpecialty || "");
-          setConsultationFee(data.consultationFee || "");
-          if (data.otherSpecialties) setOtherSpecialties(data.otherSpecialties.join(", "));
-
-          if (data.languages && Array.isArray(data.languages)) {
-            setLanguages(prev => {
-              const newLangs = { ...prev };
-              data.languages.forEach(l => { if (newLangs[l] !== undefined) newLangs[l] = true; });
-              return newLangs;
-            });
+            if (data.languages && Array.isArray(data.languages)) {
+              setLanguages(prev => {
+                const newLangs = { ...prev };
+                data.languages.forEach(l => { if (newLangs[l] !== undefined) newLangs[l] = true; });
+                return newLangs;
+              });
+            }
+            if (data.profileImage) setPhotoPreview(data.profileImage);
+          } else {
+            toast.error(docRes.message || "Failed to fetch doctor details");
           }
-          if (data.profileImage) setPhotoPreview(data.profileImage);
 
-          // Pre-fill availability
-          if (data.weeklyAvailability?.availability) {
-            const bAvail = data.weeklyAvailability.availability;
+          if (configRes.success) { 
+            const configData = configRes.data;
+            
+            setClinicSlots(configData.clinicSlots);
+            setNeedsReconfig(configData.needsReconfiguration);
+            setOriginalAvailability(configData.currentAvailability);
+
             const prefilled = {};
+            const bAvail = configData.currentAvailability;
+            
             Object.keys(bAvail).forEach(fullDay => {
               ['morning', 'afternoon', 'evening', 'night'].forEach(session => {
                 if (bAvail[fullDay][session]?.enabled && bAvail[fullDay][session]?.times) {
                   bAvail[fullDay][session].times.forEach(t => {
-                    const key = `${fullDay}|${session}|${t.start}|${t.end}`;
-                    prefilled[key] = true;
+                    if (t.enabled === true || t.enabled === undefined) {
+                      const key = `${fullDay}|${session}|${t.start}|${t.end}`;
+                      prefilled[key] = true;
+                    }
                   });
                 }
               });
             });
             setSelectedSlots(prefilled);
+
+            const firstOpen = daysMap.find(d => !configData.clinicSlots[d.full]?.isClosed);
+            if (firstOpen) setSelectedDayObj(firstOpen);
           }
+
         } else {
-          toast.error(result.message);
+          // ✅ CREATE MODE: Using Service Call
+          const response = await getClinicSlots();
+          
+          if (response.success) {
+            const slotsData = response.data.slots || response.data;
+            setClinicSlots(slotsData);
+            const firstOpen = daysMap.find(d => !slotsData[d.full]?.isClosed);
+            if (firstOpen) setSelectedDayObj(firstOpen);
+          } else {
+            toast.error(response.message || "Failed to load clinic slots");
+          }
         }
+      } catch (error) {
+        console.error("Failed to load page data:", error);
+        toast.error("Failed to load necessary data from the server.");
+      } finally {
         setIsFetchingInfo(false);
-      };
-      fetchDetails();
-    }
+      }
+    };
+
+    loadData();
   }, [doctorId]);
 
   useEffect(() => {
@@ -174,14 +196,71 @@ const AddDoctorPage = () => {
     return () => URL.revokeObjectURL(objectUrl);
   }, [photo]);
 
-  const handlePhotoChange = (e) => { if (e.target.files && e.target.files[0]) setPhoto(e.target.files[0]); };
+  const handlePhotoChange = (e) => { 
+    if (e.target.files && e.target.files[0]) {
+      setPhoto(e.target.files[0]); 
+      setRemoveImage(false); 
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setPhoto(null);
+    setPhotoPreview(null);
+    setRemoveImage(true); 
+  };
+
   const handleLanguageToggle = (lang) => setLanguages((prev) => ({ ...prev, [lang]: !prev[lang] }));
 
   const handleSlotToggle = (slotKey) => {
     setSelectedSlots(prev => ({ ...prev, [slotKey]: !prev[slotKey] }));
   };
 
-  // ✅ Includes night session as required by backend
+  const isAllSelectedForDay = () => {
+    if (!clinicSlots || !selectedDayObj) return false;
+    const dayData = clinicSlots[selectedDayObj.full];
+    if (!dayData || dayData.isClosed) return false;
+
+    let totalAvailable = 0;
+    let totalSelected = 0;
+
+    ['morning', 'afternoon', 'evening', 'night'].forEach(session => {
+      const sessionSlots = dayData[session] || [];
+      totalAvailable += sessionSlots.length;
+      sessionSlots.forEach(slot => {
+        const key = `${selectedDayObj.full}|${session}|${slot.start}|${slot.end}`;
+        if (selectedSlots[key]) totalSelected++;
+      });
+    });
+
+    return totalAvailable > 0 && totalSelected === totalAvailable;
+  };
+
+  const handleSelectAllForDayToggle = (e) => {
+    const isChecked = e.target.checked;
+    if (!clinicSlots || !selectedDayObj) return;
+
+    const dayData = clinicSlots[selectedDayObj.full];
+    if (!dayData || dayData.isClosed) return;
+
+    setSelectedSlots(prev => {
+      const newSelections = { ...prev };
+
+      ['morning', 'afternoon', 'evening', 'night'].forEach(session => {
+        const sessionSlots = dayData[session] || [];
+        sessionSlots.forEach(slot => {
+          const key = `${selectedDayObj.full}|${session}|${slot.start}|${slot.end}`;
+          if (isChecked) {
+            newSelections[key] = true;
+          } else {
+            delete newSelections[key];
+          }
+        });
+      });
+
+      return newSelections;
+    });
+  };
+
   const formatAvailabilityForBackend = () => {
     const backendAvail = {};
     daysMap.forEach(d => {
@@ -224,23 +303,21 @@ const AddDoctorPage = () => {
       formData.append("primarySpecialty", primarySpecialty);
       formData.append("consultationFee", consultationFee);
 
-      // ✅ Send languages as array fields: languages[]
       const selectedLanguages = Object.keys(languages).filter(l => languages[l]);
       selectedLanguages.forEach(lang => formData.append("languages[]", lang));
 
       formData.append("otherSpecialties", JSON.stringify(otherSpecialties.split(",").map(s => s.trim()).filter(Boolean)));
-
-      // ✅ Send availability with night session included
       formData.append("availability", JSON.stringify(formatAvailabilityForBackend()));
 
       if (photo) formData.append("profileImage", photo);
+      if (removeImage) formData.append("removeImage", "true");
 
       const result = doctorId
         ? await updateDoctor(doctorId, formData)
         : await createDoctor(formData);
 
       if (result.success) {
-        toast.success(`Doctor ${doctorId ? 'updated' : 'created'} successfully!`);
+        toast.success(result.message || `Doctor ${doctorId ? 'updated' : 'created'} successfully!`);
         router.push("/hospitaldashboard/doctors");
       } else {
         toast.error(result.message);
@@ -257,6 +334,94 @@ const AddDoctorPage = () => {
       <p>Loading details...</p>
     </div>
   );
+
+  const hasSlotsForDay = clinicSlots && !clinicSlots[selectedDayObj.full]?.isClosed && 
+      ['morning', 'afternoon', 'evening', 'night'].some(s => clinicSlots[selectedDayObj.full]?.[s]?.length > 0);
+
+  // Read-Only renderer for "Current Schedule"
+  const renderOriginalAvailability = (dayString) => {
+    if (!originalAvailability) return <p className="text-sm text-gray-500 py-4">No previous schedule found.</p>;
+    const dayData = originalAvailability[dayString];
+    
+    if (!dayData) return <p className="text-sm text-gray-500 italic py-2">Doctor is off on this day.</p>;
+
+    const hasAnySlots = ['morning', 'afternoon', 'evening', 'night'].some(s => dayData[s]?.enabled && dayData[s]?.times?.length > 0);
+    if (!hasAnySlots) return <p className="text-sm text-gray-500 italic py-2">Doctor is off on this day.</p>;
+
+    return ['morning', 'afternoon', 'evening', 'night'].map(session => {
+       const sessionData = dayData[session];
+       if (!sessionData?.enabled || !sessionData?.times?.length) return null;
+
+       return (
+          <div key={session} className="mb-4">
+             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{sessionLabels[session]}</h3>
+             <div className="space-y-2">
+                {sessionData.times.map((slot, idx) => {
+                   if(slot.enabled === false) return null;
+                   return (
+                     <div key={idx} className="flex justify-between items-center p-2.5 bg-gray-100 rounded-lg border border-gray-200/60">
+                        <span className="text-sm text-gray-600 font-medium">{slot.start} to {slot.end}</span>
+                        <Lock size={14} className="text-gray-400" />
+                     </div>
+                   );
+                })}
+             </div>
+          </div>
+       );
+    });
+  };
+
+  // Editable renderer switches styling based on 'isCompact' flag
+  const renderEditableSlots = (isCompact = false) => {
+    if (!clinicSlots) return <p className="text-sm text-gray-500 py-4">Loading clinic timings...</p>;
+    if (clinicSlots[selectedDayObj.full]?.isClosed) return <p className="text-sm text-red-500 py-4 font-medium">Clinic is closed on this day.</p>;
+
+    return (
+      <>
+        {/* DAY-SPECIFIC TOGGLE */}
+        {hasSlotsForDay && (
+          <div className={isCompact ? "flex items-center justify-between mb-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm" : "flex items-center justify-end mb-4"}>
+            <span className={isCompact ? "text-sm font-medium text-gray-800" : "text-sm font-medium text-gray-700 mr-3"}>Select All for {selectedDayObj.short}</span>
+            <ToggleSwitch 
+              id={`selectAll-${selectedDayObj.full}`} 
+              checked={isAllSelectedForDay()} 
+              onChange={handleSelectAllForDayToggle} 
+            />
+          </div>
+        )}
+
+        {/* Session Slots Loop */}
+        {['morning', 'afternoon', 'evening', 'night'].map(session => {
+          const sessionSlots = clinicSlots[selectedDayObj.full]?.[session] || [];
+          if (sessionSlots.length === 0) return null;
+
+          return (
+            <div key={session} className="mb-4">
+              <h3 className={isCompact ? "text-xs font-bold text-gray-500 uppercase tracking-wider mb-2" : "text-md font-semibold mb-3"}>{sessionLabels[session]}</h3>
+              <div className={isCompact ? "space-y-2" : "space-y-3"}>
+                {sessionSlots.map((slot) => {
+                  const slotKey = `${selectedDayObj.full}|${session}|${slot.start}|${slot.end}`;
+                  const isChecked = !!selectedSlots[slotKey];
+                  
+                  return (
+                    <div key={slot._id || slotKey} className={isCompact ? `flex justify-between items-center p-2.5 rounded-lg border transition-colors ${isChecked ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}` : "flex justify-between items-center p-3 bg-gray-50 rounded-lg"}>
+                      <span className={isCompact ? `text-sm font-medium ${isChecked ? 'text-blue-900' : 'text-gray-600'}` : "text-sm text-gray-600"}>{slot.start} to {slot.end}</span>
+                      <ToggleSwitch id={slotKey} checked={isChecked} onChange={() => handleSlotToggle(slotKey)} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Fallback if no slots generated */}
+        {!hasSlotsForDay && (
+          <p className="text-sm text-gray-500 italic py-2">No time slots configured in the clinic profile for this day.</p>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-inter">
@@ -276,9 +441,14 @@ const AddDoctorPage = () => {
               </div>
             )}
             <span className="mt-3 font-medium text-blue-600 hover:text-blue-500">
-              {doctorId && !photo ? "Change Photo" : "Upload Photo"}
+              {doctorId && !photoPreview ? "Change Photo" : "Upload Photo"}
             </span>
           </label>
+          {photoPreview && (
+            <button type="button" onClick={handleRemoveImage} className="mt-1 text-xs text-red-500 hover:underline">
+              Remove Photo
+            </button>
+          )}
         </div>
 
         {/* === Personal Information Section === */}
@@ -287,7 +457,7 @@ const AddDoctorPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormInput id="name" label="Name" value={name} onChange={(e) => setName(e.target.value)} />
             <FormInput id="age" label="Age" type="number" value={age} onChange={(e) => setAge(e.target.value)} />
-            <FormInput id="experience" label="Experience" value={experience} onChange={(e) => setExperience(e.target.value)} />
+            <FormInput id="experience" label="Experience (Years)" value={experience} onChange={(e) => setExperience(e.target.value)} />
           </div>
         </div>
 
@@ -332,8 +502,21 @@ const AddDoctorPage = () => {
         <div className="p-6">
           <h2 className="text-xl font-semibold mb-4">Weekly Availability</h2>
 
+          {/* WARNING BANNER */}
+          {needsReconfig && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 shadow-sm">
+              <AlertCircle className="text-amber-600 mt-0.5 shrink-0" size={20} />
+              <div>
+                <h4 className="text-sm font-semibold text-amber-900">Clinic Timings Have Changed!</h4>
+                <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                  The hospital has updated its operating hours. The left column shows the doctor's current schedule (which will remain active for already generated slots). Please configure the new schedule in the right column to sync with the clinic.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Day Tabs */}
-          <div className="mb-4">
+          <div className="mb-6">
             <div className="flex flex-wrap -mb-px border-b border-gray-200">
               {daysMap.map((day) => {
                 const isClosed = clinicSlots ? clinicSlots[day.full]?.isClosed : false;
@@ -343,11 +526,11 @@ const AddDoctorPage = () => {
                     key={day.full}
                     onClick={() => !isClosed && setSelectedDayObj(day)}
                     disabled={isClosed}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      isClosed
-                        ? "border-transparent text-gray-300 line-through cursor-not-allowed"
-                        : selectedDayObj.full === day.full
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 ${
+                      selectedDayObj.full === day.full
                         ? "border-blue-600 text-blue-600"
+                        : isClosed 
+                        ? "border-transparent text-gray-300 line-through cursor-not-allowed"
                         : "border-transparent text-gray-500 hover:text-gray-700"
                     }`}
                   >
@@ -358,37 +541,40 @@ const AddDoctorPage = () => {
             </div>
           </div>
 
-          {/* Slot Content */}
-          <div>
-            {!clinicSlots ? (
-              <p className="text-sm text-gray-500 py-4">Loading clinic timings...</p>
-            ) : clinicSlots[selectedDayObj.full]?.isClosed ? (
-              <p className="text-sm text-red-500 py-4">Clinic is closed on this day.</p>
-            ) : (
-              ['morning', 'afternoon', 'evening'].map(session => {
-                const sessionSlots = clinicSlots[selectedDayObj.full]?.[session] || [];
-                if (sessionSlots.length === 0) return null;
-
-                return (
-                  <div key={session} className="mb-4">
-                    <h3 className="text-md font-semibold mb-3">{sessionLabels[session]}</h3>
-                    <div className="space-y-3">
-                      {sessionSlots.map((slot) => {
-                        const slotKey = `${selectedDayObj.full}|${session}|${slot.start}|${slot.end}`;
-                        const isChecked = !!selectedSlots[slotKey];
-                        return (
-                          <div key={slot._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <span className="text-sm text-gray-600">{slot.start} to {slot.end}</span>
-                            <ToggleSwitch id={slotKey} checked={isChecked} onChange={() => handleSlotToggle(slotKey)} />
-                          </div>
-                        );
-                      })}
-                    </div>
+          {/* SIDE-BY-SIDE GRID VIEW OR STANDARD VIEW */}
+          {needsReconfig ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+              {/* Left Side: Current Locked Schedule */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
+                  <Lock size={18} className="text-gray-500" />
+                  <div>
+                    <h3 className="font-semibold text-gray-800 text-sm">Current Schedule</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Active for the next 7 days</p>
                   </div>
-                );
-              })
-            )}
-          </div>
+                </div>
+                {renderOriginalAvailability(selectedDayObj.full)}
+              </div>
+
+              {/* Right Side: New Editable Schedule */}
+              <div className="bg-blue-50/30 border border-blue-100 rounded-xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-blue-100">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <div>
+                    <h3 className="font-semibold text-blue-900 text-sm">New Configuration</h3>
+                    <p className="text-xs text-blue-600 mt-0.5">Applies to newly generated slots</p>
+                  </div>
+                </div>
+                {renderEditableSlots(true)}
+              </div>
+            </div>
+          ) : (
+            // Standard View if no conflict (Uses original layout)
+            <div>
+              {renderEditableSlots(false)}
+            </div>
+          )}
+
         </div>
 
         {/* === Save Button === */}

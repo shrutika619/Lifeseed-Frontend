@@ -98,8 +98,11 @@ export async function POST() {
     // If the backend rejects the refresh token (e.g., invalid signature or expired),
     // delete the cookies from the user's browser immediately.
     const cookieStore = await cookies();
-    cookieStore.delete("refreshToken");
-    cookieStore.delete("user_role");
+    if(error.response.status = 401){
+      cookieStore.delete("refreshToken");
+      cookieStore.delete("user_role");
+
+    }
     
     return NextResponse.json(
       error.response?.data || { message: "Session expired" },
