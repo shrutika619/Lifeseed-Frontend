@@ -1,10 +1,9 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 // ✅ IMPORT GLOBAL TIME SLOTS HOOK & API SERVICES
-// (Ensure this path matches exactly where you saved useTimeSlot.js)
 import { useTimeSlot } from '@/app/hooks/useTimeslot'; 
 import { getMeClinicProfile, updateClinicTimings } from '@/app/services/hospitalProfile.service';
 
@@ -24,6 +23,9 @@ const HospitalDashboardTimeTablePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [clinicId, setClinicId] = useState(null);
+  
+  // ✅ NEW: State for Slot Duration (Defaults to 30)
+  const [slotDuration, setSlotDuration] = useState(30);
 
   // Fetch master time slots
   const { allSlots, isLoadingSlots } = useTimeSlot();
@@ -61,6 +63,11 @@ const HospitalDashboardTimeTablePage = () => {
         
         if (response.success && response.data?.clinic) {
           setClinicId(response.data.clinic._id);
+
+          // ✅ Set existing slot duration from backend
+          if (response.data.clinic.slotDuration) {
+            setSlotDuration(response.data.clinic.slotDuration);
+          }
 
           const existingTimings = response.data.clinic.timings;
           
@@ -180,19 +187,15 @@ const HospitalDashboardTimeTablePage = () => {
 
     setIsSaving(true);
     
-    // ✅ FORMAT EXACTLY AS BACKEND EXPECTS
+    // FORMAT EXACTLY AS BACKEND EXPECTS
     const timingsArray = Object.keys(timings).map(day => {
       const dayData = timings[day];
       const isClosed = dayData.isClosed;
 
-      // Helper to format each section
       const formatSection = (sectionData) => {
-        // If the day is closed OR the section is disabled, send empty strings
         if (isClosed || !sectionData.enabled) {
           return { enabled: false, start: "", end: "" };
         }
-        
-        // Otherwise, send the formatted time with leading zeros (e.g., "09:30 AM")
         return {
           enabled: true,
           start: formatTimeForBackend(sectionData.start),
@@ -212,10 +215,18 @@ const HospitalDashboardTimeTablePage = () => {
     });
 
     try {
-      const response = await updateClinicTimings(clinicId, timingsArray);
+      // ✅ Now passing slotDuration to the API
+      const response = await updateClinicTimings(clinicId, timingsArray, slotDuration);
       
       if (response.success) {
-        toast.success("Hospital timings saved successfully!");
+        toast.success(response.message || "Hospital timings saved successfully!");
+        
+        // ✅ SMART WARNINGS: Display backend warnings if they exist (e.g. telling them to update doctors)
+        if (response.data?.warnings && response.data.warnings.length > 0) {
+          response.data.warnings.forEach(warningMsg => {
+            toast.warning(warningMsg, { duration: 8000 }); // Show warning for 8 seconds
+          });
+        }
       } else {
         toast.error(response.message || "Failed to save timings.");
       }
@@ -230,22 +241,13 @@ const HospitalDashboardTimeTablePage = () => {
     const dropdownId = `${session}-${field}`;
     const isOpen = openDropdown === dropdownId;
 
-    // ✅ STRICT TIME BOUNDARIES
+    // STRICT TIME BOUNDARIES
     const sessionSlots = allSlots.filter((time) => {
       const mins = timeToMinutes(time);
       
-      if (session === 'morning') {
-        // Morning: 6:00 AM (360) to 12:00 PM (720)
-        return mins >= 360 && mins <= 720;
-      }
-      if (session === 'afternoon') {
-        // Afternoon: 12:00 PM (720) to 5:00 PM (1020)
-        return mins >= 720 && mins <= 1020;
-      }
-      if (session === 'evening') {
-        // Evening: 5:00 PM (1020) to 11:30 PM (1410)
-        return mins >= 1020 && mins <= 1440;
-      }
+      if (session === 'morning') return mins >= 360 && mins <= 720;
+      if (session === 'afternoon') return mins >= 720 && mins <= 1020;
+      if (session === 'evening') return mins >= 1020 && mins <= 1440;
       return true;
     });
 
@@ -308,23 +310,44 @@ const HospitalDashboardTimeTablePage = () => {
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <div className="flex items-center justify-between mb-6">
+          
+          {/* Header & Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Hospital Timing</h2>
             
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700">Closed on {activeDay}?</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={timings[activeDay].isClosed}
-                  onChange={handleDayClosedToggle}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-              </label>
+            <div className="flex flex-wrap items-center gap-6">
+              {/* ✅ NEW: Slot Duration Dropdown */}
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Slot Duration:</span>
+                <select
+                  value={slotDuration}
+                  onChange={(e) => setSlotDuration(Number(e.target.value))}
+                  className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none"
+                >
+                  <option value={10}>10 Mins</option>
+                  <option value={15}>15 Mins</option>
+                  <option value={30}>30 Mins</option>
+                </select>
+              </div>
+
+              {/* Mark Day as Closed Toggle */}
+              <div className="flex items-center gap-3 border-l pl-6 border-gray-200">
+                <span className="text-sm font-medium text-gray-700">Closed on {activeDay}?</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={timings[activeDay].isClosed}
+                    onChange={handleDayClosedToggle}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                </label>
+              </div>
             </div>
           </div>
 
+          {/* Days Tabs */}
           <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
             {days.map(day => (
               <button

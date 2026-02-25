@@ -16,7 +16,8 @@ import {
   MoreVertical,
   Loader2,
   X,
-  AlertCircle
+  AlertCircle,
+  User 
 } from "lucide-react";
 
 export default function AdminClinicsPage() {
