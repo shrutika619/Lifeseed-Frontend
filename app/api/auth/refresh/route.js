@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import axios from "axios";
 import { decodeJwt } from "jose"; 
-import { Constants } from "@/app/utils/constants"; // ✅ Import Constants
+import { Constants } from "@/app/utils/constants";
 
 export async function POST() {
   try {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("refreshToken")?.value;
 
+    // 🚨 FIX 1: If no token exists, ensure cookies are fully cleared before returning 401
     if (!refreshToken) {
+      cookieStore.delete("refreshToken");
+      cookieStore.delete("user_role");
       return NextResponse.json(
         { message: "No refresh token cookie found" }, 
         { status: 401 }
@@ -28,9 +31,9 @@ export async function POST() {
     // 2. Select Endpoint using Constants
     let refreshEndpoint;
     if (role === 'super_admin' || role === 'admin') {
-        refreshEndpoint = Constants.urlEndPoints.ADMIN_REFRESH_TOKEN; // ✅ Use Constant
+        refreshEndpoint = Constants.urlEndPoints.ADMIN_REFRESH_TOKEN; 
     } else {
-        refreshEndpoint = Constants.urlEndPoints.REFRESH_TOKEN; // ✅ Use Constant
+        refreshEndpoint = Constants.urlEndPoints.REFRESH_TOKEN; 
     }
 
     console.log(`🔄 Refreshing for [${role}] via: ${refreshEndpoint}`);
@@ -91,11 +94,16 @@ export async function POST() {
   } catch (error) {
     console.error("❌ Refresh Proxy Error:", error.response?.data || error.message);
     
-    const errorResponse = NextResponse.json(
+    // 🚨 FIX 2: THE MAGIC WIPE
+    // If the backend rejects the refresh token (e.g., invalid signature or expired),
+    // delete the cookies from the user's browser immediately.
+    const cookieStore = await cookies();
+    cookieStore.delete("refreshToken");
+    cookieStore.delete("user_role");
+    
+    return NextResponse.json(
       error.response?.data || { message: "Session expired" },
       { status: error.response?.status || 401 }
     );
-    
-    return errorResponse;
   }
 }
