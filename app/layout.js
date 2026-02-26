@@ -39,7 +39,8 @@ export default function RootLayout({ children }) {
     "/super-admin/in-clinic-consultation","/admin/in-clinic-consultation",
     "/admin/clinics","/super-admin/clinics", "/login", "/register", "/verify-otp", "/hospitaldashboard/time-table"
     ,"/hospitaldashboard/doctors","/customerprofile","/hospitaldashboard/add-doctors", "/hospitaldashboard/profile","/hospitaldashboard/terms-conditions"
-    ,"/super-admin/teleconsultation/customerprofile","/super-admin/in-clinic-consultation/customerprofile"
+    ,"/super-admin/teleconsultation/customerprofile","/super-admin/in-clinic-consultation/customerprofile","/timeslotmanagement"
+    ,"/super-admin/teleconsultation/configureslot","/admin/teleconsultation/configureslot"
   ];
 
   // Logic to handle exact matches or sub-paths if necessary

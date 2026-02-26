@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import Link from "next/link";
 import {
   Search,
   Filter,
@@ -17,6 +18,7 @@ import {
   PhoneCall,
   Video,
   CheckCircle,
+  Settings,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────
@@ -277,7 +279,7 @@ const AdminTeleconsultationPage = () => {
   return (
     <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans">
 
-      {/* ── Row 1: Date + Consultation Status Badges ── */}
+      {/* ── Row 1: Date + Consultation Status Badges + Configure Slot ── */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 mb-4">
         <div className="relative w-full sm:w-auto">
           <select
@@ -299,6 +301,15 @@ const AdminTeleconsultationPage = () => {
           <StatusPill count="06" label="Follow UP"  color="bg-blue-50 text-blue-700 border border-blue-200"           onClick={() => setActiveFilter("Follow UP")} />
           <StatusPill count="00" label="Time out"   color="bg-orange-50 text-orange-600 border border-orange-200"     onClick={() => setActiveFilter("Time out")} />
         </div>
+
+        {/* ── Configure Slot Button ── */}
+        <Link
+          href="/super-admin/teleconsultation/configureslot"
+          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-md transition-all active:scale-95 shadow-sm whitespace-nowrap"
+        >
+          <Settings className="w-4 h-4" />
+          Configure Slot
+        </Link>
       </div>
 
       {/* ── Row 2: Sell Status ── */}
