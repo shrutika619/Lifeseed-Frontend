@@ -52,7 +52,7 @@ export class Constants {
 
     //--SLOTS & DOCTOR--
     GET_CLINIC_DOCTORS: `${this.API_BASE_URL}/clinicDoctor`,
-    GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/clinicDoctor`, 
+    GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/appoinntmentslot`, 
     
     //--HOSPITAL DASHBOARD--
     HOSPITAL_DOCTORS: `${this.API_BASE_URL}/doctors`,

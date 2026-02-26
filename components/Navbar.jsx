@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAllCities } from "@/app/services/clinic.service";
+import { toast } from "sonner"; // ✅ Imported toast
 // Icons
 import { User, LogOut, ChevronDown } from "lucide-react";
 
@@ -44,10 +45,30 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
+  // ✅ UPDATED: Catch 404 Error and show toast ONLY once per session
   useEffect(() => {
-    if (isAuthenticated && !user?.fullName) {
-      dispatch(fetchProfileDetails());
-    }
+    const checkProfile = async () => {
+      if (isAuthenticated && !user?.fullName) {
+        // Dispatch the thunk and wait for the result
+        const resultAction = await dispatch(fetchProfileDetails());
+        
+        // If the action has an error (like a 404 from your API)
+        if (resultAction.error || resultAction.payload?.error) {
+          // Check session storage so we don't spam the user on every page load
+          const hasShownToast = sessionStorage.getItem("missing_profile_toast");
+          
+          if (!hasShownToast) {
+            toast.warning("Please complete your profile setup to continue.", {
+               duration: 6000, // Show it a bit longer so they can read it
+            });
+            // Mark as shown for this session
+            sessionStorage.setItem("missing_profile_toast", "true");
+          }
+        }
+      }
+    };
+
+    checkProfile();
   }, [dispatch, isAuthenticated, user?.fullName]); 
 
   useEffect(() => {
@@ -104,6 +125,8 @@ const Navbar = () => {
       console.error("Logout API call failed", error);
     } finally {
       dispatch(logoutSuccess());
+      // ✅ Clear the session storage flag on logout so it triggers again if they log back in
+      sessionStorage.removeItem("missing_profile_toast");
       closeDropdown();
       router.push("/");
       router.refresh();
@@ -190,7 +213,6 @@ const Navbar = () => {
             )}
           </li>
 
-          {/* ✅ Contact Us Added */}
           <li>
             <Link
               href="/contact"
@@ -297,7 +319,6 @@ const Navbar = () => {
               </Link>
             </li>
 
-            {/* ✅ Contact Us Mobile */}
             <li>
               <Link href="/contact" onClick={closeDropdown} className="block py-1">
                 Contact Us

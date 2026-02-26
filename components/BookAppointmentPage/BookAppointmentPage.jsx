@@ -25,7 +25,7 @@ const BookAppointmentPage = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null); 
   const [selectedTime, setSelectedTime] = useState(null);
-  const [dateOffset, setDateOffset] = useState(0); // ✅ Track which 7 days are visible
+  const [dateOffset, setDateOffset] = useState(0); 
   
   // ✅ Form data state
   const [formData, setFormData] = useState({
@@ -49,7 +49,7 @@ const BookAppointmentPage = () => {
     }
   }, [user]);
 
-  // ✅ 1. Fetch Doctors on Mount
+  // ✅ 1. Fetch Doctors & Fix Object Error
   useEffect(() => {
     const fetchDoctors = async () => {
       if (!clinicId) {
@@ -60,16 +60,32 @@ const BookAppointmentPage = () => {
       try {
         setLoadingDoctors(true);
         const data = await ClinicDoctorService.getDoctorsByClinicId(clinicId);
+
         if (data.success) {
           setClinicName(data.data.clinicName);
-          const mappedDoctors = data.data.doctors.map(doc => ({
-            id: doc._id,
-            name: doc.name,
-            specialization: doc.primarySpecialty,
-            location: data.data.clinicName,
-            fee: doc.consultationFee,
-            image: doc.profileImage || `https://via.placeholder.com/100/6366f1/ffffff?text=${doc.name.charAt(0)}`
-          }));
+          
+          const mappedDoctors = data.data.doctors.map(doc => {
+            // 🚨 FIX FOR CRASH: Extract the string 'name' from the nested objects safely
+            const ug = doc.underGraduationDegree?.name || "";
+            const pg = doc.postGraduationDegree?.name || "";
+            const superSpec = doc.superSpecialization?.name || "";
+            
+            // Format to look like the image: "MBBS, MD (General Medicine)"
+            const qualifications = [ug, pg, superSpec].filter(Boolean).join(", ");
+            const fallbackSpec = doc.primarySpecialty?.name || "Specialist";
+
+            return {
+              id: doc._id,
+              // Prepend "Dr." if it isn't already there
+              name: doc.name.toLowerCase().startsWith('dr') ? doc.name : `Dr. ${doc.name}`,
+              specialization: qualifications || fallbackSpec,
+              experience: doc.experience ? `${doc.experience}+ Years` : "Experience not listed",
+              location: data.data.clinicName,
+              fee: doc.consultationFee,
+              image: doc.profileImage || `https://via.placeholder.com/100/6366f1/ffffff?text=${doc.name.charAt(0)}`
+            };
+          });
+          
           setDoctors(mappedDoctors);
         }
       } catch (error) {
@@ -90,10 +106,10 @@ const BookAppointmentPage = () => {
         setSelectedDate(null); 
         setSelectedTime(null); 
 
-        const res = await ClinicDoctorService.getDoctorAvailability(selectedDoctor);
-        if (res.success && res.data.availability) {
+        const res = await ClinicDoctorService.getDoctorDetailsById(selectedDoctor);
+        if (res.success && res.data?.availability) {
           setAvailabilityData(res.data.availability);
-          setDateOffset(0); // Reset the 7-day slider when changing doctors
+          setDateOffset(0); 
           
           if (res.data.availability.length > 0) {
             setSelectedDate(res.data.availability[0].date);
@@ -118,17 +134,15 @@ const BookAppointmentPage = () => {
     };
   });
 
-  // Calculate the 7 visible dates based on the offset
   const maxOffset = Math.max(0, formattedDates.length - 7);
   const visibleDates = formattedDates.slice(dateOffset, dateOffset + 7);
 
-  // Get current Month & Year string based on the first visible date
   const currentMonthYear = visibleDates.length > 0 
     ? new Date(visibleDates[0].fullDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) 
     : '';
 
-  // Get slots for the currently selected date
   const currentDayAvailability = availabilityData.find(a => a.date === selectedDate);
+  
   const getSlotsByPeriod = (periodName) => {
     const group = currentDayAvailability?.slotGroups?.find(g => g.period === periodName);
     return group ? group.slots.filter(s => s.isAvailable) : [];
@@ -151,7 +165,7 @@ const BookAppointmentPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-3 sm:py-6 px-3 sm:px-4 md:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-3 sm:py-6 px-3 sm:px-4 md:px-6 lg:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
 
         <div className="text-center mb-4 sm:mb-6 md:mb-8">
@@ -177,7 +191,7 @@ const BookAppointmentPage = () => {
                 <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">Select Doctor</h2>
               </div>
               
-              <div className="space-y-2 sm:space-y-3">
+              <div className="space-y-3">
                 {loadingDoctors ? (
                   <div className="flex justify-center py-8">
                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -187,38 +201,49 @@ const BookAppointmentPage = () => {
                     <div
                       key={doctor.id}
                       onClick={() => setSelectedDoctor(doctor.id)}
-                      className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all ${
-                        selectedDoctor === doctor.id ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'
+                      className={`border-2 rounded-xl p-4 sm:p-5 cursor-pointer transition-all duration-200 ${
+                        selectedDoctor === doctor.id 
+                          ? 'border-indigo-600 bg-indigo-50/30 shadow-sm' 
+                          : 'border-gray-200 hover:border-indigo-300 hover:shadow-sm bg-white'
                       }`}
                     >
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-1 min-w-0">
+                      {/* ✅ DOCTOR CARD STYLED LIKE IMAGE */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 sm:gap-5 flex-1 min-w-0">
+                          
+                          {/* Profile Image */}
                           <img 
                             src={doctor.image} 
                             alt={doctor.name} 
-                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0 bg-gray-100" 
+                            className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-full object-cover flex-shrink-0 bg-gray-100 border border-gray-100 shadow-sm" 
                           />
-                          <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                          
+                          {/* Doctor Details */}
+                          <div className="min-w-0 flex-1 flex flex-col justify-center">
+                            <h3 className="font-bold text-[#0f172a] text-[17px] sm:text-[20px] leading-tight mb-1 truncate">
                               {doctor.name}
                             </h3>
-                            <p className="text-xs sm:text-sm text-gray-600 truncate">
+                            <p className="text-[#475569] text-sm sm:text-[15px] font-medium truncate mb-0.5">
                               {doctor.specialization}
                             </p>
-                            <p className="text-xs sm:text-sm text-gray-500 truncate">
-                              {doctor.location}
+                            <p className="text-[#64748b] text-[13px] sm:text-[14px] font-medium">
+                              {doctor.experience}
                             </p>
                           </div>
+
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xl sm:text-2xl font-bold text-gray-900">₹{doctor.fee}</p>
-                          <p className="text-xs text-gray-500">per session</p>
+                        
+                        {/* Fee Section */}
+                        <div className="text-right flex-shrink-0 flex flex-col justify-center self-start sm:self-center mt-1 sm:mt-0">
+                          <p className="text-[22px] sm:text-[26px] font-extrabold text-[#0f172a] leading-none mb-1 tracking-tight">₹{doctor.fee}</p>
+                          <p className="text-[13px] sm:text-[14px] text-[#64748b] font-medium">per session</p>
                         </div>
                       </div>
+
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
                     No doctors available at this clinic.
                   </div>
                 )}
@@ -228,8 +253,8 @@ const BookAppointmentPage = () => {
             {/* YOUR DETAILS */}
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 md:p-6">
               <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Your Details</h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 ml-0 sm:ml-[40px]">
                 <input
                   type="text"
                   name="fullName"
@@ -281,7 +306,7 @@ const BookAppointmentPage = () => {
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 md:p-6">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-base">
-                  3
+                  2
                 </div>
                 <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
                   Select Date & Time
@@ -289,26 +314,26 @@ const BookAppointmentPage = () => {
               </div>
 
               {!selectedDoctor ? (
-                <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-dashed ml-0 sm:ml-[40px]">
                   Please select a doctor first to view their availability.
                 </div>
               ) : loadingSlots ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-8 ml-0 sm:ml-[40px]">
                   <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
                 </div>
               ) : formattedDates.length === 0 ? (
-                <div className="text-center py-6 text-red-500 bg-red-50 rounded-lg border border-dashed">
+                <div className="text-center py-6 text-red-500 bg-red-50 rounded-lg border border-dashed border-red-200 ml-0 sm:ml-[40px]">
                   No slots available for this doctor currently.
                 </div>
               ) : (
-                <>
-                  {/* ✅ EXACT 7-DAY SLIDER DESIGN */}
+                <div className="ml-0 sm:ml-[40px]">
+                  {/* EXACT 7-DAY SLIDER DESIGN */}
                   <div className="mb-6 sm:mb-8">
                     <div className="flex items-center justify-between mb-4 px-1">
                       <button 
                         onClick={() => setDateOffset(Math.max(0, dateOffset - 1))}
                         disabled={dateOffset === 0}
-                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
                       >
                         ←
                       </button>
@@ -318,7 +343,7 @@ const BookAppointmentPage = () => {
                       <button 
                         onClick={() => setDateOffset(Math.min(maxOffset, dateOffset + 1))}
                         disabled={dateOffset >= maxOffset}
-                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
                       >
                         →
                       </button>
@@ -332,10 +357,10 @@ const BookAppointmentPage = () => {
                             setSelectedDate(d.fullDate);
                             setSelectedTime(null); 
                           }}
-                          className={`flex flex-col items-center justify-center py-2 sm:py-3 rounded-xl transition-all ${
+                          className={`flex flex-col items-center justify-center py-2 sm:py-3 rounded-xl transition-all border ${
                             selectedDate === d.fullDate
-                              ? 'bg-indigo-600 text-white shadow-md'
-                              : 'bg-[#f8fafc] hover:bg-gray-200 text-gray-600'
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                              : 'bg-[#f8fafc] hover:bg-gray-200 text-gray-600 border-transparent'
                           }`}
                         >
                           <span className="text-xs font-medium mb-0.5">{d.day}</span>
@@ -357,10 +382,10 @@ const BookAppointmentPage = () => {
                             <button
                               key={slot._id}
                               onClick={() => setSelectedTime(slot.time)}
-                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all ${
+                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium ${
                                 selectedTime === slot.time
                                   ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700'
+                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50'
                               }`}
                             >
                               {slot.time}
@@ -379,10 +404,10 @@ const BookAppointmentPage = () => {
                             <button
                               key={slot._id}
                               onClick={() => setSelectedTime(slot.time)}
-                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all ${
+                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium ${
                                 selectedTime === slot.time
                                   ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700'
+                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50'
                               }`}
                             >
                               {slot.time}
@@ -401,10 +426,10 @@ const BookAppointmentPage = () => {
                             <button
                               key={slot._id}
                               onClick={() => setSelectedTime(slot.time)}
-                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all ${
+                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium ${
                                 selectedTime === slot.time
                                   ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700'
+                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50'
                               }`}
                             >
                               {slot.time}
@@ -416,11 +441,11 @@ const BookAppointmentPage = () => {
 
                     {/* NO SLOTS FALLBACK */}
                     {morningSlots.length === 0 && afternoonSlots.length === 0 && eveningSlots.length === 0 && (
-                       <p className="text-sm text-gray-500 text-center py-4">No slots available for this date.</p>
+                       <p className="text-sm text-gray-500 py-4 bg-gray-50 rounded-lg px-4 border border-dashed">No slots available for this date.</p>
                     )}
 
                   </div>
-                </>
+                </div>
               )}
             </div>
 
