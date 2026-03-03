@@ -1,4 +1,4 @@
-import api from "@/lib/axios"; // ✅ Use the new engine
+import axios from "axios";
 import { Constants } from "@/app/utils/constants";
 
 
@@ -12,7 +12,7 @@ export const getAllClinics = async (cityId) => {
     }
 
     try {
-        const response = await api.get(`${Constants.urlEndPoints.GET_CLINICS}`, {
+        const response = await axios.get(`${Constants.urlEndPoints.GET_CLINICS}`, {
             params: { city: cityId }
         });
 
@@ -49,7 +49,7 @@ export const getAllCities = async () => {
 
         if (!url) throw new Error("URL Constant is undefined!");
 
-        const response = await api.get(url);
+        const response = await axios.get(url);
         return response.data;
     } catch (error) {
         // 2. Log the specific error details
@@ -66,7 +66,7 @@ export const getClinicById = async (id) => {
   try {
     // Uses the existing GET_CLINICS endpoint + ID
     // Final URL: http://localhost:5000/api/v1/public/clinics/{id}
-    const response = await api.get(`${Constants.urlEndPoints.GET_CLINICS}/${id}`);
+    const response = await axios.get(`${Constants.urlEndPoints.GET_CLINICS}/${id}`);
     
     if (response.data.success) {
       return { success: true, data: response.data.data };

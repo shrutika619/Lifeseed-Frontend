@@ -1,6 +1,10 @@
 "use client";
 import React, { useState } from 'react';
 import { Calendar, Clock, MapPin, X } from 'lucide-react';
+import { getAllCities } from '@/app/services/clinic.service';
+import { useEffect } from 'react';
+import Link from "next/link";
+
 
 const FreeConsultationPage = () => {
   const [selectedDay, setSelectedDay] = useState('Mon');
@@ -40,13 +44,40 @@ const FreeConsultationPage = () => {
     'Other'
   ];
 
-  const cities = [
-    { name: 'NAGPUR', state: 'Maharashtra, India' },
-    { name: 'MUMBAI', state: 'Maharashtra' },
-    { name: 'PUNE', state: 'Maharashtra' },
-    { name: 'AMRAVATI', state: 'Maharashtra' },
-    { name: 'DELHI', state: 'Delhi' }
-  ];
+  // const cities = [
+  //   { name: 'NAGPUR', state: 'Maharashtra, India' },
+  //   { name: 'MUMBAI', state: 'Maharashtra' },
+  //   { name: 'PUNE', state: 'Maharashtra' },
+  //   { name: 'AMRAVATI', state: 'Maharashtra' },
+  //   { name: 'DELHI', state: 'Delhi' }
+  // ];
+
+  const [clinicLinks, setClinicLinks] = useState({});
+  
+
+useEffect(() => {
+    const fetchCityData = async () => {
+      try {
+        const response = await getAllCities();
+        const data = response?.data || response; 
+        
+        if (Array.isArray(data)) {
+          const formattedLinks = data.reduce((acc, city) => {
+            if (city?.name) {
+                acc[city.name] = city.name.toLowerCase();
+            }
+            return acc;
+          }, {});
+          setClinicLinks(formattedLinks);
+        }
+      } catch (error) {
+        console.error("Failed to fetch cities", error);
+      }
+    };
+    fetchCityData();
+  }, []);
+
+  
 
   const handleBooking = () => {
     const selectedDayData = days.find(d => d.label === selectedDay);
@@ -457,7 +488,7 @@ const FreeConsultationPage = () => {
 
             {/* City List */}
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {cities.map((city) => (
+              {/* {cities.map((city) => (
                 <button
                   key={city.name}
                   onClick={() => handleCitySelect(city.name)}
@@ -469,7 +500,19 @@ const FreeConsultationPage = () => {
                     <div className="text-sm text-gray-500">{city.state}</div>
                   </div>
                 </button>
-              ))}
+              ))} */}
+
+               {Object.entries(clinicLinks).map(([label, path]) => (
+                  <button
+                   key={path}
+                   className="w-full flex items-start gap-3 p-4 hover:bg-gray-50 rounded-lg transition border-b border-gray-100 text-left"
+                  >
+                    <Link href={`/clinic/${path}`} className="flex items-center gap-2" >
+                      <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
+                      <div className="font-semibold text-gray-800">{label}</div>
+                    </Link>
+                  </button>
+                ))}
               
               {/* Footer text */}
               <p className="text-center text-sm text-gray-400 mt-4 pb-2">
