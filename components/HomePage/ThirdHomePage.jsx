@@ -3,32 +3,32 @@ import { Heart, CheckCircle, Clock, Users, Droplet, AlertCircle } from "lucide-r
 
 const treatments = [
   {
-    title: "Sexual Dysfunction",
-    description: "Provide compassionate support to improve intimacy and satisfaction.",
+    title: "Semen Banking & Supply",
+    description: "Access ethically sourced, clinically screened donor sperm. Backed by strict compliance with the ART Act and traceability at every stage..",
     icon: <Heart className="w-6 h-6 text-green-500" />,
   },
   {
-    title: "Erectile Dysfunction",
-    description: "Offer personalized treatment to enhance performance and confidence.",
+    title: "Oocyte Donation",
+    description: "Centralized oocyte donor recruitment, screening, and retrieval — aligned with medical protocols and mandates..",
     icon: <CheckCircle className="w-6 h-6 text-green-400" />,
   },
   {
-    title: "Premature Ejaculation",
+    title: " Fertility Counseling", 
     description: "Help users manage early ejaculation and reduce stress in relationships.",
     icon: <AlertCircle className="w-6 h-6 text-yellow-400" />,
   },
   {
-    title: "Delayed Ejaculation",
-    description: "Explain possible causes and provide effective treatment options.",
+    title: "Medico-Legal Support",
+    description: "Our legal team manages all contracts, ensuring that your clinic stays fully compliant with evolving ART regulations.",
     icon: <Clock className="w-6 h-6 text-blue-400" />,
   },
   {
-    title: "Couple Sex Problems",
+    title: "Couples Counseling",
     description: "Provide counseling and solutions to help couples reconnect.",
     icon: <Users className="w-6 h-6 text-pink-500" />,
   },
   {
-    title: "Low Sperm Count",
+    title: "Lifestyle Advice",
     description: "Offer therapies and lifestyle advice to improve reproductive health.",
     icon: <Droplet className="w-6 h-6 text-blue-500" />,
   },

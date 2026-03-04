@@ -135,13 +135,13 @@ const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm">
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-1">
         
         <Link href="/" onClick={closeDropdown}>
           <img
-            src="/Images/MEN10.svg"
-            alt="MEN10 Logo"
-            className="h-[50px] w-[122px]"
+            src="/Images/lifeseed.png"
+            alt="LifeSeed Logo"
+            className="h-[77px] w-[240px] object-contain"
           />
         </Link>
 

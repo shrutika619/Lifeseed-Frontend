@@ -17,26 +17,26 @@ const HeroHomePage = () => {
         {/* Left Content */}
         <div className="w-full md:w-1/2 text-center md:text-left mt-8 md:mt-0">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-snug">
-            Reclaim Your <br /> Confidence & Intimacy ✨
+            Built for Clinics. <br />  Backed by Science ✨
           </h1>
           <p className="mt-4 text-gray-600 text-lg">
-            With <span className="font-semibold">MEN10</span>, a unique blend of 
-            Ayurvedic wisdom and modern science. Take our free, confidential 
-            assessment to begin your journey.
+            With <span className="font-semibold">Lifeseed</span>,  AI-enabled IVF & Fertility SaaS solution designed to support clinics with secure patient management, treatment tracking, and digital workflows.
+
+
           </p>
           <button
             onClick={handleRedirect}
             className="mt-6 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg shadow hover:bg-blue-700 transition"
           >
-            Free Consultation →
+             Get Free Consultation →
           </button>
         </div>
 
         {/* Right Image */}
         <div className="w-full md:w-1/2 flex justify-center md:justify-end">
           <Image
-            src="/Images/Container.svg"
-            alt="Container"
+            src="/Images/clinic.webp"
+            alt="Clinic Image"
             width={500}
             height={500}
             className="rounded-xl shadow-lg"
