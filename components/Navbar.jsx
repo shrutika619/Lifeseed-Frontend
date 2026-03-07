@@ -306,24 +306,142 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white shadow-lg border-t border-gray-100">
-          <ul className="flex flex-col gap-3 px-6 py-4 font-medium">
+          <ul className="flex flex-col gap-1 px-6 py-4 font-medium">
             <li>
-              <Link href="/" onClick={closeDropdown} className="block py-1">
+              <Link href="/" onClick={closeDropdown} className="block py-2">
                 Home
               </Link>
             </li>
             
             <li>
-              <Link href="/about" onClick={closeDropdown} className="block py-1">
+              <Link href="/about" onClick={closeDropdown} className="block py-2">
                 About Us
               </Link>
             </li>
 
+            {/* Mobile: Conditions We Treat Dropdown */}
             <li>
-              <Link href="/contact" onClick={closeDropdown} className="block py-1">
+              <button
+                onClick={() => toggleMobileDropdown("conditions")}
+                className="w-full flex items-center justify-between py-2 text-left text-gray-700"
+              >
+                <span>Conditions We Treat</span>
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 transition-transform duration-200 ${
+                    mobileDropdown === "conditions" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {mobileDropdown === "conditions" && (
+                <ul className="ml-3 mt-1 mb-2 bg-[#F3F6FF] rounded-lg py-1">
+                  {Object.entries(conditionLinks).map(([label, path]) => (
+                    <li key={path}>
+                      <Link
+                        href={`/conditionswetreat/${path}`}
+                        onClick={closeDropdown}
+                        className="block px-4 py-2 text-sm text-gray-600 hover:text-blue-600"
+                      >
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+
+            {/* Mobile: Clinic Dropdown */}
+            <li>
+              <button
+                onClick={() => toggleMobileDropdown("clinic")}
+                className="w-full flex items-center justify-between py-2 text-left text-gray-700"
+              >
+                <span>Clinic</span>
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 transition-transform duration-200 ${
+                    mobileDropdown === "clinic" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {mobileDropdown === "clinic" && (
+                <ul className="ml-3 mt-1 mb-2 bg-[#F3F6FF] rounded-lg py-1">
+                  {Object.entries(clinicLinks).map(([label, path]) => (
+                    <li key={path}>
+                      <Link
+                        href={`/clinic/${path}`}
+                        onClick={closeDropdown}
+                        className="block px-4 py-2 text-sm text-gray-600 hover:text-blue-600"
+                      >
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+
+            <li>
+              <Link href="/contact" onClick={closeDropdown} className="block py-2">
                 Contact Us
               </Link>
             </li>
+
+            {/* Mobile: Auth Section */}
+            {isAuthenticated ? (
+              <>
+                <li className="border-t border-gray-100 mt-2 pt-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-blue-50 flex-shrink-0">
+                      {user?.profileImageUrl ? (
+                        <img
+                          src={user.profileImageUrl}
+                          alt="User"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User size={18} className="text-blue-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 truncate max-w-[180px]">
+                        {user?.fullName || "User"}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate max-w-[180px]">
+                        {user?.mobileNo || user?.email}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <Link
+                    href="/profile"
+                    onClick={closeDropdown}
+                    className="block py-2 text-gray-700"
+                  >
+                    My Profile
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 py-2 text-red-600 w-full text-left"
+                  >
+                    <LogOut size={14} /> Logout
+                  </button>
+                </li>
+              </>
+            ) : (
+              <li className="border-t border-gray-100 mt-2 pt-3">
+                <Link
+                  href="/login"
+                  onClick={closeDropdown}
+                  className="block py-2 text-blue-600 font-medium"
+                >
+                  Login
+                </Link>
+              </li>
+            )}
 
             <li>
               <Link
