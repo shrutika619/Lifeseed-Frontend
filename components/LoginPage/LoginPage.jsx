@@ -4,8 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useDispatch } from "react-redux";
 
-import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth.service";
-import { getPatientProfile, savePatientProfile } from "@/app/services/patient.service";
+import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth/auth.service";
+import { getPatientProfile, savePatientProfile } from "@/app/services/patient/patient.service";
 import { setCredentials } from "@/redux/slices/authSlice";
 
 const LoginPage = () => {

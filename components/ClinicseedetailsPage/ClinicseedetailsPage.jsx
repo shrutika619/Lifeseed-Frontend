@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 // ❌ Remove useParams
 // import { useParams } from "next/navigation"; 
-import { getClinicById } from "@/app/services/clinic.service"; 
+import { getClinicById } from "@/app/services/patient/clinic.service"; 
 
 import HerosectionClinincseedetailsPage from "./HerosectionClinincseedetailsPage";
 import SecondClinicseedetailsPage from "./SecondClinicseedetailsPage";

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Calendar, Clock, MapPin, X } from 'lucide-react';
-import { getAllCities } from '@/app/services/clinic.service';
+import { getAllCities } from '@/app/services/patient/clinic.service';
 import { useEffect } from 'react';
 import Link from "next/link";
 

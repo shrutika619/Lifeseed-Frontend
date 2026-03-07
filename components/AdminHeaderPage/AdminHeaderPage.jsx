@@ -7,7 +7,7 @@ import { logoutSuccess, selectUser, selectUserRole } from "@/redux/slices/authSl
 import { toast } from "sonner"; 
 import { Bell, Menu, User, LogOut, ChevronDown, ShieldCheck } from "lucide-react";
 
-import { logoutUser } from "@/app/services/auth.service"; 
+import { logoutUser } from "@/app/services/auth/auth.service"; 
 
 const AdminHeaderPage = ({ 
   title = "Dashboard", 

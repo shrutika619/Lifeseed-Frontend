@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux"; 
 import { Calendar, Clock, MapPin, User, Phone, Mail, Loader2 } from 'lucide-react';
-import { ClinicDoctorService } from "@/app/services/clinicDoctor.service"; 
+import { ClinicDoctorService } from "@/app/services/patient/clinicDoctor.service"; 
 
 const BookAppointmentPage = () => {
   const router = useRouter();

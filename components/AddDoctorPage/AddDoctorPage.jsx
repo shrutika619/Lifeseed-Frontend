@@ -12,7 +12,7 @@ import {
   updateDoctor, 
   getDoctorSlotConfig,
   getClinicSlots 
-} from '@/app/services/hospitalDoctor.service'; 
+} from '@/app/services/clinic/hospitalDoctor.service'; 
 
 // --- Helper Components ---
 const FormInput = ({ id, label, type = "text", placeholder, value, onChange }) => (

@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // ✅ IMPORT YOUR API SERVICES
-import { getMeClinicProfile, updateClinicProfile } from "@/app/services/hospitalProfile.service";
+import { getMeClinicProfile, updateClinicProfile } from "@/app/services/clinic/hospitalProfile.service";
 
 /* ── ICONS ── */
 const EditIcon = () => (

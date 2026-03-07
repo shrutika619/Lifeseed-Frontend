@@ -16,8 +16,8 @@ import { logoutSuccess } from "@/redux/slices/authSlice";
 import { toast } from "sonner"; 
 
 // ✅ Import Services
-import { logoutUser } from "@/app/services/auth.service"; 
-import { getMeClinicProfile } from "@/app/services/hospitalProfile.service"; // ⬅️ NEW IMPORT
+import { logoutUser } from "@/app/services/auth/auth.service"; 
+import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service"; // ⬅️ NEW IMPORT
 
 const menuItems = [
   { label: "Time Table", icon: Clock, path: "time-table" },

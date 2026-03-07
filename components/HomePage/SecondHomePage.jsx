@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 // ✅ Services
-import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth.service"; 
-import { getConcerns, getQuestions, submitAssessment, getMyAssessment } from "@/app/services/assesment.service";
+import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth/auth.service"; 
+import { getConcerns, getQuestions, submitAssessment, getMyAssessment } from "@/app/services/patient/assesment.service";
 
 // ✅ Redux
 import { useSelector, useDispatch } from "react-redux";

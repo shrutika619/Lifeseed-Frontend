@@ -17,7 +17,7 @@ import { useSelector } from "react-redux";
 import { selectUser } from "@/redux/slices/authSlice";
 
 // ✅ Import the service
-import { getAdminById } from "@/app/services/adminUsers.service";
+import { getAdminById } from "@/app/services/admin/adminUsers.service";
 
 const menuItems = [
   { label: " Dashboard", icon: LayoutDashboard, path: "dashboard", moduleKey: "dashboard" },

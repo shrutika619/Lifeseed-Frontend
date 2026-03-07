@@ -17,7 +17,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { selectIsAuthenticated, selectUserRole, selectUser, logoutSuccess } from "@/redux/slices/authSlice";
 
 // ✅ Import Services
-import { sendClinicOtp, verifyClinicOtp } from "@/app/services/clinic-auth.service";
+import { sendClinicOtp, verifyClinicOtp } from "@/app/services/auth/clinic-auth.service";
 import api from "@/lib/axios"; // Needed for logout
 
 export default function ClinicAuth() {

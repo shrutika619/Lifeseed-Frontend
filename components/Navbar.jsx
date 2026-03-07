@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getAllCities } from "@/app/services/clinic.service";
+import { getAllCities } from "@/app/services/patient/clinic.service";
 import { toast } from "sonner"; // ✅ Imported toast
 // Icons
 import { User, LogOut, ChevronDown } from "lucide-react";

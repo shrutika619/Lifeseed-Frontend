@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ClinicStatusService } from "@/app/services/clinicStatus.service"; 
+import { ClinicStatusService } from "@/app/services/admin/clinicStatus.service"; 
 // ✅ IMPORT BOTH SERVICES
-import { getAllClinics, getClinicById } from "@/app/services/adminClinic.service"; 
+import { getAllClinics, getClinicById } from "@/app/services/admin/adminClinic.service"; 
 import { toast } from "sonner"; 
 import {
   Filter,

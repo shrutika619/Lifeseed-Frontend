@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Plus, Star, Clock, User, Calendar, Droplet, X, Check } from 'lucide-react';
-import { getMeClinicProfile } from "@/app/services/hospitalProfile.service"; // ✅ IMPORT SERVICE
+import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service"; // ✅ IMPORT SERVICE
 
 const HospitalDashboard = () => {
   const [activeTab, setActiveTab] = useState('all');

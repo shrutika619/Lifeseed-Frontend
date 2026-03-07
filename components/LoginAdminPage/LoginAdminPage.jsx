@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Lock, Mail, Eye, EyeOff, Shield, CheckCircle, ArrowRight } from "lucide-react";
 
 // ✅ Import Combined Auth Service & Redux
-import { adminLogin, logoutUser } from "@/app/services/auth.service";
+import { adminLogin, logoutUser } from "@/app/services/auth/auth.service";
 import { setCredentials, logoutSuccess, selectIsAuthenticated, selectUserRole, selectUser } from "@/redux/slices/authSlice";
 
 const LoginAdminPage = () => {
