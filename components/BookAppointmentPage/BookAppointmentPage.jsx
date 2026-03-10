@@ -6,28 +6,49 @@ import { useSelector } from "react-redux";
 import { Calendar, Clock, MapPin, User, Phone, Mail, Loader2 } from 'lucide-react';
 import { ClinicDoctorService } from "@/app/services/patient/clinicDoctor.service"; 
 
+// ✅ HELPER: Always generate the next 7 days starting from today
+const generateNext7Days = () => {
+  return Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    
+    // Format to YYYY-MM-DD for accurate comparison
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    
+    return {
+      fullDate: `${year}-${month}-${day}`, 
+      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: d.getDate(),
+      obj: d
+    };
+  });
+};
+
 const BookAppointmentPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clinicId = searchParams.get("clinicId"); 
 
-  // ⭐ Fetch user details from Redux
   const user = useSelector((state) => state.auth?.user);
 
-  // ✅ States for Doctors
+  // States for Doctors
   const [doctors, setDoctors] = useState([]);
   const [clinicName, setClinicName] = useState("Our Clinic");
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
 
-  // ✅ States for Dynamic Slots & Timings
+  // States for Dynamic Slots & Timings
   const [availabilityData, setAvailabilityData] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  
+  // ✅ Initialize visible dates to the next 7 days
+  const [visibleDates] = useState(generateNext7Days());
   const [selectedDate, setSelectedDate] = useState(null); 
   const [selectedTime, setSelectedTime] = useState(null);
-  const [dateOffset, setDateOffset] = useState(0); 
   
-  // ✅ Form data state
+  // Form data state
   const [formData, setFormData] = useState({
     fullName: '',
     contact: '',
@@ -37,7 +58,6 @@ const BookAppointmentPage = () => {
   
   const [acceptTerms, setAcceptTerms] = useState(false);
 
-  // ⭐ Auto-fill form data when Redux user data is available
   useEffect(() => {
     if (user) {
       setFormData({
@@ -49,7 +69,7 @@ const BookAppointmentPage = () => {
     }
   }, [user]);
 
-  // ✅ 1. Fetch Doctors & Fix Object Error
+  // 1. Fetch Doctors 
   useEffect(() => {
     const fetchDoctors = async () => {
       if (!clinicId) {
@@ -65,18 +85,15 @@ const BookAppointmentPage = () => {
           setClinicName(data.data.clinicName);
           
           const mappedDoctors = data.data.doctors.map(doc => {
-            // 🚨 FIX FOR CRASH: Extract the string 'name' from the nested objects safely
             const ug = doc.underGraduationDegree?.name || "";
             const pg = doc.postGraduationDegree?.name || "";
             const superSpec = doc.superSpecialization?.name || "";
             
-            // Format to look like the image: "MBBS, MD (General Medicine)"
             const qualifications = [ug, pg, superSpec].filter(Boolean).join(", ");
             const fallbackSpec = doc.primarySpecialty?.name || "Specialist";
 
             return {
               id: doc._id,
-              // Prepend "Dr." if it isn't already there
               name: doc.name.toLowerCase().startsWith('dr') ? doc.name : `Dr. ${doc.name}`,
               specialization: qualifications || fallbackSpec,
               experience: doc.experience ? `${doc.experience}+ Years` : "Experience not listed",
@@ -97,23 +114,19 @@ const BookAppointmentPage = () => {
     fetchDoctors();
   }, [clinicId]);
 
-  // ✅ 2. Fetch Slots whenever a Doctor is selected
+  // 2. Fetch Slots whenever a Doctor is selected
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!selectedDoctor) return;
       try {
         setLoadingSlots(true);
-        setSelectedDate(null); 
+        // Default select "today" from our generated 7-day array
+        setSelectedDate(visibleDates[0].fullDate); 
         setSelectedTime(null); 
 
         const res = await ClinicDoctorService.getDoctorDetailsById(selectedDoctor);
         if (res.success && res.data?.availability) {
           setAvailabilityData(res.data.availability);
-          setDateOffset(0); 
-          
-          if (res.data.availability.length > 0) {
-            setSelectedDate(res.data.availability[0].date);
-          }
         }
       } catch (error) {
         console.error("Failed to fetch availability", error);
@@ -122,35 +135,31 @@ const BookAppointmentPage = () => {
       }
     };
     fetchAvailability();
-  }, [selectedDoctor]);
+  }, [selectedDoctor, visibleDates]);
 
-  // --- Helpers for Dynamic Slots & 7-Day View ---
-  const formattedDates = availabilityData.map(avail => {
-    const d = new Date(avail.date);
-    return {
-      fullDate: avail.date,
-      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-      date: d.getDate()
-    };
-  });
-
-  const maxOffset = Math.max(0, formattedDates.length - 7);
-  const visibleDates = formattedDates.slice(dateOffset, dateOffset + 7);
-
-  const currentMonthYear = visibleDates.length > 0 
-    ? new Date(visibleDates[0].fullDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) 
-    : '';
-
-  const currentDayAvailability = availabilityData.find(a => a.date === selectedDate);
-  
-  const getSlotsByPeriod = (periodName) => {
-    const group = currentDayAvailability?.slotGroups?.find(g => g.period === periodName);
-    return group ? group.slots.filter(s => s.isAvailable) : [];
+  // ✅ HELPER: Match selected local date string with backend ISO date
+  const getAvailabilityForDate = (targetDateStr) => {
+    return availabilityData.find(a => {
+      const aDate = new Date(a.date);
+      const aYear = aDate.getFullYear();
+      const aMonth = String(aDate.getMonth() + 1).padStart(2, '0');
+      const aDay = String(aDate.getDate()).padStart(2, '0');
+      return `${aYear}-${aMonth}-${aDay}` === targetDateStr;
+    });
   };
 
-  const morningSlots = getSlotsByPeriod("morning");
-  const afternoonSlots = getSlotsByPeriod("afternoon");
-  const eveningSlots = getSlotsByPeriod("evening");
+  const currentMonthYear = visibleDates[0].obj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  
+  const currentDayAvailability = getAvailabilityForDate(selectedDate);
+  const patientLimit = currentDayAvailability?.patientLimit || 1;
+  
+  // ✅ EXTRACT & SORT: Night -> Morning -> Afternoon -> Evening
+  let activeGroups = [];
+  if (currentDayAvailability?.slotGroups) {
+    activeGroups = [...currentDayAvailability.slotGroups].filter(g => g.slots && g.slots.length > 0);
+    const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
+    activeGroups.sort((a, b) => (orderMap[a.period] || 99) - (orderMap[b.period] || 99));
+  }
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -207,18 +216,15 @@ const BookAppointmentPage = () => {
                           : 'border-gray-200 hover:border-indigo-300 hover:shadow-sm bg-white'
                       }`}
                     >
-                      {/* ✅ DOCTOR CARD STYLED LIKE IMAGE */}
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 sm:gap-5 flex-1 min-w-0">
                           
-                          {/* Profile Image */}
                           <img 
                             src={doctor.image} 
                             alt={doctor.name} 
                             className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-full object-cover flex-shrink-0 bg-gray-100 border border-gray-100 shadow-sm" 
                           />
                           
-                          {/* Doctor Details */}
                           <div className="min-w-0 flex-1 flex flex-col justify-center">
                             <h3 className="font-bold text-[#0f172a] text-[17px] sm:text-[20px] leading-tight mb-1 truncate">
                               {doctor.name}
@@ -233,7 +239,6 @@ const BookAppointmentPage = () => {
 
                         </div>
                         
-                        {/* Fee Section */}
                         <div className="text-right flex-shrink-0 flex flex-col justify-center self-start sm:self-center mt-1 sm:mt-0">
                           <p className="text-[22px] sm:text-[26px] font-extrabold text-[#0f172a] leading-none mb-1 tracking-tight">₹{doctor.fee}</p>
                           <p className="text-[13px] sm:text-[14px] text-[#64748b] font-medium">per session</p>
@@ -302,7 +307,7 @@ const BookAppointmentPage = () => {
               </div>
             </div>
 
-            {/* DATE & TIME (DEPENDS ON DOCTOR) */}
+            {/* DATE & TIME */}
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 md:p-6">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-base">
@@ -321,19 +326,14 @@ const BookAppointmentPage = () => {
                 <div className="flex justify-center py-8 ml-0 sm:ml-[40px]">
                   <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
                 </div>
-              ) : formattedDates.length === 0 ? (
-                <div className="text-center py-6 text-red-500 bg-red-50 rounded-lg border border-dashed border-red-200 ml-0 sm:ml-[40px]">
-                  No slots available for this doctor currently.
-                </div>
               ) : (
                 <div className="ml-0 sm:ml-[40px]">
-                  {/* EXACT 7-DAY SLIDER DESIGN */}
+                  {/* ALWAYS SHOW 7-DAY SLIDER */}
                   <div className="mb-6 sm:mb-8">
                     <div className="flex items-center justify-between mb-4 px-1">
                       <button 
-                        onClick={() => setDateOffset(Math.max(0, dateOffset - 1))}
-                        disabled={dateOffset === 0}
-                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
+                        disabled={true}
+                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all opacity-30 cursor-not-allowed text-gray-600"
                       >
                         ←
                       </button>
@@ -341,9 +341,8 @@ const BookAppointmentPage = () => {
                         {currentMonthYear}
                       </span>
                       <button 
-                        onClick={() => setDateOffset(Math.min(maxOffset, dateOffset + 1))}
-                        disabled={dateOffset >= maxOffset}
-                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
+                        disabled={true}
+                        className="p-1 hover:bg-gray-100 rounded-full text-xl transition-all opacity-30 cursor-not-allowed text-gray-600"
                       >
                         →
                       </button>
@@ -370,80 +369,51 @@ const BookAppointmentPage = () => {
                     </div>
                   </div>
 
-                  {/* TIME SLOTS */}
+                  {/* ✅ DYNAMIC TIME SLOTS OR NOT AVAILABLE MESSAGE */}
                   <div className="space-y-4 sm:space-y-5">
-                    
-                    {/* MORNING */}
-                    {morningSlots.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">Morning</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {morningSlots.map((slot) => (
-                            <button
-                              key={slot._id}
-                              onClick={() => setSelectedTime(slot.time)}
-                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium ${
-                                selectedTime === slot.time
-                                  ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              {slot.time}
-                            </button>
-                          ))}
+                    {activeGroups.length === 0 ? (
+                       <div className="text-center py-8 text-red-500 bg-red-50 rounded-xl border border-dashed border-red-200">
+                         <p className="font-semibold text-sm sm:text-base">Doctor is not available for this day.</p>
+                         <p className="text-xs text-red-400 mt-1">Please select another date from the calendar above.</p>
+                       </div>
+                    ) : (
+                      activeGroups.map((group) => (
+                        <div key={group.period}>
+                          <h3 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base capitalize">
+                            {group.period}
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {group.slots.map((slot) => {
+                              const isFull = slot.bookedCount >= patientLimit;
+                              const isBookable = slot.isAvailable && !isFull;
+                              const isSelected = selectedTime === slot.time;
+
+                              return (
+                                <button
+                                  key={slot._id || slot.time}
+                                  disabled={!isBookable}
+                                  onClick={() => setSelectedTime(slot.time)}
+                                  className={`
+                                    px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium flex flex-col items-center justify-center min-w-[90px]
+                                    ${isSelected 
+                                      ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-sm' 
+                                      : isBookable 
+                                        ? 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50' 
+                                        : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                                    }
+                                  `}
+                                >
+                                  <span>{slot.time}</span>
+                                  {isFull && (
+                                    <span className="text-[10px] text-red-500 font-bold mt-0.5 leading-none uppercase">Full</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+                      ))
                     )}
-
-                    {/* AFTERNOON */}
-                    {afternoonSlots.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">Afternoon</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {afternoonSlots.map((slot) => (
-                            <button
-                              key={slot._id}
-                              onClick={() => setSelectedTime(slot.time)}
-                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium ${
-                                selectedTime === slot.time
-                                  ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              {slot.time}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* EVENING */}
-                    {eveningSlots.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">Evening</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {eveningSlots.map((slot) => (
-                            <button
-                              key={slot._id}
-                              onClick={() => setSelectedTime(slot.time)}
-                              className={`px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium ${
-                                selectedTime === slot.time
-                                  ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                                  : 'border-gray-300 hover:border-indigo-300 text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              {slot.time}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* NO SLOTS FALLBACK */}
-                    {morningSlots.length === 0 && afternoonSlots.length === 0 && eveningSlots.length === 0 && (
-                       <p className="text-sm text-gray-500 py-4 bg-gray-50 rounded-lg px-4 border border-dashed">No slots available for this date.</p>
-                    )}
-
                   </div>
                 </div>
               )}
