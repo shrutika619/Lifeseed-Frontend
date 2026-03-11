@@ -8,10 +8,15 @@ import {
   FileText, 
   ChevronDown, 
   Plus,
-  User
+  User,
+  Loader2,
+  X,
+  CheckCircle2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getLoginUsersLeads } from "@/app/services/admin/leads.service"; 
 
+// --- Action Menu Component ---
 const ActionMenu = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -56,66 +61,169 @@ const ActionMenu = ({ userId }) => {
   );
 };
 
-const AdminLoginInUserPage = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDate, setSelectedDate] = useState("Today");
-
-  const userData = [
-    {
-      id: "#09883",
-      name: "Sheetal Dayal",
-      age: 50,
-      phone: "9973827100",
-      email: "sheetald@xyz.com",
-      location: "Nagpur",
-      assessmentDate: "10/12/2025",
-      assessmentTime: "12:40 PM",
-      lastUpdateDate: "10/12/2025",
-      lastUpdateTime: "12:40 PM",
-      lastUpdateStatus: "Login Fail",
-      assignTo: "Pranjal",
-      nextCallDate: "10/12/2025",
-      nextCallTime: "12:40 PM",
-      status: "Interested",
-    },
-    {
-      id: "#09884",
-      name: "Kunal Joshi",
-      age: 36,
-      phone: "9973827100",
-      email: "Kunal@xyz.com",
-      location: "Pune",
-      assessmentDate: "10/12/2025",
-      assessmentTime: "12:40 PM",
-      lastUpdateDate: "12/12/2025",
-      lastUpdateTime: "12:40 PM",
-      lastUpdateStatus: "Login",
-      assignTo: "Pranjal",
-      nextCallDate: "10/12/2025",
-      nextCallTime: "12:40 PM",
-      status: "Interested",
-    },
-    {
-      id: "#09885",
-      name: "Rajesh Kumar",
-      age: 45,
-      phone: "9973827100",
-      email: "rajesh@xyz.com",
-      location: "Mumbai",
-      assessmentDate: "10/12/2025",
-      assessmentTime: "12:40 PM",
-      lastUpdateDate: "10/12/2025",
-      lastUpdateTime: "12:40 PM",
-      lastUpdateStatus: "Scroll About",
-      assignTo: "Pranjal",
-      nextCallDate: "10/12/2025",
-      nextCallTime: "12:40 PM",
-      status: "Interested",
-    },
-  ];
+// --- Assessment Modal Component ---
+const AssessmentModal = ({ assessment, onClose }) => {
+  if (!assessment) return null;
 
   return (
-    <div className="p-4 md:p-6 bg-slate-50 min-h-screen text-slate-700 font-sans">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+        
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <FileText className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 leading-tight">Assessment Details</h2>
+              <p className="text-xs text-gray-500">
+                Completed: {new Date(assessment.completedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 overflow-y-auto space-y-6">
+          
+          {/* Top Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+              <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider font-semibold">Gender</p>
+              <p className="text-sm font-bold text-slate-800">{assessment.gender || "Not specified"}</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl">
+              <p className="text-xs text-blue-500 mb-1 uppercase tracking-wider font-semibold">Total Score</p>
+              <p className="text-sm font-bold text-blue-800">
+                <span className="text-lg">{assessment.totalScore}</span> / {assessment.maxScore}
+              </p>
+            </div>
+            <div className="col-span-2 md:col-span-1 bg-emerald-50 border border-emerald-100 p-3 rounded-xl">
+              <p className="text-xs text-emerald-600 mb-1 uppercase tracking-wider font-semibold">Concerns</p>
+              <div className="flex flex-wrap gap-1">
+                {assessment.selectedConcerns?.map((c, i) => (
+                  <span key={i} className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Q&A Sections */}
+          <div className="space-y-6">
+            {assessment.concerns && Object.entries(assessment.concerns).map(([concernName, data], idx) => (
+              <div key={idx} className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    {concernName}
+                  </h3>
+                  <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-md">
+                    Score: {data.score}
+                  </span>
+                </div>
+                
+                <div className="divide-y divide-gray-100">
+                  {data.questions?.map((q, qIdx) => (
+                    <div key={qIdx} className="p-4 hover:bg-gray-50/50 transition-colors">
+                      <p className="text-sm text-gray-600 mb-2 font-medium">Q: {q.question}</p>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-bold text-gray-400 mt-0.5">A:</span>
+                        <p className="text-sm font-bold text-gray-900">{q.answer}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+        
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-end rounded-b-2xl">
+          <button 
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            Close
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+
+// --- Main Page Component ---
+const AdminLoginInUserPage = () => {
+  // States for API Params
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDate, setSelectedDate] = useState("today");
+  const [selectedStage, setSelectedStage] = useState(""); // empty string means "All"
+
+  // States for API Data
+  const [leads, setLeads] = useState([]);
+  const [counts, setCounts] = useState({
+    total: 0,
+    New: 0,
+    Interested: 0,
+    "Follow-Up": 0,
+    Future: 0,
+    "N-Interested": 0,
+    Cancel: 0,
+    Regular: 0
+  });
+  const [loading, setLoading] = useState(true);
+  
+  // State for Assessment Modal
+  const [selectedAssessment, setSelectedAssessment] = useState(null);
+
+  // Fetch Data
+  useEffect(() => {
+    const fetchLeads = async () => {
+      setLoading(true);
+      
+      const params = {};
+      if (selectedDate) params.date = selectedDate;
+      if (searchTerm) params.search = searchTerm;
+      if (selectedStage) params.stage = selectedStage;
+
+      const response = await getLoginUsersLeads(params);
+      
+      if (response.success && response.data) {
+        setLeads(response.data.leads || []);
+        setCounts(response.data.counts || {});
+      }
+      setLoading(false);
+    };
+
+    // Debounce search
+    const timeoutId = setTimeout(() => { fetchLeads(); }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, selectedDate, selectedStage]);
+
+  // Helper to format ISO dates
+  const formatDate = (isoString) => {
+    if (!isoString || isoString === "--") return { date: "--", time: "--" };
+    const d = new Date(isoString);
+    return {
+      date: d.toLocaleDateString("en-IN", { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      time: d.toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+  };
+
+  // Helper to format counts consistently (e.g., 01, 09, 10)
+  const formatCount = (num) => (num < 10 ? `0${num || 0}` : num);
+
+  return (
+    <div className="p-4 md:p-6 bg-slate-50 min-h-screen text-slate-700 font-sans relative">
       
       {/* --- Status Badges / Top Row --- */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 md:gap-4 mb-6">
@@ -123,22 +231,57 @@ const AdminLoginInUserPage = () => {
           <select 
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full sm:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
-            <option>Today</option>
-            <option>Yesterday</option>
-            <option>Last 7 Days</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">This Month</option>
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>
 
+        {/* Dynamic Clickable Badge Counts */}
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Badge count="06" label="50-50" color="bg-slate-100 text-slate-600" />
-          <Badge count="03" label="Interested" color="bg-cyan-50 text-cyan-600 border border-cyan-100" />
-          <Badge count="00" label="Not-interested" color="bg-yellow-50 text-yellow-600 border border-yellow-100" />
-          <Badge count="00" label="Future" color="bg-orange-50 text-orange-600 border border-orange-100" />
-          <Badge count="00" label="Black list" color="bg-pink-50 text-pink-600 border border-pink-100" />
-          <Badge count="00" label="Regular" color="bg-sky-50 text-sky-600 border border-sky-100" />
+          <Badge 
+            count={formatCount(counts.total)} label="All" 
+            color={selectedStage === "" ? "bg-blue-100 text-blue-700 border-blue-300 ring-2 ring-blue-300" : "bg-white text-slate-600 border border-slate-200"} 
+            onClick={() => setSelectedStage("")} 
+          />
+          <Badge 
+            count={formatCount(counts.New)} label="New" 
+            color={selectedStage === "New" ? "bg-slate-200 text-slate-800 ring-2 ring-slate-400" : "bg-slate-100 text-slate-600 border border-slate-200"} 
+            onClick={() => setSelectedStage("New")}
+          />
+          <Badge 
+            count={formatCount(counts.Interested)} label="Interested" 
+            color={selectedStage === "Interested" ? "bg-cyan-100 text-cyan-800 ring-2 ring-cyan-400" : "bg-cyan-50 text-cyan-600 border border-cyan-100"} 
+            onClick={() => setSelectedStage("Interested")}
+          />
+          <Badge 
+            count={formatCount(counts["N-Interested"])} label="Not-interested" 
+            color={selectedStage === "N-Interested" ? "bg-yellow-100 text-yellow-800 ring-2 ring-yellow-400" : "bg-yellow-50 text-yellow-600 border border-yellow-100"} 
+            onClick={() => setSelectedStage("N-Interested")}
+          />
+          <Badge 
+            count={formatCount(counts.Future)} label="Future" 
+            color={selectedStage === "Future" ? "bg-orange-100 text-orange-800 ring-2 ring-orange-400" : "bg-orange-50 text-orange-600 border border-orange-100"} 
+            onClick={() => setSelectedStage("Future")}
+          />
+          <Badge 
+            count={formatCount(counts.Cancel)} label="Cancel" 
+            color={selectedStage === "Cancel" ? "bg-pink-100 text-pink-800 ring-2 ring-pink-400" : "bg-pink-50 text-pink-600 border border-pink-100"} 
+            onClick={() => setSelectedStage("Cancel")}
+          />
+          <Badge 
+            count={formatCount(counts.Regular)} label="Regular" 
+            color={selectedStage === "Regular" ? "bg-sky-100 text-sky-800 ring-2 ring-sky-400" : "bg-sky-50 text-sky-600 border border-sky-100"} 
+            onClick={() => setSelectedStage("Regular")}
+          />
+          <Badge 
+            count={formatCount(counts["Follow-Up"])} label="Follow-Up" 
+            color={selectedStage === "Follow-Up" ? "bg-purple-100 text-purple-800 ring-2 ring-purple-400" : "bg-purple-50 text-purple-600 border border-purple-100"} 
+            onClick={() => setSelectedStage("Follow-Up")}
+          />
         </div>
       </div>
 
@@ -153,7 +296,7 @@ const AdminLoginInUserPage = () => {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by name or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pr-10 pl-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
@@ -167,146 +310,238 @@ const AdminLoginInUserPage = () => {
         </button>
       </div>
 
-      {/* --- Desktop Table View --- */}
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-white border-b border-slate-100">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User ID</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer info</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assessment</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Last Update</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assign To</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Next Call</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {userData.map((user, index) => (
-                <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-600">{user.id}</td>
-                  
-                  <td className="px-6 py-4">
-                    <div className="text-sm">
-                      <p className="font-semibold text-slate-800">{user.name} Age {user.age}</p>
-                      <p className="text-slate-500">{user.phone}</p>
-                      <p className="text-slate-500">{user.email}</p>
-                      <p className="text-slate-500">{user.location}</p>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <FileText className="w-5 h-5 text-slate-400" />
-                      <div className="text-[11px] text-slate-400 font-medium">
-                        <p>{user.assessmentDate}</p>
-                        <p>{user.assessmentTime}</p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="text-sm">
-                      <p className="text-slate-500">{user.lastUpdateDate}</p>
-                      <p className="text-slate-500">{user.lastUpdateTime}</p>
-                      <p className="text-slate-500 font-medium">{user.lastUpdateStatus}</p>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-slate-600">{user.assignTo}</td>
-                  
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    <p>{user.nextCallDate}</p>
-                    <p>{user.nextCallTime}</p>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-md text-xs font-semibold border border-emerald-100">
-                      {user.status}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-center">
-                    <ActionMenu userId={user.id} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* --- Loading / Empty States --- */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </div>
-      </div>
+      ) : leads.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-slate-200">
+          <p className="text-slate-500 font-medium">No leads found for the selected filters.</p>
+        </div>
+      ) : (
+        <>
+          {/* --- Desktop Table View --- */}
+          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white border-b border-slate-100">
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User ID</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer info</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assessment</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Last Update</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assign To</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Next Call</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {leads.map((user) => {
+                    const updateDateTime = formatDate(user.lastUpdate?.date);
+                    const nextCallDateTime = user.nextCall ? formatDate(user.nextCall.date) : { date: "--", time: "--" };
+                    
+                    let assessmentDateTime = { date: "--", time: "--" };
+                    let hasAssessment = false;
+                    if (user.assessment && typeof user.assessment === 'object' && user.assessment.completedAt) {
+                      assessmentDateTime = formatDate(user.assessment.completedAt);
+                      hasAssessment = true;
+                    }
 
-      {/* --- Mobile/Tablet Card View --- */}
-      <div className="lg:hidden space-y-4">
-        {userData.map((user, index) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
-            {/* Header Row */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-slate-500">{user.id}</span>
-                  <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md text-[10px] font-semibold border border-emerald-100">
-                    {user.status}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-slate-800 text-base">
-                  {user.name} <span className="text-slate-500 font-normal text-sm">Age {user.age}</span>
-                </h3>
-              </div>
-              <ActionMenu userId={user.id} />
-            </div>
+                    return (
+                      <tr key={user.leadId} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium text-slate-600">{user.customerId}</td>
+                        
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            <p className="font-semibold text-slate-800">
+                              {user.customerInfo?.name} 
+                              {user.customerInfo?.age && user.customerInfo.age !== "--" && (
+                                <span className="font-normal text-slate-500 ml-1">Age {user.customerInfo.age}</span>
+                              )}
+                            </p>
+                            <p className="text-slate-500">{user.customerInfo?.phone}</p>
+                            {user.customerInfo?.email && user.customerInfo.email !== "--" && (
+                              <p className="text-slate-500">{user.customerInfo.email}</p>
+                            )}
+                            {user.customerInfo?.city && user.customerInfo.city !== "--" && (
+                              <p className="text-slate-500 italic">{user.customerInfo.city}</p>
+                            )}
+                          </div>
+                        </td>
 
-            {/* Contact Info */}
-            <div className="space-y-1 mb-4 pb-4 border-b border-slate-100">
-              <p className="text-sm text-slate-600">{user.phone}</p>
-              <p className="text-sm text-slate-600">{user.email}</p>
-              <p className="text-sm text-slate-500">{user.location}</p>
-            </div>
+                        <td className="px-6 py-4">
+                          <div 
+                            onClick={() => hasAssessment && setSelectedAssessment(user.assessment)}
+                            className={`flex flex-col gap-1 p-2 -m-2 rounded-lg transition-all w-max ${
+                              hasAssessment ? 'cursor-pointer hover:bg-slate-100' : 'cursor-default'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <FileText className={`w-5 h-5 ${hasAssessment ? 'text-blue-500' : 'text-slate-300'}`} />
+                              {hasAssessment && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">View</span>}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-medium">
+                              <p>{assessmentDateTime.date}</p>
+                              <p>{assessmentDateTime.time}</p>
+                            </div>
+                          </div>
+                        </td>
 
-            {/* Grid Info - Assessment & Last Update */}
-            <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
-              <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <FileText className="w-4 h-4 text-slate-400" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Assessment</span>
-                </div>
-                <p className="text-xs text-slate-600 font-medium">{user.assessmentDate}</p>
-                <p className="text-xs text-slate-500">{user.assessmentTime}</p>
-              </div>
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            <p className="text-slate-500">{updateDateTime.date}</p>
+                            <p className="text-slate-500">{updateDateTime.time}</p>
+                            <p className="text-slate-500 font-medium">{user.lastUpdate?.action || "--"}</p>
+                          </div>
+                        </td>
 
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Last Update</span>
-                <p className="text-xs text-slate-600 font-medium">{user.lastUpdateDate}</p>
-                <p className="text-xs text-slate-500">{user.lastUpdateTime}</p>
-                <p className="text-xs text-slate-600 font-medium mt-1">{user.lastUpdateStatus}</p>
-              </div>
-            </div>
+                        <td className="px-6 py-4 text-sm text-slate-600">{user.assignTo}</td>
+                        
+                        <td className="px-6 py-4 text-sm text-slate-600">
+                          <p>{nextCallDateTime.date}</p>
+                          <p>{nextCallDateTime.time}</p>
+                        </td>
 
-            {/* Grid Info - Assign To & Next Call */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assigned To</span>
-                <span className="text-xs text-slate-700 font-medium">{user.assignTo}</span>
-              </div>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-md text-xs font-semibold border ${
+                            user.status === 'Interested' ? 'bg-cyan-50 text-cyan-600 border-cyan-100' :
+                            user.status === 'New' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            user.status === 'Cancel' ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                            'bg-gray-50 text-gray-600 border-gray-200'
+                          }`}>
+                            {user.status || "Unknown"}
+                          </span>
+                        </td>
 
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Next Call</span>
-                <p className="text-xs text-slate-600 font-medium">{user.nextCallDate}</p>
-                <p className="text-xs text-slate-500">{user.nextCallTime}</p>
-              </div>
+                        <td className="px-6 py-4 text-center">
+                          <ActionMenu userId={user.userId} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* --- Mobile/Tablet Card View --- */}
+          <div className="lg:hidden space-y-4">
+            {leads.map((user) => {
+              const updateDateTime = formatDate(user.lastUpdate?.date);
+              const nextCallDateTime = user.nextCall ? formatDate(user.nextCall.date) : { date: "--", time: "--" };
+              
+              let assessmentDateTime = { date: "--", time: "--" };
+              let hasAssessment = false;
+              if (user.assessment && typeof user.assessment === 'object' && user.assessment.completedAt) {
+                assessmentDateTime = formatDate(user.assessment.completedAt);
+                hasAssessment = true;
+              }
+
+              return (
+                <div key={user.leadId} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-slate-500">{user.customerId}</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                          user.status === 'Interested' ? 'bg-cyan-50 text-cyan-600 border-cyan-100' :
+                          user.status === 'New' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                          user.status === 'Cancel' ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                          'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}>
+                          {user.status || "Unknown"}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-slate-800 text-base">
+                        {user.customerInfo?.name} 
+                        {user.customerInfo?.age && user.customerInfo.age !== "--" && (
+                          <span className="text-slate-500 font-normal text-sm ml-1">Age {user.customerInfo.age}</span>
+                        )}
+                      </h3>
+                    </div>
+                    <ActionMenu userId={user.userId} />
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-1 mb-4 pb-4 border-b border-slate-100">
+                    <p className="text-sm text-slate-600">{user.customerInfo?.phone}</p>
+                    {user.customerInfo?.email && user.customerInfo.email !== "--" && (
+                      <p className="text-sm text-slate-600">{user.customerInfo.email}</p>
+                    )}
+                    {user.customerInfo?.city && user.customerInfo.city !== "--" && (
+                      <p className="text-sm text-slate-500 italic">{user.customerInfo.city}</p>
+                    )}
+                  </div>
+
+                  {/* Grid Info - Assessment & Last Update */}
+                  <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
+                    {/* Assessment */}
+                    <div 
+                      onClick={() => hasAssessment && setSelectedAssessment(user.assessment)}
+                      className={`p-2 -m-2 rounded-lg transition-all ${
+                        hasAssessment ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <FileText className={`w-4 h-4 ${hasAssessment ? 'text-blue-500' : 'text-slate-300'}`} />
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${hasAssessment ? 'text-blue-600' : 'text-slate-500'}`}>
+                          Assessment
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 font-medium">{assessmentDateTime.date}</p>
+                      <p className="text-xs text-slate-500">{assessmentDateTime.time}</p>
+                    </div>
+
+                    {/* Last Update */}
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Last Update</span>
+                      <p className="text-xs text-slate-600 font-medium">{updateDateTime.date}</p>
+                      <p className="text-xs text-slate-500">{updateDateTime.time}</p>
+                      <p className="text-xs text-slate-600 font-medium mt-1">{user.lastUpdate?.action || "--"}</p>
+                    </div>
+                  </div>
+
+                  {/* Grid Info - Assign To & Next Call */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Assign To */}
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assigned To</span>
+                      <span className="text-xs text-slate-700 font-medium">{user.assignTo}</span>
+                    </div>
+
+                    {/* Next Call */}
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Next Call</span>
+                      <p className="text-xs text-slate-600 font-medium">{nextCallDateTime.date}</p>
+                      <p className="text-xs text-slate-500">{nextCallDateTime.time}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ✅ Assessment Modal Render */}
+      <AssessmentModal 
+        assessment={selectedAssessment} 
+        onClose={() => setSelectedAssessment(null)} 
+      />
+
     </div>
   );
 };
 
-// Reusable Badge Component
-const Badge = ({ count, label, color }) => (
-  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] md:text-xs font-bold ${color}`}>
+// Reusable Clickable Badge Component
+const Badge = ({ count, label, color, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] md:text-xs font-bold cursor-pointer transition-all hover:opacity-80 ${color}`}
+  >
     <span className="text-sm leading-none">{count}</span>
     <span className="whitespace-nowrap">{label}</span>
   </div>
