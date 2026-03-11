@@ -5,18 +5,21 @@ import {
   Search, 
   Filter, 
   MoreVertical, 
-  FileText, 
+  FileText,
+  Loader2, 
   ChevronDown,
   User
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getFirstTimeLeads } from "@/app/services/admin/leads.service"; 
 
 // --- Action Menu Component ---
 const ActionMenu = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
+  
   const router = useRouter();
+  const pathname = usePathname(); // ✅ 1. Grabs the current base URL automatically
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -42,7 +45,8 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              router.push("/super-admin/first-time-user/customerprofile");
+              // ✅ 2. Dynamically attaches the path AND passes the userId!
+              router.push(`${pathname}/customerprofile?userId=${userId}`);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >

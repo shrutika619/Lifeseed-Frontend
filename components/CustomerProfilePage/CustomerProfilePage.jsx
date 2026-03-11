@@ -1,11 +1,12 @@
 "use client"
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useSearchParams } from 'next/navigation'; // ✅ Import to get URL params
+import { getPatientDetailsById } from '@/app/services/admin/leads.service'; // ✅ Import the service
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
-  XCircle, History, Save, ChevronDown, RotateCcw,
-  Phone, Monitor, MapPin, CheckSquare, AlertCircle,
-  Tag, Pill, X, ArrowLeft
+  XCircle, Save, ChevronDown, RotateCcw,
+  Monitor, MapPin, X, ArrowLeft, Loader2
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────
@@ -148,6 +149,7 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
               {...register(field.name)}
               className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500"
             >
+              <option value="" disabled>Select...</option>
               {field.options.map(o => <option key={o} value={o}>{o}</option>)}
               {!field.options.includes(currentValue) && currentValue && (
                 <option value={currentValue}>{currentValue}</option>
@@ -173,30 +175,77 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
    MAIN PAGE
 ───────────────────────────────────────────── */
 const CustomerProfilePage = () => {
+  const searchParams = useSearchParams();
+  const userId = searchParams.get('userId'); // ✅ Extract ID from URL
+  
   const [showBookModal, setShowBookModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [customerData, setCustomerData] = useState(null);
+  
+  // State to hold the dynamic admin dropdown list
+  const [adminList, setAdminList] = useState([]);
 
-  const { register, handleSubmit, watch, setValue, resetField } = useForm({
+  const { register, handleSubmit, watch, setValue, resetField, reset } = useForm({
     defaultValues: {
-      leadSource: 'Website',
-      leadOwner: 'Pranjal',
-      leadStage: 'New',
-      city: 'Nagpur',
-      addressLabel: 'Home',
       activityType: 'Next Medicine Order'
     }
   });
 
   const [activeTab, setActiveTab] = useState('Upcoming');
-  const [activities, setActivities] = useState([
-    {
-      id: 1,
-      title: "Next Medicine Order",
-      desc: "Monthly prescription refill for Metformin and Atorvastatin.",
-      date: "Sat Nov 15 2025",
-      time: "10:00",
-      status: "Admin"
-    }
-  ]);
+  const [activities, setActivities] = useState([]);
+
+  // ✅ Fetch Profile Data on Mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      const res = await getPatientDetailsById(userId);
+      
+      if (res.success && res.data) {
+        setCustomerData(res.data);
+        
+        // Extract full names for the Lead Owner dropdown
+        const admins = res.data.assignToDropdown?.map(admin => admin.fullName) || [];
+        setAdminList(admins);
+
+        // ✅ HELPER: Safely extract string if backend sends an object
+        const safeString = (val) => {
+          if (!val) return "";
+          if (typeof val === 'object') return val.fullName || val.username || "";
+          return String(val);
+        };
+
+        // Populate the form with API data
+        reset({
+          name: res.data.name || "",
+          age: res.data.age || "",
+          contact: res.data.mobileNo || "",
+          whatsapp: res.data.whatsappNumber || "",
+          leadOwner: safeString(res.data.leadOwner), // ✅ Safe usage
+          leadStage: res.data.leadStage || "New",
+          city: res.data.city || "",
+          email: res.data.mailId || res.data.email || "",
+          leadSource: res.data.leadSource || "Website",
+          addressLabel: res.data.deliveryAddress?.label || "Home",
+          flatNo: res.data.deliveryAddress?.flatNo || "",
+          street: res.data.deliveryAddress?.streetArea || "",
+          landmark: res.data.deliveryAddress?.landmark || "",
+          pincode: res.data.deliveryAddress?.pinCode || "",
+          notes: res.data.notes || "",
+          sendWhatsApp: res.data.sendWhatsAppNotification || false,
+          activityType: "Next Medicine Order",
+          assignTo: safeString(res.data.currentAdmin) // ✅ Safe usage
+        });
+      }
+      setLoading(false);
+    };
+
+    fetchProfile();
+  }, [userId, reset]);
 
   const addNewActivity = () => {
     const type = watch('activityType');
@@ -212,7 +261,7 @@ const CustomerProfilePage = () => {
       desc: notes || "No additional notes provided.",
       date: new Date(date).toDateString(),
       time: time || "--:--",
-      status: "Admin"
+      status: customerData?.currentAdmin?.fullName || "Admin"
     };
 
     setActivities([newAct, ...activities]);
@@ -223,6 +272,31 @@ const CustomerProfilePage = () => {
     console.log("Final Data:", { ...data, activityHistory: activities });
     alert("Full Customer Profile Saved Successfully!");
   };
+
+  // ✅ LOADING STATE
+  if (loading) {
+    return (
+      <div className="bg-[#F8FAFC] min-h-screen flex flex-col items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
+        <p className="text-slate-500 font-medium">Loading customer profile...</p>
+      </div>
+    );
+  }
+
+  // ✅ ERROR STATE
+  if (!customerData) {
+    return (
+      <div className="bg-[#F8FAFC] min-h-screen flex flex-col items-center justify-center">
+        <p className="text-slate-500 font-medium">Customer profile not found or invalid user ID.</p>
+        <button 
+          onClick={() => window.history.back()}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
@@ -244,19 +318,24 @@ const CustomerProfilePage = () => {
               <ArrowLeft size={16} />
               Back
             </button>
-            <h1 className="text-2xl font-bold text-slate-800">Customer ID - 1254</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">
+                Customer ID - {customerData.customerId || 'N/A'}
+              </h1>
+              <p className="text-sm font-medium text-slate-400 mt-1">Status: {customerData.pageStatus?.replace("_", " ").toUpperCase()}</p>
+            </div>
           </div>
           <div className="w-full md:w-64">
             <label className="text-[11px] font-bold text-slate-400 uppercase mb-1 block">Lead Source</label>
             <div className="relative">
               <select {...register("leadSource")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
-                <option>Website</option>
-                <option>Whats App</option>
-                <option>Manual</option>
-                <option>Self</option>
-                <option>Agent</option>
-                <option>Doctor</option>
-                <option>Other</option>
+                <option value="Website">Website</option>
+                <option value="Whats App">Whats App</option>
+                <option value="Manual">Manual</option>
+                <option value="Self">Self</option>
+                <option value="Agent">Agent</option>
+                <option value="Doctor">Doctor</option>
+                <option value="Other">Other</option>
               </select>
               <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
             </div>
@@ -266,16 +345,18 @@ const CustomerProfilePage = () => {
         {/* BASIC INFORMATION */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           {[
-            { label: "Name", name: "name" }, { label: "Age", name: "age" },
-            { label: "Contact Number", name: "contact" }, { label: "WhatsApp Number", name: "whatsapp" },
-            { label: "Lead Owner", name: "leadOwner", type: "creatable", options: ["Pranjal", "Ankit"] },
+            { label: "Name", name: "name" }, 
+            { label: "Age", name: "age" },
+            { label: "Contact Number", name: "contact" }, 
+            { label: "WhatsApp Number", name: "whatsapp" },
+            { label: "Lead Owner", name: "leadOwner", type: "creatable", options: adminList }, // ✅ DYNAMIC DROPDOWN
             { 
                 label: "Lead Stage", 
                 name: "leadStage", 
                 type: "select", 
-                options: ["New", "Interested", "Future", "N-Interested", "Cancel", "Regular"] 
+                options: ["New", "Interested", "Follow-Up", "Future", "N-Interested", "Cancel", "Regular"] 
             },
-            { label: "City", name: "city", type: "select", options: ["Nagpur", "Mumbai"] },
+            { label: "City", name: "city", type: "select", options: ["Nagpur", "Mumbai", "Pune", "Delhi", "Nashik", "Amravati"] },
             { label: "Mail Id", name: "email" }
           ].map((f) => (
             <div key={f.name}>
@@ -283,7 +364,8 @@ const CustomerProfilePage = () => {
               {f.type === "select" ? (
                 <div className="relative">
                     <select {...register(f.name)} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
-                    {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                      <option value="">Select...</option>
+                      {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                     <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
                 </div>
@@ -369,8 +451,11 @@ const CustomerProfilePage = () => {
               <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (Lead Owner)</label>
               <div className="relative">
                 <select {...register("assignTo")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
-                  <option>Pranjal</option>
-                  <option>Ankit</option>
+                  <option value="" disabled>Select User</option>
+                  {/* ✅ DYNAMIC DROPDOWN */}
+                  {adminList.map(admin => (
+                    <option key={admin} value={admin}>{admin}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
               </div>
@@ -453,7 +538,7 @@ const CustomerProfilePage = () => {
             <span className="group-hover:text-blue-600 transition-colors">Send WhatsApp Notification</span>
           </label>
           <div className="flex gap-4">
-            <button type="button" className="px-10 py-2.5 bg-slate-100 text-slate-500 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
+            <button type="button" onClick={() => window.history.back()} className="px-10 py-2.5 bg-slate-100 text-slate-500 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
             <button type="submit" className="px-12 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2">
               <Save size={18} /> Save Profile
             </button>

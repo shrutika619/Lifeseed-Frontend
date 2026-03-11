@@ -29,3 +29,15 @@ export const getLoginUsersLeads = async (params) => {
     };
   }
 };
+
+
+export const getPatientDetailsById = async (userId) => {
+  try {
+    const response = await api.get(`${Constants.urlEndPoints.GET_PATIENT_DETAILS}/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching patient details:", error);
+    return { success: false, data: null, message: error?.message || "Failed to load profile" };
+  }
+};
+

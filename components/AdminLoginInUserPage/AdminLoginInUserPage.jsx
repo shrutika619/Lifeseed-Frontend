@@ -13,7 +13,7 @@ import {
   X,
   CheckCircle2
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getLoginUsersLeads } from "@/app/services/admin/leads.service"; 
 
 // --- Action Menu Component ---
@@ -21,6 +21,9 @@ const ActionMenu = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const router = useRouter();
+  
+  // ✅ ADD THIS: Grabs the current URL path (e.g., "/admin/log-in-user" or "/super-admin/log-in-user")
+  const pathname = usePathname(); 
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -46,7 +49,8 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              router.push("/super-admin/log-in-user/customerprofile");
+              // ✅ FIX: Dynamically route based on role AND pass the userId!
+              router.push(`${pathname}/customerprofile?userId=${userId}`);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
