@@ -1,39 +1,62 @@
 "use client";
-import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, X } from 'lucide-react';
-import { getAllCities } from '@/app/services/clinic.service';
-import { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, MapPin, X, Loader2 } from 'lucide-react';
+import { getAllCities } from '@/app/services/patient/clinic.service';
 import Link from "next/link";
+import api from "@/lib/axios"; 
+import { Constants } from "@/app/utils/constants"; 
 
+// Helper to generate the next 3 days dynamically
+const generateUpcomingDates = (numDays = 3) => {
+  const dates = [];
+  const today = new Date();
+  for (let i = 0; i < numDays; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    dates.push({
+      fullDate: d.toISOString().split('T')[0], // YYYY-MM-DD for backend
+      label: d.toLocaleDateString('en-US', { weekday: 'short' }), // "Mon"
+      date: d.getDate().toString() // "15"
+    });
+  }
+  return dates;
+};
+
+// ✅ HELPER: Sort periods chronologically starting at midnight
+const sortPeriodsChronologically = (groups) => {
+  const orderMap = {
+    night: 1,      // 12:00 AM - 6:00 AM
+    morning: 2,    // 6:00 AM - 12:00 PM
+    afternoon: 3,  // 12:00 PM - 6:00 PM
+    evening: 4     // 6:00 PM - 12:00 AM
+  };
+
+  return [...groups].sort((a, b) => {
+    return (orderMap[a.period] || 99) - (orderMap[b.period] || 99);
+  });
+};
 
 const FreeConsultationPage = () => {
-  const [selectedDay, setSelectedDay] = useState('Mon');
-  const [selectedTime, setSelectedTime] = useState('');
+  // Dynamic Date & Slot States
+  const [availableDates, setAvailableDates] = useState(generateUpcomingDates());
+  const [selectedDate, setSelectedDate] = useState(availableDates[0].fullDate);
+  const [slotGroups, setSlotGroups] = useState([]);
+  const [patientLimit, setPatientLimit] = useState(1);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null); 
+
+  // Form States
   const [gender, setGender] = useState('');
   const [concern, setConcern] = useState('');
   const [fullName, setFullName] = useState('');
   const [age, setAge] = useState('');
+  
+  // UI States
   const [showCityPopup, setShowCityPopup] = useState(false);
   const [activeTab, setActiveTab] = useState('online');
   const [isBooked, setIsBooked] = useState(false);
   const [bookingData, setBookingData] = useState(null);
-
-  const days = [
-    { label: 'Sat', date: '13' },
-    { label: 'Sun', date: '14' },
-    { label: 'Mon', date: '15' },
-    { label: 'Tue', date: '16' },
-    { label: 'Wed', date: '17' },
-    { label: 'Thu', date: '18' },
-    { label: 'Fri', date: '19' }
-  ];
-
-  const timeSlots = {
-    morning: ['10:30 AM', '11:00 AM', '11:30 AM'],
-    afternoon: ['12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM'],
-    evening: ['6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM', '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'],
-    night: ['12:00 AM', '12:30 AM', '1:00 AM', '1:30 AM', '2:00 AM']
-  };
+  const [clinicLinks, setClinicLinks] = useState({});
 
   const concerns = [
     'Sexual Dysfunction',
@@ -44,18 +67,8 @@ const FreeConsultationPage = () => {
     'Other'
   ];
 
-  // const cities = [
-  //   { name: 'NAGPUR', state: 'Maharashtra, India' },
-  //   { name: 'MUMBAI', state: 'Maharashtra' },
-  //   { name: 'PUNE', state: 'Maharashtra' },
-  //   { name: 'AMRAVATI', state: 'Maharashtra' },
-  //   { name: 'DELHI', state: 'Delhi' }
-  // ];
-
-  const [clinicLinks, setClinicLinks] = useState({});
-  
-
-useEffect(() => {
+  // Fetch Cities 
+  useEffect(() => {
     const fetchCityData = async () => {
       try {
         const response = await getAllCities();
@@ -77,14 +90,51 @@ useEffect(() => {
     fetchCityData();
   }, []);
 
-  
+  // Fetch Slots when Date changes
+  useEffect(() => {
+    const fetchSlots = async () => {
+      if (!selectedDate) return;
+      
+      setLoadingSlots(true);
+      setSelectedSlot(null); 
+
+      try {
+        const res = await api.get(`${Constants.urlEndPoints.GET_PATIENT_TELE_SLOTS}?date=${selectedDate}`);
+        if (res.data.success && res.data.slotGroups) {
+          
+          // ✅ Sort the groups so Night is always first
+          const sortedGroups = sortPeriodsChronologically(res.data.slotGroups);
+          
+          setSlotGroups(sortedGroups);
+          setPatientLimit(res.data.patientLimit || 1);
+        } else {
+          setSlotGroups([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch slots:", error);
+        setSlotGroups([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    fetchSlots();
+  }, [selectedDate]);
 
   const handleBooking = () => {
-    const selectedDayData = days.find(d => d.label === selectedDay);
+    if (!selectedSlot || !fullName || !age || !gender || !concern) {
+      alert("Please fill all details and select a time slot.");
+      return;
+    }
+
+    const displayDate = new Date(selectedDate).toLocaleDateString('en-US', { 
+      month: 'long', day: 'numeric', year: 'numeric' 
+    });
+
     const data = {
-      orderId: 'TC10',
-      date: `September ${selectedDayData.date}, 2025`,
-      time: selectedTime,
+      orderId: 'TC' + Math.floor(Math.random() * 10000), 
+      date: displayDate,
+      time: selectedSlot.time,
       name: fullName,
       age: age,
       gender: gender,
@@ -102,8 +152,8 @@ useEffect(() => {
     setAge('');
     setGender('');
     setConcern('');
-    setSelectedDay('Mon');
-    setSelectedTime('');
+    setSelectedDate(availableDates[0].fullDate);
+    setSelectedSlot(null);
   };
 
   const handleTabClick = (tab) => {
@@ -113,16 +163,12 @@ useEffect(() => {
     setActiveTab(tab);
   };
 
-  const handleCitySelect = (cityName) => {
-    setShowCityPopup(false);
-  };
-
+  // SUCCESS SCREEN
   if (isBooked && bookingData) {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-md mx-auto">
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Success Header */}
             <div className="bg-gradient-to-b from-white to-gray-50 p-8 text-center">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,9 +179,8 @@ useEffect(() => {
               <p className="text-sm text-gray-600">Your appointment details are confirmed below.</p>
             </div>
 
-            {/* Booking Details */}
             <div className="p-6 space-y-6">
-              {/* Payment & Booking Details */}
+              {/* Payment Details */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -150,7 +195,7 @@ useEffect(() => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Payment Status</p>
-                    <p className="font-semibold text-gray-800">N/A</p>
+                    <p className="font-semibold text-green-600">Free / ₹0</p>
                   </div>
                 </div>
               </div>
@@ -208,7 +253,6 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Cancel Button */}
               <div className="pt-4">
                 <p className="text-center text-sm text-gray-600 mb-3">Need to make a change?</p>
                 <button 
@@ -224,6 +268,9 @@ useEffect(() => {
       </div>
     );
   }
+
+  // Active slot groups that actually contain slots
+  const activeGroups = slotGroups.filter(g => g.slots && g.slots.length > 0);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -352,110 +399,84 @@ useEffect(() => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Date & Time</h2>
             
-            {/* Date Selection */}
+            {/* Dynamic Date Selection */}
             <div className="mb-6">
               <label className="block text-sm text-gray-600 mb-3">Select a Date</label>
               <div className="grid grid-cols-7 gap-2">
-                {days.map((day, index) => (
+                {availableDates.map((day) => (
                   <button
-                    key={`${day.label}-${index}`}
-                    onClick={() => setSelectedDay(day.label)}
-                    className={`py-3 px-2 rounded-lg text-center transition ${
-                      selectedDay === day.label
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    key={day.fullDate}
+                    onClick={() => setSelectedDate(day.fullDate)}
+                    className={`py-3 px-2 rounded-lg text-center transition border ${
+                      selectedDate === day.fullDate
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                        : 'bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200'
                     }`}
                   >
-                    <div className="font-semibold text-xs">{day.label}</div>
-                    <div className="text-sm">{day.date}</div>
+                    <div className={`font-semibold text-xs ${selectedDate === day.fullDate ? 'text-blue-100' : 'text-gray-500'}`}>
+                      {day.label}
+                    </div>
+                    <div className="text-sm font-bold mt-1">{day.date}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Time Selection */}
-            <div>
+            {/* Dynamic Time Selection from API */}
+            <div className="min-h-[250px]">
               <label className="block text-sm text-gray-600 mb-3">Select a Time Slot</label>
               
-              {/* Morning */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Morning</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.morning.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
+              {loadingSlots ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-blue-600" />
+                  <p className="text-sm">Loading available slots...</p>
                 </div>
-              </div>
+              ) : activeGroups.length === 0 ? (
+                <div className="text-center py-10 px-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <p className="text-gray-500 text-sm">No slots available for this date.</p>
+                  <p className="text-gray-400 text-xs mt-1">Please select a different date.</p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {/* ✅ Mapped using the newly sorted array */}
+                  {activeGroups.map((group) => (
+                    <div key={group.period}>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 capitalize tracking-wide">
+                        {group.period}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {group.slots.map((slot) => {
+                          const isFull = slot.bookedCount >= patientLimit;
+                          const isBookable = slot.isAvailable && !isFull;
+                          const isSelected = selectedSlot?._id === slot._id;
 
-              {/* Afternoon */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Afternoon</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.afternoon.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
+                          return (
+                            <button
+                              key={slot._id}
+                              disabled={!isBookable}
+                              onClick={() => setSelectedSlot(slot)}
+                              className={`
+                                py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
+                                ${isSelected 
+                                  ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                                  : isBookable 
+                                    ? 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50' 
+                                    : 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed'
+                                }
+                              `}
+                            >
+                              <span className="font-medium whitespace-nowrap text-xs">{slot.time}</span>
+                              {isFull && (
+                                <span className="text-[10px] text-red-500 font-bold mt-0.5 leading-none">Full</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Evening */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Evening</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.evening.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Night */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">Night</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.night.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -464,18 +485,18 @@ useEffect(() => {
         <div className="text-center mt-8">
           <button 
             onClick={handleBooking}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-12 py-3 rounded-lg transition"
+            disabled={!selectedSlot}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-12 py-4 rounded-xl shadow-lg transition-all transform active:scale-95"
           >
-            Book Free Consultation
+            {selectedSlot ? 'Confirm & Book Free Consultation' : 'Select a Slot to Book'}
           </button>
         </div>
       </div>
 
-      {/* City Selection Popup */}
+      {/* City Selection Popup (Unchanged) */}
       {showCityPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
             <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Select Clinic City</h3>
               <button 
@@ -486,37 +507,20 @@ useEffect(() => {
               </button>
             </div>
 
-            {/* City List */}
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {/* {cities.map((city) => (
+              {Object.entries(clinicLinks).map(([label, path]) => (
                 <button
-                  key={city.name}
-                  onClick={() => handleCitySelect(city.name)}
+                  key={path}
                   className="w-full flex items-start gap-3 p-4 hover:bg-gray-50 rounded-lg transition border-b border-gray-100 text-left"
                 >
-                  <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
-                  <div>
-                    <div className="font-semibold text-gray-800">{city.name}</div>
-                    <div className="text-sm text-gray-500">{city.state}</div>
-                  </div>
+                  <Link href={`/clinic/${path}`} className="flex items-center gap-2 w-full">
+                    <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
+                    <div className="font-semibold text-gray-800">{label}</div>
+                  </Link>
                 </button>
-              ))} */}
-
-               {Object.entries(clinicLinks).map(([label, path]) => (
-                  <button
-                   key={path}
-                   className="w-full flex items-start gap-3 p-4 hover:bg-gray-50 rounded-lg transition border-b border-gray-100 text-left"
-                  >
-                    <Link href={`/clinic/${path}`} className="flex items-center gap-2" >
-                      <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
-                      <div className="font-semibold text-gray-800">{label}</div>
-                    </Link>
-                  </button>
-                ))}
-              
-              {/* Footer text */}
+              ))}
               <p className="text-center text-sm text-gray-400 mt-4 pb-2">
-                Can't find your city? Contact Customer...
+                Can't find your city? Contact Customer Support.
               </p>
             </div>
           </div>

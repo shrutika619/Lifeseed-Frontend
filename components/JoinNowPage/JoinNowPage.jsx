@@ -2,8 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { sendClinicOtp, submitClinicForm } from "@/app/services/clinic-auth.service";
-import { getAllCities } from "@/app/services/clinic.service"; // ✅ Import City Service
+import { sendClinicOtp, submitClinicForm } from "@/app/services/auth/clinic-auth.service";
+import { getAllCities } from "@/app/services/patient/clinic.service"; // ✅ Import City Service
 
 const JoinNowPage = () => {
   const router = useRouter();

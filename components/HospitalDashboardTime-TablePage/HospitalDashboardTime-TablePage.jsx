@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 // ✅ IMPORT GLOBAL TIME SLOTS HOOK & API SERVICES
 import { useTimeSlot } from '@/app/hooks/useTimeslot'; 
-import { getMeClinicProfile, updateClinicTimings } from '@/app/services/hospitalProfile.service';
+import { getMeClinicProfile, updateClinicTimings } from '@/app/services/clinic/hospitalProfile.service';
 
 // ✅ HELPER: Convert "10:30 AM" into minutes (0 - 1440)
 const timeToMinutes = (timeStr) => {

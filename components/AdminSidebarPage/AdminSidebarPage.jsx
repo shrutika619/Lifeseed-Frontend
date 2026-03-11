@@ -11,22 +11,24 @@ import {
   ScrollText,
   Users,
   X,
+  Truck, // Added for Delivery Manager
+  UserCheck // Added for Login Users
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 import { selectUser } from "@/redux/slices/authSlice";
+import { getAdminById } from "@/app/services/admin/adminUsers.service";
 
-// ✅ Import the service
-import { getAdminById } from "@/app/services/adminUsers.service";
-
+// ✅ UPDATED: Aligned exactly with APP_MODULES keys
 const menuItems = [
-  { label: " Dashboard", icon: LayoutDashboard, path: "dashboard", moduleKey: "dashboard" },
-  { label: "First Time User", icon: MessageSquare, path: "first-time-user", moduleKey: "inquiry" },
-  { label: "Log In User", icon: MessageSquare, path: "log-in-user", moduleKey: "inquiry" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "dashboard", moduleKey: "dashboard" },
+  { label: "First Time User", icon: MessageSquare, path: "first-time-user", moduleKey: "first_time" },
+  { label: "Log In User", icon: UserCheck, path: "log-in-user", moduleKey: "login_users" },
   { label: "In-clinic Consultation", icon: Building2, path: "in-clinic-consultation", moduleKey: "inclinic" },
   { label: "Teleconsultation", icon: Video, path: "teleconsultation", moduleKey: "teleconsultation" },
-  { label: "Clinics", icon: Stethoscope, path: "clinics", moduleKey: "super_admin_only" }, 
-  { label: "Setup", icon: Settings, path: "setup", moduleKey: "super_admin_only" }, 
+  { label: "Delivery Manager", icon: Truck, path: "delivery-manager", moduleKey: "delivery_manager" },
+  { label: "Clinics", icon: Stethoscope, path: "clinics", moduleKey: "clinic" }, 
+  { label: "Setup", icon: Settings, path: "setup", moduleKey: "setup" }, 
   { label: "Audit Logs", icon: ScrollText, path: "auditlogs", moduleKey: "audit_logs" },
   { label: "Team", icon: Users, path: "team", moduleKey: "team" },
 ];
@@ -35,13 +37,10 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ Get the current user ID from Redux
   const currentUser = useSelector(selectUser);
 
-  // ✅ State to hold fresh permissions from the API (fallback to Redux initially to prevent UI flickering)
   const [activePermissions, setActivePermissions] = useState(currentUser?.modulePermissions || []);
 
-  // ✅ Fetch Fresh Permissions on Mount
   useEffect(() => {
     // Super Admins don't need to fetch permissions to filter the sidebar
     if (role === "SUPER_ADMIN" || role === "super_admin") return;
@@ -51,8 +50,6 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
         try {
           const res = await getAdminById(currentUser._id);
           if (res.success) {
-            // Your service already handles the "message" vs "data" quirk.
-            // The response structure gives us: res.data.admin.modulePermissions
             const fetchedPermissions = res.data?.admin?.modulePermissions || [];
             setActivePermissions(fetchedPermissions);
           }
@@ -66,10 +63,10 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   }, [currentUser?._id, role]);
 
 
-  // ✅ BASE PATH
+  // BASE PATH
   const basePath = role === "SUPER_ADMIN" || role === "super_admin" ? "/super-admin" : "/admin";
 
-  // ✅ Role & Permission based filtering
+  // Role & Permission based filtering
   const filteredMenu = menuItems.filter((item) => {
     // 1. Super Admins see everything
     if (role === "SUPER_ADMIN" || role === "super_admin") {
@@ -78,7 +75,9 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
 
     // 2. Standard Admins only see what is in their API permissions array
     if (role === "ADMIN" || role === "admin") {
-      if (item.moduleKey === "super_admin_only") return false;
+      // If you want certain items to ALWAYS be hidden from standard admins regardless of DB:
+      if (item.moduleKey === "super_admin_only") return false; 
+      
       return activePermissions.includes(item.moduleKey);
     }
 
@@ -94,7 +93,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
 
   return (
     <>
-      {/* 🔹 Mobile Backdrop */}
+      {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -102,7 +101,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
         />
       )}
 
-      {/* 🔹 Sidebar */}
+      {/* Sidebar */}
       <aside
         className={`
           fixed lg:sticky
@@ -116,7 +115,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
           overflow-y-auto
         `}
       >
-        {/* 🔹 Logo */}
+        {/* Logo */}
         <div className="flex items-center justify-between p-6">
           <h1 className="text-blue-600 font-bold text-2xl">MEN10</h1>
 
@@ -129,7 +128,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
           </button>
         </div>
 
-        {/* 🔹 Navigation */}
+        {/* Navigation */}
         <nav className="p-4 space-y-3">
           {filteredMenu.map(({ label, icon: Icon, path }) => (
             <button

@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // ✅ IMPORT YOUR API SERVICES
-import { getMeClinicProfile, updateClinicProfile } from "@/app/services/hospitalProfile.service";
+import { getMeClinicProfile, updateClinicProfile } from "@/app/services/clinic/hospitalProfile.service";
 
 /* ── ICONS ── */
 const EditIcon = () => (
@@ -510,9 +510,7 @@ export default function ClinicProfileDesktop() {
                   <div className="cpd-icon ic-r"><ClockIcon /></div>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Working Hours</div>
-                    {isEditing
-                      ? <input className="cpd-input" name="workingHours" value={cur.workingHours} onChange={onChange} readOnly title="Working hours managed via Timings Module" />
-                      : <div className="cpd-val">{data.workingHours}</div>}
+                      <div className="cpd-val">{data.workingHours}</div>
                   </div>
                 </div>
                 <div className="cpd-row">

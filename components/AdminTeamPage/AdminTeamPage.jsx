@@ -11,7 +11,7 @@ import {
   updateAdminProfile, 
   updateAdminPermissions, 
   getModulePermissions 
-} from '@/app/services/adminUsers.service';
+} from '@/app/services/admin/adminUsers.service';
 
 export const AdminTeamPage = () => {
   const [loading, setLoading] = useState(true);

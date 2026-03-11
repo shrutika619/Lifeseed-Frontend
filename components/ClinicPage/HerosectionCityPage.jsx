@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, MapPin, Phone, Navigation, Star, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getAllClinics, getAllCities } from "@/app/services/clinic.service";
+import { getAllClinics, getAllCities } from "@/app/services/patient/clinic.service";
 
 export default function HerosectionCity({ cityName }) {
   const [searchTerm, setSearchTerm] = useState("");

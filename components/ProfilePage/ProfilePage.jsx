@@ -10,7 +10,7 @@ import { toast } from "sonner";
 // ✅ REDUX & SERVICES
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectIsAuthenticated, logoutSuccess } from "@/redux/slices/authSlice";
-import { getPatientProfile, savePatientProfile } from "@/app/services/patient.service"; 
+import { getPatientProfile, savePatientProfile } from "@/app/services/patient/patient.service"; 
 import api from "@/lib/axios";
 
 const ProfilePage = () => {
