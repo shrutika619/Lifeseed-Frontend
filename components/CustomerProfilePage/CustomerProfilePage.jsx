@@ -1,8 +1,9 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useSearchParams } from 'next/navigation'; // ✅ Import to get URL params
-import { getPatientDetailsById } from '@/app/services/admin/leads.service'; // ✅ Import the service
+import { useSearchParams } from 'next/navigation'; 
+import { getPatientDetailsById, submitCustomerProfile } from '@/app/services/admin/leads.service'; 
+import {toast} from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
   XCircle, Save, ChevronDown, RotateCcw,
@@ -28,14 +29,8 @@ const CitySelectModal = ({ onClose }) => {
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 bg-blue-600">
           <h3 className="font-bold text-white text-lg">Select Clinic City</h3>
           <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors">
@@ -45,9 +40,7 @@ const CitySelectModal = ({ onClose }) => {
         <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100">
           {cities.map((city) => (
             <button
-              key={city.slug}
-              type="button"
-              onClick={() => handleCitySelect(city.slug)}
+              key={city.slug} type="button" onClick={() => handleCitySelect(city.slug)}
               className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
             >
               <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
@@ -75,14 +68,8 @@ const BookConsultationModal = ({ onClose }) => {
   if (showCityModal) return <CitySelectModal onClose={onClose} />;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-bold text-slate-800 text-lg">Book Consultation</h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
@@ -91,8 +78,7 @@ const BookConsultationModal = ({ onClose }) => {
         </div>
         <div className="flex flex-col gap-4">
           <button
-            type="button"
-            onClick={() => setShowCityModal(true)}
+            type="button" onClick={() => setShowCityModal(true)}
             className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-[#0097A7] hover:bg-[#E0F7FA] transition-all group"
           >
             <div className="w-11 h-11 rounded-full bg-[#E0F7FA] flex items-center justify-center group-hover:bg-[#0097A7] transition-all">
@@ -104,8 +90,7 @@ const BookConsultationModal = ({ onClose }) => {
             </div>
           </button>
           <button
-            type="button"
-            onClick={() => { window.location.href = '/free-consultation'; }}
+            type="button" onClick={() => { window.location.href = '/free-consultation'; }}
             className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group"
           >
             <div className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-all">
@@ -123,7 +108,7 @@ const BookConsultationModal = ({ onClose }) => {
 };
 
 /* ─────────────────────────────────────────────
-   CREATABLE SELECT (dropdown + custom input)
+   CREATABLE SELECT (With Disabled Logic)
 ───────────────────────────────────────────── */
 const CreatableSelect = ({ field, register, setValue, watch }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -131,7 +116,7 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
 
   return (
     <div className="relative">
-      {isEditing ? (
+      {isEditing && !field.disabled ? (
         <div className="flex gap-2">
           <input
             autoFocus
@@ -147,7 +132,8 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
           <div className="relative flex-1">
             <select
               {...register(field.name)}
-              className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500"
+              disabled={field.disabled}
+              className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${field.disabled ? 'opacity-60 cursor-not-allowed bg-gray-100' : 'focus:border-blue-500'}`}
             >
               <option value="" disabled>Select...</option>
               {field.options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -155,16 +141,18 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
                 <option value={currentValue}>{currentValue}</option>
               )}
             </select>
-            <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16} />
+            <ChevronDown className={`absolute right-3 top-3 pointer-events-none ${field.disabled ? 'text-gray-300' : 'text-slate-400'}`} size={16} />
           </div>
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            title="Enter custom name"
-            className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-all text-xs font-bold"
-          >
-            Edit
-          </button>
+          {!field.disabled && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              title="Enter custom name"
+              className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-all text-xs font-bold"
+            >
+              Edit
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -176,13 +164,13 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
 ───────────────────────────────────────────── */
 const CustomerProfilePage = () => {
   const searchParams = useSearchParams();
-  const userId = searchParams.get('userId'); // ✅ Extract ID from URL
+  const userId = searchParams.get('userId'); 
   
   const [showBookModal, setShowBookModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [customerData, setCustomerData] = useState(null);
   
-  // State to hold the dynamic admin dropdown list
   const [adminList, setAdminList] = useState([]);
 
   const { register, handleSubmit, watch, setValue, resetField, reset } = useForm({
@@ -194,7 +182,6 @@ const CustomerProfilePage = () => {
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [activities, setActivities] = useState([]);
 
-  // ✅ Fetch Profile Data on Mount
   useEffect(() => {
     const fetchProfile = async () => {
       if (!userId) {
@@ -207,25 +194,24 @@ const CustomerProfilePage = () => {
       
       if (res.success && res.data) {
         setCustomerData(res.data);
-        
-        // Extract full names for the Lead Owner dropdown
-        const admins = res.data.assignToDropdown?.map(admin => admin.fullName) || [];
-        setAdminList(admins);
+        setAdminList(res.data.assignToDropdown || []);
 
-        // ✅ HELPER: Safely extract string if backend sends an object
         const safeString = (val) => {
           if (!val) return "";
           if (typeof val === 'object') return val.fullName || val.username || "";
           return String(val);
         };
 
-        // Populate the form with API data
+        // ✅ Auto-Assign Lead Owner Logic
+        const existingOwner = safeString(res.data.leadOwner);
+        const defaultOwnerName = existingOwner || res.data.currentAdmin?.fullName || "";
+
         reset({
           name: res.data.name || "",
           age: res.data.age || "",
           contact: res.data.mobileNo || "",
           whatsapp: res.data.whatsappNumber || "",
-          leadOwner: safeString(res.data.leadOwner), // ✅ Safe usage
+          leadOwner: defaultOwnerName, // ✅ Will default to current user if empty
           leadStage: res.data.leadStage || "New",
           city: res.data.city || "",
           email: res.data.mailId || res.data.email || "",
@@ -238,7 +224,7 @@ const CustomerProfilePage = () => {
           notes: res.data.notes || "",
           sendWhatsApp: res.data.sendWhatsAppNotification || false,
           activityType: "Next Medicine Order",
-          assignTo: safeString(res.data.currentAdmin) // ✅ Safe usage
+          assignTo: safeString(res.data.currentAdmin) 
         });
       }
       setLoading(false);
@@ -268,12 +254,52 @@ const CustomerProfilePage = () => {
     resetField('activityNotes');
   };
 
-  const onFinalSubmit = (data) => {
-    console.log("Final Data:", { ...data, activityHistory: activities });
-    alert("Full Customer Profile Saved Successfully!");
+  const onFinalSubmit = async (data) => {
+    setIsSaving(true);
+
+    const selectedAdmin = adminList.find(a => a.fullName === data.leadOwner);
+    let leadOwnerId = selectedAdmin ? selectedAdmin._id : data.leadOwner; 
+    
+    if (!selectedAdmin && data.leadOwner === customerData?.currentAdmin?.fullName) {
+      leadOwnerId = customerData.currentAdmin._id; 
+    }
+
+    const payload = {
+      name: data.name,
+      age: data.age ? Number(data.age) : null,
+      contactNumber: data.contact,
+      whatsappNumber: data.whatsapp,
+      email: data.email,
+      mailId: data.email,
+      city: data.city,
+      leadSource: data.leadSource,
+      leadStage: data.leadStage,
+      leadOwner: leadOwnerId, 
+      notes: data.notes,
+      sendWhatsAppNotification: !!data.sendWhatsApp,
+      deliveryAddress: {
+        label: data.addressLabel,
+        flatNo: data.flatNo,
+        streetArea: data.street,
+        landmark: data.landmark,
+        pinCode: data.pincode,
+        contactNumber: data.contact 
+      }
+    };
+
+    const res = await submitCustomerProfile(userId, payload);
+    
+    if (res.success) {
+      // ✅ Sonner Success Toast
+      toast.success("Successfully saved!", { duration: 5000 }); 
+    } else {
+      // ✅ Sonner Error Toast
+      toast.error(res.message || "Failed to update profile.", { duration: 5000 }); 
+    }
+    
+    setIsSaving(false);
   };
 
-  // ✅ LOADING STATE
   if (loading) {
     return (
       <div className="bg-[#F8FAFC] min-h-screen flex flex-col items-center justify-center">
@@ -283,7 +309,6 @@ const CustomerProfilePage = () => {
     );
   }
 
-  // ✅ ERROR STATE
   if (!customerData) {
     return (
       <div className="bg-[#F8FAFC] min-h-screen flex flex-col items-center justify-center">
@@ -298,17 +323,18 @@ const CustomerProfilePage = () => {
     );
   }
 
+  // ✅ Only super_admin can change the lead owner
+  const isSuperAdmin = customerData.currentAdmin?.role === 'super_admin';
+
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
 
-      {/* BOOK CONSULTATION MODAL */}
       {showBookModal && <BookConsultationModal onClose={() => setShowBookModal(false)} />}
 
       <form onSubmit={handleSubmit(onFinalSubmit)} className="max-w-5xl mx-auto space-y-6">
         
         {/* HEADER AREA */}
         <div className="flex flex-wrap justify-between items-end bg-white p-6 rounded-2xl shadow-sm border border-slate-200 gap-4">
-          {/* ── BACK BUTTON ── */}
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -349,7 +375,13 @@ const CustomerProfilePage = () => {
             { label: "Age", name: "age" },
             { label: "Contact Number", name: "contact" }, 
             { label: "WhatsApp Number", name: "whatsapp" },
-            { label: "Lead Owner", name: "leadOwner", type: "creatable", options: adminList }, // ✅ DYNAMIC DROPDOWN
+            { 
+              label: "Lead Owner", 
+              name: "leadOwner", 
+              type: "creatable", 
+              options: adminList.map(a => a.fullName),
+              disabled: !isSuperAdmin // ✅ Disables input for regular admins
+            }, 
             { 
                 label: "Lead Stage", 
                 name: "leadStage", 
@@ -382,7 +414,6 @@ const CustomerProfilePage = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-50 pb-3">
             <h3 className="font-bold text-slate-700">Delivery Address</h3>
-            <button type="button" className="text-xs px-4 py-2 text-blue-600 font-bold bg-blue-50 rounded-lg hover:bg-blue-100 transition-all">Save Address</button>
           </div>
           <div className="flex gap-3">
             {['Home', 'Office', 'Other'].map(l => (
@@ -390,10 +421,10 @@ const CustomerProfilePage = () => {
             ))}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input {...register("flatNo")} placeholder="Flat No / House No" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none" />
-            <input {...register("street")} placeholder="Street / Area" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none" />
-            <input {...register("landmark")} placeholder="Landmark" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none" />
-            <input {...register("pincode")} placeholder="Pin Code" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none" />
+            <input {...register("flatNo")} placeholder="Flat No / House No" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+            <input {...register("street")} placeholder="Street / Area" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+            <input {...register("landmark")} placeholder="Landmark" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+            <input {...register("pincode")} placeholder="Pin Code" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
           </div>
         </div>
 
@@ -401,9 +432,8 @@ const CustomerProfilePage = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
            <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block">General Notes</label>
            <textarea {...register("notes")} className="w-full p-3 border border-slate-200 rounded-xl text-sm h-24 mb-4 outline-none focus:border-blue-400 resize-none" placeholder="Enter patient summary or general observations..."></textarea>
+           
            <div className="flex justify-end gap-3">
-             <button type="button" className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-700">Save Notes</button>
-             {/* ✅ Book Consultation → opens modal */}
              <button
                type="button"
                onClick={() => setShowBookModal(true)}
@@ -452,9 +482,8 @@ const CustomerProfilePage = () => {
               <div className="relative">
                 <select {...register("assignTo")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
                   <option value="" disabled>Select User</option>
-                  {/* ✅ DYNAMIC DROPDOWN */}
                   {adminList.map(admin => (
-                    <option key={admin} value={admin}>{admin}</option>
+                    <option key={admin._id} value={admin.fullName}>{admin.fullName}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
@@ -486,7 +515,7 @@ const CustomerProfilePage = () => {
           </div>
 
           {/* ACTIVITY TABS */}
-          <div className="flex gap-8 border-b border-slate-100 text-sm font-bold text-slate-400 pt-4">
+          <div className="flex gap-8 border-b border-slate-100 text-sm font-bold text-slate-400 pt-4 overflow-x-auto whitespace-nowrap">
             {['Upcoming', 'History', 'Order History', 'Ticket'].map(tab => (
               <button 
                 key={tab} 
@@ -539,8 +568,13 @@ const CustomerProfilePage = () => {
           </label>
           <div className="flex gap-4">
             <button type="button" onClick={() => window.history.back()} className="px-10 py-2.5 bg-slate-100 text-slate-500 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
-            <button type="submit" className="px-12 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2">
-              <Save size={18} /> Save Profile
+            <button 
+              type="submit" 
+              disabled={isSaving}
+              className="px-12 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:bg-blue-400 disabled:cursor-not-allowed"
+            >
+              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} 
+              {isSaving ? "Saving..." : "Save Profile"}
             </button>
           </div>
         </div>

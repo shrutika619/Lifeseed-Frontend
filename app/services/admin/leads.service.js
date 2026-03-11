@@ -41,3 +41,15 @@ export const getPatientDetailsById = async (userId) => {
   }
 };
 
+export const submitCustomerProfile = async (userId, payload) => {
+  try {
+    const response = await api.patch(`${Constants.urlEndPoints.SUBMIT_CUSTOMER_PROFILE}/${userId}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting profile:", error);
+    return { 
+      success: false, 
+      message: error?.response?.data?.message || "Failed to save profile" 
+    };
+  }
+};
