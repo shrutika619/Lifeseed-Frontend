@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Filter,
@@ -19,6 +20,7 @@ import {
   Video,
   CheckCircle,
   Settings,
+  ArrowLeft,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────
@@ -186,7 +188,6 @@ const ActionCell = ({ item }) => {
       {callModal && <CallModal patient={item.customer} onClose={() => setCallModal(false)} />}
 
       <div className="flex items-center justify-center gap-1.5">
-        {/* 📞 Call */}
         <button
           onClick={() => setCallModal(true)}
           title="Call Patient"
@@ -195,7 +196,6 @@ const ActionCell = ({ item }) => {
           <Phone className="w-4 h-4" />
         </button>
 
-        {/* 👤 Profile → redirect to route */}
         <a
           href={`/super-admin/teleconsultation/customerprofile`}
           title="View Profile"
@@ -204,7 +204,6 @@ const ActionCell = ({ item }) => {
           <User className="w-4 h-4" />
         </a>
 
-        {/* ⋮ More */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowDropdown((p) => !p)}
@@ -232,6 +231,7 @@ const ActionCell = ({ item }) => {
 ───────────────────────────────────────────── */
 
 const AdminTeleconsultationPage = () => {
+  const router = useRouter();
   const [searchTerm,   setSearchTerm]   = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedTime, setSelectedTime] = useState("Today");
@@ -279,8 +279,19 @@ const AdminTeleconsultationPage = () => {
   return (
     <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans">
 
-      {/* ── Row 1: Date + Consultation Status Badges + Configure Slot ── */}
+      {/* ── Row 1: Back + Date + Consultation Status Badges + Configure Slot ── */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 mb-4">
+
+        {/* ── BACK BUTTON ── */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+
         <div className="relative w-full sm:w-auto">
           <select
             value={selectedTime}
@@ -329,7 +340,6 @@ const AdminTeleconsultationPage = () => {
       {/* ── Row 3: Search + Action Buttons ── */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 mb-6">
 
-        {/* Search */}
         <div className="flex items-center gap-2 w-full lg:flex-1">
           <button className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
             <Filter className="w-5 h-5 text-slate-500" />
@@ -346,7 +356,6 @@ const AdminTeleconsultationPage = () => {
           </div>
         </div>
 
-        {/* ── Action Buttons ── */}
         <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
           <button className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition-all hover:shadow-lg">
             <Plus className="w-4 h-4" />

@@ -11,7 +11,8 @@ import {
   User,
   Loader2,
   X,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeft
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getLoginUsersLeads } from "@/app/services/admin/leads.service"; 
@@ -21,8 +22,6 @@ const ActionMenu = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const router = useRouter();
-  
-  // ✅ ADD THIS: Grabs the current URL path (e.g., "/admin/log-in-user" or "/super-admin/log-in-user")
   const pathname = usePathname(); 
 
   useEffect(() => {
@@ -49,7 +48,6 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              // ✅ FIX: Dynamically route based on role AND pass the userId!
               router.push(`${pathname}/customerprofile?userId=${userId}`);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
@@ -167,10 +165,12 @@ const AssessmentModal = ({ assessment, onClose }) => {
 
 // --- Main Page Component ---
 const AdminLoginInUserPage = () => {
+  const router = useRouter();
+
   // States for API Params
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("today");
-  const [selectedStage, setSelectedStage] = useState(""); // empty string means "All"
+  const [selectedStage, setSelectedStage] = useState("");
 
   // States for API Data
   const [leads, setLeads] = useState([]);
@@ -208,12 +208,10 @@ const AdminLoginInUserPage = () => {
       setLoading(false);
     };
 
-    // Debounce search
     const timeoutId = setTimeout(() => { fetchLeads(); }, 500);
     return () => clearTimeout(timeoutId);
   }, [searchTerm, selectedDate, selectedStage]);
 
-  // Helper to format ISO dates
   const formatDate = (isoString) => {
     if (!isoString || isoString === "--") return { date: "--", time: "--" };
     const d = new Date(isoString);
@@ -223,7 +221,6 @@ const AdminLoginInUserPage = () => {
     };
   };
 
-  // Helper to format counts consistently (e.g., 01, 09, 10)
   const formatCount = (num) => (num < 10 ? `0${num || 0}` : num);
 
   return (
@@ -231,6 +228,17 @@ const AdminLoginInUserPage = () => {
       
       {/* --- Status Badges / Top Row --- */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 md:gap-4 mb-6">
+
+        {/* ── BACK BUTTON ── */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+
         <div className="relative w-full sm:w-auto">
           <select 
             value={selectedDate}
@@ -308,7 +316,11 @@ const AdminLoginInUserPage = () => {
           </div>
         </div>
 
-        <button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-2">
+        {/* ── ONLY CHANGE: onClick added for redirect ── */}
+        <button
+          onClick={() => router.push("/super-admin/newuser")}
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-2"
+        >
           <Plus className="w-4 h-4" />
           Add Booking/User
         </button>
@@ -482,7 +494,6 @@ const AdminLoginInUserPage = () => {
 
                   {/* Grid Info - Assessment & Last Update */}
                   <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
-                    {/* Assessment */}
                     <div 
                       onClick={() => hasAssessment && setSelectedAssessment(user.assessment)}
                       className={`p-2 -m-2 rounded-lg transition-all ${
@@ -499,7 +510,6 @@ const AdminLoginInUserPage = () => {
                       <p className="text-xs text-slate-500">{assessmentDateTime.time}</p>
                     </div>
 
-                    {/* Last Update */}
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Last Update</span>
                       <p className="text-xs text-slate-600 font-medium">{updateDateTime.date}</p>
@@ -510,13 +520,11 @@ const AdminLoginInUserPage = () => {
 
                   {/* Grid Info - Assign To & Next Call */}
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Assign To */}
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assigned To</span>
                       <span className="text-xs text-slate-700 font-medium">{user.assignTo}</span>
                     </div>
 
-                    {/* Next Call */}
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Next Call</span>
                       <p className="text-xs text-slate-600 font-medium">{nextCallDateTime.date}</p>
@@ -530,7 +538,7 @@ const AdminLoginInUserPage = () => {
         </>
       )}
 
-      {/* ✅ Assessment Modal Render */}
+      {/* Assessment Modal Render */}
       <AssessmentModal 
         assessment={selectedAssessment} 
         onClose={() => setSelectedAssessment(null)} 

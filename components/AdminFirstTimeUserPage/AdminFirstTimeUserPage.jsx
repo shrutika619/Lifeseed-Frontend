@@ -8,7 +8,8 @@ import {
   FileText,
   Loader2, 
   ChevronDown,
-  User
+  User,
+  ArrowLeft
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getFirstTimeLeads } from "@/app/services/admin/leads.service"; 
@@ -19,7 +20,7 @@ const ActionMenu = ({ userId }) => {
   const menuRef = useRef(null);
   
   const router = useRouter();
-  const pathname = usePathname(); // ✅ 1. Grabs the current base URL automatically
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -45,7 +46,6 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              // ✅ 2. Dynamically attaches the path AND passes the userId!
               router.push(`${pathname}/customerprofile?userId=${userId}`);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
@@ -171,7 +171,6 @@ const AdminFirstTimeUserPage = () => {
   const [totalNew, setTotalNew] = useState(0);
   const [loading, setLoading] = useState(true);
   
-  // ✅ New state for the modal
   const [selectedAssessment, setSelectedAssessment] = useState(null);
 
   // Fetch Data
@@ -210,17 +209,29 @@ const AdminFirstTimeUserPage = () => {
       
       {/* Top Header / Filters */}
       <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="relative">
-          <select 
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        <div className="flex items-center gap-3">
+          {/* ── BACK BUTTON ── */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
           >
-            <option>Today</option>
-            <option>Yesterday</option>
-            <option>Last 7 Days</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
+          <div className="relative">
+            <select 
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option>Today</option>
+              <option>Yesterday</option>
+              <option>Last 7 Days</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
         </div>
 
         <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md border border-blue-100 flex items-center gap-2">
@@ -307,7 +318,6 @@ const AdminFirstTimeUserPage = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {/* ✅ Clickable Assessment Container */}
                           <div 
                             onClick={() => hasAssessment && setSelectedAssessment(lead.assessment)}
                             className={`flex flex-col gap-1.5 p-2 -m-2 rounded-lg transition-all w-max ${
@@ -402,7 +412,6 @@ const AdminFirstTimeUserPage = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
-                    {/* ✅ Clickable Assessment Container (Mobile) */}
                     <div 
                       onClick={() => hasAssessment && setSelectedAssessment(lead.assessment)}
                       className={`p-2 -m-2 rounded-lg transition-all ${
@@ -445,7 +454,7 @@ const AdminFirstTimeUserPage = () => {
         </>
       )}
 
-      {/* ✅ Assessment Modal Render */}
+      {/* Assessment Modal Render */}
       <AssessmentModal 
         assessment={selectedAssessment} 
         onClose={() => setSelectedAssessment(null)} 
