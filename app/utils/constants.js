@@ -32,6 +32,10 @@ export class Constants {
     // --- CLINICS ---
     GET_ALL_CLINICS: `${this.API_BASE_URL}/admin/clinics`,
     
+    // --- CUSTUMER LEADS ---
+    ADMIN_FIRST_TIME_CUSTUMER: `${this.API_BASE_URL}/customer/first-time`,
+    ADMIN_LOGGED_IN_CUSTUMER: `${this.API_BASE_URL}/customer/login-users`,
+    
     // Dynamic endpoints (Functions)
     ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE
     ADMIN_PERMISSIONS: (id) => `/users/admin/${id}/permissions`, // PUT
