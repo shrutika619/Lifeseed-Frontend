@@ -1,14 +1,59 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, 
   Filter, 
   MoreVertical, 
   FileText, 
-  ChevronDown, 
-  Calendar 
+  ChevronDown,
+  User
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+const ActionMenu = ({ userId }) => {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="p-2 hover:bg-white hover:shadow-md rounded-lg transition-all border border-transparent hover:border-gray-200"
+      >
+        <MoreVertical className="w-5 h-5 text-gray-400" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+          <button
+            onClick={() => {
+              setOpen(false);
+              router.push("/super-admin/first-time-user/customerprofile");
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4 text-blue-500" />
+            </div>
+            <span className="font-medium">CRM Profile</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const AdminFirstTimeUserPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -143,9 +188,7 @@ const AdminFirstTimeUserPage = () => {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{user.source}</td>
                   <td className="px-6 py-4 text-center">
-                    <button className="p-2 hover:bg-white hover:shadow-md rounded-lg transition-all border border-transparent hover:border-gray-200">
-                      <MoreVertical className="w-5 h-5 text-gray-400" />
-                    </button>
+                    <ActionMenu userId={user.id} />
                   </td>
                 </tr>
               ))}
@@ -175,9 +218,7 @@ const AdminFirstTimeUserPage = () => {
                   {user.name} <span className="text-gray-400 font-normal text-sm">Age {user.age}</span>
                 </h3>
               </div>
-              <button className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                <MoreVertical className="w-5 h-5 text-gray-400" />
-              </button>
+              <ActionMenu userId={user.id} />
             </div>
 
             {/* Contact Info */}

@@ -3,7 +3,9 @@ import CustomerProfilePage from '@/components/CustomerProfilePage/CustomerProfil
 
 const page = () => {
   return (
-    <div><CustomerProfilePage /></div>
+    <div>
+        <CustomerProfilePage />
+    </div>
   )
 }
 

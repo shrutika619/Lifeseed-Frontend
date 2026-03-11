@@ -1,21 +1,65 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, 
   Filter, 
   MoreVertical, 
   FileText, 
   ChevronDown, 
-  Plus 
+  Plus,
+  User
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+const ActionMenu = ({ userId }) => {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="p-2 hover:bg-slate-100 rounded-full transition-colors inline-flex items-center justify-center border border-slate-200 shadow-sm"
+      >
+        <MoreVertical className="w-5 h-5 text-slate-400" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+          <button
+            onClick={() => {
+              setOpen(false);
+              router.push("/super-admin/log-in-user/customerprofile");
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4 text-blue-500" />
+            </div>
+            <span className="font-medium">CRM Profile</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const AdminLoginInUserPage = () => {
-  // --- State for Search and Filter ---
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("Today");
 
-  // --- Sample Data Based on Image ---
   const userData = [
     {
       id: "#09883",
@@ -88,7 +132,6 @@ const AdminLoginInUserPage = () => {
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>
 
-        {/* Dynamic Badge Counts */}
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Badge count="06" label="50-50" color="bg-slate-100 text-slate-600" />
           <Badge count="03" label="Interested" color="bg-cyan-50 text-cyan-600 border border-cyan-100" />
@@ -186,9 +229,7 @@ const AdminLoginInUserPage = () => {
                   </td>
 
                   <td className="px-6 py-4 text-center">
-                    <button className="p-2 hover:bg-slate-100 rounded-full transition-colors inline-flex items-center justify-center border border-slate-200 shadow-sm">
-                      <MoreVertical className="w-5 h-5 text-slate-400" />
-                    </button>
+                    <ActionMenu userId={user.id} />
                   </td>
                 </tr>
               ))}
@@ -214,9 +255,7 @@ const AdminLoginInUserPage = () => {
                   {user.name} <span className="text-slate-500 font-normal text-sm">Age {user.age}</span>
                 </h3>
               </div>
-              <button className="p-2 hover:bg-slate-50 rounded-lg transition-colors">
-                <MoreVertical className="w-5 h-5 text-slate-400" />
-              </button>
+              <ActionMenu userId={user.id} />
             </div>
 
             {/* Contact Info */}
@@ -228,7 +267,6 @@ const AdminLoginInUserPage = () => {
 
             {/* Grid Info - Assessment & Last Update */}
             <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
-              {/* Assessment */}
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <FileText className="w-4 h-4 text-slate-400" />
@@ -238,7 +276,6 @@ const AdminLoginInUserPage = () => {
                 <p className="text-xs text-slate-500">{user.assessmentTime}</p>
               </div>
 
-              {/* Last Update */}
               <div>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Last Update</span>
                 <p className="text-xs text-slate-600 font-medium">{user.lastUpdateDate}</p>
@@ -249,13 +286,11 @@ const AdminLoginInUserPage = () => {
 
             {/* Grid Info - Assign To & Next Call */}
             <div className="grid grid-cols-2 gap-4">
-              {/* Assign To */}
               <div>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assigned To</span>
                 <span className="text-xs text-slate-700 font-medium">{user.assignTo}</span>
               </div>
 
-              {/* Next Call */}
               <div>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Next Call</span>
                 <p className="text-xs text-slate-600 font-medium">{user.nextCallDate}</p>
