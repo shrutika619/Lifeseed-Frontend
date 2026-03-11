@@ -53,3 +53,28 @@ export const submitCustomerProfile = async (userId, payload) => {
     };
   }
 };
+
+
+export const getCustomerActivities = async (userId, tab = "Upcoming") => {
+  try {
+    const response = await api.get(`${Constants.urlEndPoints.CUSTOMER_ACTIVITY}/${userId}?tab=${tab}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching activities:", error);
+    return { success: false, data: { logs: [] } };
+  }
+};
+
+
+export const addCustomerActivity = async (userId, payload) => {
+  try {
+    const response = await api.post(`${Constants.urlEndPoints.CUSTOMER_ACTIVITY}/${userId}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error adding activity:", error);
+    return { 
+      success: false, 
+      message: error?.response?.data?.message || "Failed to add activity" 
+    };
+  }
+};

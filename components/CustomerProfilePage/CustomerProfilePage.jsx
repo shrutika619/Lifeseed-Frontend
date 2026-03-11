@@ -1,9 +1,9 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'next/navigation'; 
-import { getPatientDetailsById, submitCustomerProfile } from '@/app/services/admin/leads.service'; 
-import {toast} from 'sonner';
+import { getPatientDetailsById, submitCustomerProfile, getCustomerActivities, addCustomerActivity } from '@/app/services/admin/leads.service'; 
+import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
   XCircle, Save, ChevronDown, RotateCcw,
@@ -13,6 +13,7 @@ import {
 /* ─────────────────────────────────────────────
    CITY SELECT MODAL
 ───────────────────────────────────────────── */
+// ... (Keep existing cities array and CitySelectModal component exactly the same)
 const cities = [
   { name: "NAGPUR",   sub: "Maharashtra, India", slug: "nagpur"   },
   { name: "MUMBAI",   sub: "Maharashtra",        slug: "mumbai"   },
@@ -62,6 +63,7 @@ const CitySelectModal = ({ onClose }) => {
 /* ─────────────────────────────────────────────
    BOOK CONSULTATION MODAL
 ───────────────────────────────────────────── */
+// ... (Keep existing BookConsultationModal component exactly the same)
 const BookConsultationModal = ({ onClose }) => {
   const [showCityModal, setShowCityModal] = useState(false);
 
@@ -110,6 +112,7 @@ const BookConsultationModal = ({ onClose }) => {
 /* ─────────────────────────────────────────────
    CREATABLE SELECT (With Disabled Logic)
 ───────────────────────────────────────────── */
+// ... (Keep existing CreatableSelect exactly the same)
 const CreatableSelect = ({ field, register, setValue, watch }) => {
   const [isEditing, setIsEditing] = useState(false);
   const currentValue = watch(field.name);
@@ -159,6 +162,26 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
   );
 };
 
+
+/* ─────────────────────────────────────────────
+   HELPERS & MAPPINGS
+───────────────────────────────────────────── */
+// ✅ Map activity types to their backend categories automatically
+const ACTIVITY_CATEGORIES = {
+  "Next Medicine Order": "Follow-Up",
+  "Follow-Up": "Follow-Up",
+  "Dr Consultation TC": "Follow-Up",
+  "Dr Follow Up In Clinic": "Follow-Up",
+  "Just Contact": "History",
+  "Miss Contact": "History",
+  "TC Related": "Ticket",
+  "In-Clinic Related": "Ticket",
+  "Medicine Related": "Ticket",
+  "Refund Related": "Ticket",
+  "Side Effect": "Ticket",
+  "Other": "Ticket"
+};
+
 /* ─────────────────────────────────────────────
    MAIN PAGE
 ───────────────────────────────────────────── */
@@ -169,19 +192,24 @@ const CustomerProfilePage = () => {
   const [showBookModal, setShowBookModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [customerData, setCustomerData] = useState(null);
   
   const [adminList, setAdminList] = useState([]);
 
+  // ✅ Activity States
+  const [activeTab, setActiveTab] = useState('Upcoming');
+  const [activities, setActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+
   const { register, handleSubmit, watch, setValue, resetField, reset } = useForm({
     defaultValues: {
-      activityType: 'Next Medicine Order'
+      activityType: 'Next Medicine Order',
+      activityAssignTo: '' 
     }
   });
 
-  const [activeTab, setActiveTab] = useState('Upcoming');
-  const [activities, setActivities] = useState([]);
-
+  // 1. Fetch Profile Data
   useEffect(() => {
     const fetchProfile = async () => {
       if (!userId) {
@@ -202,7 +230,6 @@ const CustomerProfilePage = () => {
           return String(val);
         };
 
-        // ✅ Auto-Assign Lead Owner Logic
         const existingOwner = safeString(res.data.leadOwner);
         const defaultOwnerName = existingOwner || res.data.currentAdmin?.fullName || "";
 
@@ -211,7 +238,7 @@ const CustomerProfilePage = () => {
           age: res.data.age || "",
           contact: res.data.mobileNo || "",
           whatsapp: res.data.whatsappNumber || "",
-          leadOwner: defaultOwnerName, // ✅ Will default to current user if empty
+          leadOwner: defaultOwnerName, 
           leadStage: res.data.leadStage || "New",
           city: res.data.city || "",
           email: res.data.mailId || res.data.email || "",
@@ -224,7 +251,7 @@ const CustomerProfilePage = () => {
           notes: res.data.notes || "",
           sendWhatsApp: res.data.sendWhatsAppNotification || false,
           activityType: "Next Medicine Order",
-          assignTo: safeString(res.data.currentAdmin) 
+          activityAssignTo: "" 
         });
       }
       setLoading(false);
@@ -233,27 +260,71 @@ const CustomerProfilePage = () => {
     fetchProfile();
   }, [userId, reset]);
 
-  const addNewActivity = () => {
+  // 2. ✅ Fetch Activities (Triggers on mount AND when tab changes)
+  const fetchActivities = useCallback(async () => {
+    if (!userId) return;
+    setLoadingActivities(true);
+    const res = await getCustomerActivities(userId, activeTab);
+    if (res.success && res.data) {
+      setActivities(res.data.logs || []);
+    } else {
+      setActivities([]);
+    }
+    setLoadingActivities(false);
+  }, [userId, activeTab]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  // 3. ✅ ADD NEW ACTIVITY LOG (Hits the POST API)
+  const addNewActivity = async () => {
     const type = watch('activityType');
     const notes = watch('activityNotes');
     const date = watch('activityDate');
     const time = watch('activityTime');
+    const assignToName = watch('activityAssignTo');
 
-    if(!date) return alert("Please select a date");
+    // Auto-map category based on the selected type
+    const category = ACTIVITY_CATEGORIES[type] || "Follow-Up";
 
-    const newAct = {
-      id: Date.now(),
-      title: type,
-      desc: notes || "No additional notes provided.",
-      date: new Date(date).toDateString(),
-      time: time || "--:--",
-      status: customerData?.currentAdmin?.fullName || "Admin"
+    // Build payload
+    const payload = {
+      type: type,
+      category: category,
+      notes: notes || "",
     };
 
-    setActivities([newAct, ...activities]);
-    resetField('activityNotes');
+    // Only add date/time if provided
+    if (date) payload.scheduledDate = date;
+    if (time) payload.scheduledTime = time;
+
+    // Find admin ID if assigned
+    if (assignToName) {
+      const selectedAdmin = adminList.find(a => a.fullName === assignToName);
+      if (selectedAdmin) payload.assignedTo = selectedAdmin._id;
+    }
+
+    setIsAddingActivity(true);
+    const res = await addCustomerActivity(userId, payload);
+    
+    if (res.success) {
+      toast.success("Activity added successfully!");
+      // Clear form
+      resetField('activityNotes');
+      resetField('activityDate');
+      resetField('activityTime');
+      resetField('activityAssignTo');
+      
+      // Refresh the list immediately
+      fetchActivities(); 
+    } else {
+      toast.error(res.message || "Failed to add activity");
+    }
+    setIsAddingActivity(false);
   };
 
+  // 4. FINAL PROFILE SUBMIT HANDLER
   const onFinalSubmit = async (data) => {
     setIsSaving(true);
 
@@ -274,7 +345,7 @@ const CustomerProfilePage = () => {
       city: data.city,
       leadSource: data.leadSource,
       leadStage: data.leadStage,
-      leadOwner: leadOwnerId, 
+      leadOwner: leadOwnerId,
       notes: data.notes,
       sendWhatsAppNotification: !!data.sendWhatsApp,
       deliveryAddress: {
@@ -290,14 +361,20 @@ const CustomerProfilePage = () => {
     const res = await submitCustomerProfile(userId, payload);
     
     if (res.success) {
-      // ✅ Sonner Success Toast
       toast.success("Successfully saved!", { duration: 5000 }); 
     } else {
-      // ✅ Sonner Error Toast
       toast.error(res.message || "Failed to update profile.", { duration: 5000 }); 
     }
     
     setIsSaving(false);
+  };
+
+  // Helper to format date strings for the activity cards safely
+  const formatActivityDate = (isoString) => {
+    if (!isoString) return "--";
+    return new Date(isoString).toLocaleDateString("en-IN", { 
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' 
+    });
   };
 
   if (loading) {
@@ -323,7 +400,6 @@ const CustomerProfilePage = () => {
     );
   }
 
-  // ✅ Only super_admin can change the lead owner
   const isSuperAdmin = customerData.currentAdmin?.role === 'super_admin';
 
   return (
@@ -380,7 +456,7 @@ const CustomerProfilePage = () => {
               name: "leadOwner", 
               type: "creatable", 
               options: adminList.map(a => a.fullName),
-              disabled: !isSuperAdmin // ✅ Disables input for regular admins
+              disabled: !isSuperAdmin 
             }, 
             { 
                 label: "Lead Stage", 
@@ -478,10 +554,11 @@ const CustomerProfilePage = () => {
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (Lead Owner)</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (User)</label>
               <div className="relative">
-                <select {...register("assignTo")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
-                  <option value="" disabled>Select User</option>
+                {/* ✅ Renamed to activityAssignTo to avoid form conflict */}
+                <select {...register("activityAssignTo")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
+                  <option value="">Unassigned</option>
                   {adminList.map(admin => (
                     <option key={admin._id} value={admin.fullName}>{admin.fullName}</option>
                   ))}
@@ -507,9 +584,11 @@ const CustomerProfilePage = () => {
             </div>
             <button 
               type="button" 
+              disabled={isAddingActivity}
               onClick={addNewActivity}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-100 transition-all active:scale-95"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-100 transition-all active:scale-95 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
+              {isAddingActivity && <Loader2 size={16} className="animate-spin"/>}
               Add Activity
             </button>
           </div>
@@ -529,32 +608,47 @@ const CustomerProfilePage = () => {
           </div>
 
           {/* ACTIVITY LIST */}
-          <div className="space-y-4">
-            {activities.length > 0 ? activities.map(act => (
-              <div key={act.id} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative hover:border-blue-200 transition-all animate-in fade-in slide-in-from-bottom-2">
-                <div className="absolute top-5 right-5 text-[10px] font-bold bg-slate-50 px-2 py-1 rounded-lg text-slate-400 uppercase tracking-widest">{act.status}</div>
+          <div className="space-y-4 min-h-[150px]">
+            {loadingActivities ? (
+               <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
+            ) : activities.length > 0 ? (
+              activities.map(act => (
+              <div key={act.activityId} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative hover:border-blue-200 transition-all animate-in fade-in slide-in-from-bottom-2">
+                <div className="absolute top-5 right-5 flex items-center gap-2">
+                  <span className="text-[10px] font-bold bg-slate-50 px-2 py-1 rounded-lg text-slate-400 uppercase tracking-widest">{act.status}</span>
+                </div>
                 <div className="flex items-start gap-4">
                   <div className="bg-blue-50 p-3 rounded-full text-blue-500">
                     <RotateCcw size={18} />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <h4 className="text-sm font-bold text-slate-800">{act.title}</h4>
-                    <p className="text-sm text-slate-500 leading-relaxed">{act.desc}</p>
-                    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase mt-2">
-                      <span className="flex items-center gap-1"><Calendar size={12}/> {act.date}</span>
-                      <span className="flex items-center gap-1"><Clock size={12}/> {act.time}</span>
-                    </div>
+                    <h4 className="text-sm font-bold text-slate-800">{act.type}</h4>
+                    <p className="text-sm text-slate-500 leading-relaxed">{act.notes}</p>
                     
-                    <div className="flex flex-wrap gap-2 pt-4">
-                      <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E8F5E9] text-[#2E7D32] border border-[#C8E6C9] px-4 py-1.5 rounded-full hover:bg-[#C8E6C9] transition-all"><CheckCircle2 size={13}/> Complete</button>
-                      <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#FFEBEE] text-[#C62828] border border-[#FFCDD2] px-4 py-1.5 rounded-full hover:bg-[#FFCDD2] transition-all"><XCircle size={13}/> Not Interested</button>
-                      <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E3F2FD] text-[#1565C0] border border-[#BBDEFB] px-4 py-1.5 rounded-full hover:bg-[#BBDEFB] transition-all"><Clock size={13}/> Postpone</button>
-                      <button type="button" className="ml-2 p-2 text-slate-300 hover:text-blue-500 transition-colors"><MessageSquare size={18}/></button>
+                    {(act.scheduledDate || act.scheduledTime) && (
+                      <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase mt-2">
+                        {act.scheduledDate && <span className="flex items-center gap-1"><Calendar size={12}/> {formatActivityDate(act.scheduledDate)}</span>}
+                        {act.scheduledTime && <span className="flex items-center gap-1"><Clock size={12}/> {act.scheduledTime}</span>}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 mt-2 text-xs text-slate-400 font-medium">
+                      <span>Created By: {act.createdBy || 'Unknown'}</span>
+                      {act.assignedTo && <span className="before:content-['•'] before:mr-2 before:text-slate-300">Assigned To: {act.assignedTo}</span>}
                     </div>
+
+                    {act.showActions && (
+                      <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-50 mt-4">
+                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E8F5E9] text-[#2E7D32] border border-[#C8E6C9] px-4 py-1.5 rounded-full hover:bg-[#C8E6C9] transition-all"><CheckCircle2 size={13}/> Complete</button>
+                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#FFEBEE] text-[#C62828] border border-[#FFCDD2] px-4 py-1.5 rounded-full hover:bg-[#FFCDD2] transition-all"><XCircle size={13}/> Not Interested</button>
+                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E3F2FD] text-[#1565C0] border border-[#BBDEFB] px-4 py-1.5 rounded-full hover:bg-[#BBDEFB] transition-all"><Clock size={13}/> Postpone</button>
+                        <button type="button" className="ml-2 p-2 text-slate-300 hover:text-blue-500 transition-colors"><MessageSquare size={18}/></button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            )) : (
+            ))) : (
               <div className="text-center py-10 text-slate-400 text-sm">No {activeTab.toLowerCase()} activities found.</div>
             )}
           </div>
