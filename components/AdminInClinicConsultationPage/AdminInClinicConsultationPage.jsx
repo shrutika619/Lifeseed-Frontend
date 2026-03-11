@@ -4,8 +4,9 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search, Filter, ChevronDown, Plus, Bell,
   Phone, User, MoreVertical, Calendar, Download,
-  FileText, MapPin, X, PhoneCall,
+  FileText, MapPin, X, PhoneCall, ArrowLeft,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 /* ── CALL MODAL ── */
 const CallModal = ({ patient, onClose }) => {
@@ -109,7 +110,6 @@ const ActionCell = ({ item }) => {
           className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-all hover:scale-110 border border-blue-200 shadow-sm">
           <Phone className="w-4 h-4" />
         </button>
-        {/* 👤 View Profile → redirect */}
         <a href="/super-admin/in-clinic-consultation/customerprofile" title="View Profile"
           className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white flex items-center justify-center transition-all hover:scale-110 border border-indigo-200 shadow-sm">
           <User className="w-4 h-4" />
@@ -136,6 +136,7 @@ const StatusBadge = ({ count, label, color, active, onClick }) => (
 
 /* ── MAIN PAGE ── */
 const AdminInClinicConsultationPage = () => {
+  const router = useRouter();
   const [searchTerm,    setSearchTerm]    = useState("");
   const [activeFilter,  setActiveFilter]  = useState("All");
   const [primaryDate,   setPrimaryDate]   = useState("Today");
@@ -162,6 +163,16 @@ const AdminInClinicConsultationPage = () => {
 
       {/* Row 1 */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 mb-6">
+        {/* ── BACK BUTTON ── */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+
         <div className="relative w-full sm:w-auto">
           <select value={primaryDate} onChange={(e) => setPrimaryDate(e.target.value)} className="w-full sm:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
             <option>Today</option><option>Yesterday</option><option>Last 7 Days</option>

@@ -7,7 +7,8 @@ import {
   MoreVertical, 
   FileText, 
   ChevronDown,
-  User
+  User,
+  ArrowLeft
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -56,6 +57,7 @@ const ActionMenu = ({ userId }) => {
 };
 
 const AdminFirstTimeUserPage = () => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("Today");
 
@@ -96,17 +98,29 @@ const AdminFirstTimeUserPage = () => {
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
       {/* --- Top Header / Filters --- */}
       <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="relative">
-          <select 
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        <div className="flex items-center gap-3">
+          {/* ── BACK BUTTON ── */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
           >
-            <option>Today</option>
-            <option>Yesterday</option>
-            <option>Last 7 Days</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
+          <div className="relative">
+            <select 
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option>Today</option>
+              <option>Yesterday</option>
+              <option>Last 7 Days</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
         </div>
 
         <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md border border-blue-100 flex items-center gap-2">

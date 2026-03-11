@@ -5,7 +5,7 @@ import {
   Calendar, Clock, MessageSquare, CheckCircle2, 
   XCircle, History, Save, ChevronDown, RotateCcw,
   Phone, Monitor, MapPin, CheckSquare, AlertCircle,
-  Tag, Pill, X
+  Tag, Pill, X, ArrowLeft
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────
@@ -234,7 +234,18 @@ const CustomerProfilePage = () => {
         
         {/* HEADER AREA */}
         <div className="flex flex-wrap justify-between items-end bg-white p-6 rounded-2xl shadow-sm border border-slate-200 gap-4">
-          <h1 className="text-2xl font-bold text-slate-800">Customer ID - 1254</h1>
+          {/* ── BACK BUTTON ── */}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
+            <h1 className="text-2xl font-bold text-slate-800">Customer ID - 1254</h1>
+          </div>
           <div className="w-full md:w-64">
             <label className="text-[11px] font-bold text-slate-400 uppercase mb-1 block">Lead Source</label>
             <div className="relative">

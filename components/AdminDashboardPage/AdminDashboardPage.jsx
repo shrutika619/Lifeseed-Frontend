@@ -13,13 +13,14 @@ import {
   Calendar,
   User,
   Phone,
-  Mail
+  Mail,
+  ArrowLeft
 } from "lucide-react";
 
 const initialStatsData = [
   {
     id: 'inquiry-direct',
-    title: "Inquiry Direct",
+    title: "First Time User",
     icon: FileText,
     items: [
       { label: "New", value: 3, status: "new" },
@@ -101,14 +102,6 @@ export default function AdminDashboardPage() {
   const [modalType, setModalType] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
-  const [showOrderForm, setShowOrderForm] = useState(false);
-  const [orderFormData, setOrderFormData] = useState({
-    patientName: '',
-    phone: '',
-    email: '',
-    service: '',
-    notes: ''
-  });
   const [searchTerm, setSearchTerm] = useState('');
 
   // Open list modal
@@ -118,12 +111,6 @@ export default function AdminDashboardPage() {
     setSelectedStatus({ status, label });
     setModalType('list');
     setShowModal(true);
-  };
-
-  // Open order form
-  const handlePlaceOrder = (section) => {
-    setSelectedSection(section);
-    setShowOrderForm(true);
   };
 
   // Get filtered patients
@@ -173,61 +160,23 @@ export default function AdminDashboardPage() {
     setShowModal(false);
   };
 
-  // Submit order form
-  const handleSubmitOrder = (e) => {
-    e.preventDefault();
-    
-    const newPatient = {
-      id: Date.now(),
-      name: orderFormData.patientName,
-      phone: orderFormData.phone,
-      email: orderFormData.email,
-      status: 'new',
-      date: new Date().toISOString().split('T')[0],
-      notes: orderFormData.notes
-    };
-
-    // Add to mock patients
-    if (!mockPatients[selectedSection.id]) {
-      mockPatients[selectedSection.id] = [];
-    }
-    mockPatients[selectedSection.id].unshift(newPatient);
-
-    // Update stats
-    setStatsData(prev => prev.map(section => {
-      if (section.id === selectedSection.id) {
-        return {
-          ...section,
-          items: section.items.map(item => {
-            if (item.status === 'new') {
-              return { ...item, value: item.value + 1 };
-            }
-            return item;
-          })
-        };
-      }
-      return section;
-    }));
-
-    // Reset form
-    setOrderFormData({
-      patientName: '',
-      phone: '',
-      email: '',
-      service: '',
-      notes: ''
-    });
-    setShowOrderForm(false);
-    
-    alert('Order placed successfully!');
-  };
-
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <div className="flex items-center gap-3">
+            {/* ── BACK BUTTON ── */}
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          </div>
           <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg hover:bg-gray-100">
             <Filter className="w-4 h-4" />
             <span className="text-sm">Filters</span>
@@ -274,17 +223,6 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-
-                {/* Action */}
-                <div className="flex justify-end xl:items-center">
-                  <button 
-                    onClick={() => handlePlaceOrder(section)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2.5 rounded-lg w-full sm:w-auto flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Place Order
-                  </button>
                 </div>
               </div>
             );
@@ -377,108 +315,6 @@ export default function AdminDashboardPage() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Order Form Modal */}
-      {showOrderForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Place New Order</h2>
-              <button 
-                onClick={() => setShowOrderForm(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitOrder} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Patient Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={orderFormData.patientName}
-                  onChange={(e) => setOrderFormData({...orderFormData, patientName: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter patient name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  required
-                  value={orderFormData.phone}
-                  onChange={(e) => setOrderFormData({...orderFormData, phone: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="+91-XXXXXXXXXX"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={orderFormData.email}
-                  onChange={(e) => setOrderFormData({...orderFormData, email: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="patient@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Service Type
-                </label>
-                <input
-                  type="text"
-                  value={selectedSection?.title}
-                  disabled
-                  className="w-full px-3 py-2 border rounded-lg bg-gray-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={orderFormData.notes}
-                  onChange={(e) => setOrderFormData({...orderFormData, notes: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Additional notes..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowOrderForm(false)}
-                  className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Submit Order
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
