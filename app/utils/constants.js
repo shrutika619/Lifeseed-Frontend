@@ -38,6 +38,7 @@ export class Constants {
     GET_PATIENT_DETAILS: `${this.API_BASE_URL}/customer/patient`,
     SUBMIT_CUSTOMER_PROFILE: `${this.API_BASE_URL}/customer/submit`,
     CUSTOMER_ACTIVITY: `${this.API_BASE_URL}/customer/activity`,
+    MANUAL_CUSTOMER_CREATE: `${this.API_BASE_URL}/customer/manual`,
     
     // Dynamic endpoints (Functions)
     ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE

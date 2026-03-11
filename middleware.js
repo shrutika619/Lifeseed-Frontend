@@ -77,13 +77,15 @@ export async function middleware(request) {
   const protectedPrefix = Object.keys(ROUTE_PERMISSIONS).find(prefix => pathname.startsWith(prefix));
 
   if (protectedPrefix) {
+    
+    // ✅ Identify correct login page based on URL
+    const targetLoginPage = (pathname.startsWith('/admin') || pathname.startsWith('/super-admin')) 
+      ? '/login-admin' 
+      : '/login';
+
     // 1. Check if User is Logged In
     if (!isLoggedIn) {
-       const targetLogin = (pathname.startsWith('/admin') || pathname.startsWith('/super-admin')) 
-         ? '/login-admin' 
-         : '/login';
-       
-       const loginUrl = new URL(targetLogin, request.url);
+       const loginUrl = new URL(targetLoginPage, request.url);
        loginUrl.searchParams.set('from', pathname);
        return NextResponse.redirect(loginUrl);
     }
@@ -93,8 +95,8 @@ export async function middleware(request) {
       const payload = decodeJwt(refreshToken);
       if (payload.exp && Date.now() >= payload.exp * 1000) throw new Error("Expired");
     } catch (e) {
-       // Token invalid/expired -> Logout & Redirect
-       const response = NextResponse.redirect(new URL('/login?session_expired=true', request.url));
+       // Token invalid/expired -> Logout & Redirect to the CORRECT login page
+       const response = NextResponse.redirect(new URL(`${targetLoginPage}?session_expired=true`, request.url));
        response.cookies.delete('refreshToken');
        response.cookies.delete('user_role');
        return response;

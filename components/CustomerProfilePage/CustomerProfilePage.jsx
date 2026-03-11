@@ -1,8 +1,16 @@
 "use client"
 import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { useSearchParams } from 'next/navigation'; 
-import { getPatientDetailsById, submitCustomerProfile, getCustomerActivities, addCustomerActivity } from '@/app/services/admin/leads.service'; 
+import { useSearchParams, usePathname, useRouter } from 'next/navigation'; 
+import { 
+  getPatientDetailsById, 
+  submitCustomerProfile, 
+  getCustomerActivities, 
+  addCustomerActivity, 
+  updateCustomerActivity,
+  createCustomerProfile, 
+  getAdminDropdownData   
+} from '@/app/services/admin/leads.service'; 
 import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
@@ -13,7 +21,6 @@ import {
 /* ─────────────────────────────────────────────
    CITY SELECT MODAL
 ───────────────────────────────────────────── */
-// ... (Keep existing cities array and CitySelectModal component exactly the same)
 const cities = [
   { name: "NAGPUR",   sub: "Maharashtra, India", slug: "nagpur"   },
   { name: "MUMBAI",   sub: "Maharashtra",        slug: "mumbai"   },
@@ -63,7 +70,6 @@ const CitySelectModal = ({ onClose }) => {
 /* ─────────────────────────────────────────────
    BOOK CONSULTATION MODAL
 ───────────────────────────────────────────── */
-// ... (Keep existing BookConsultationModal component exactly the same)
 const BookConsultationModal = ({ onClose }) => {
   const [showCityModal, setShowCityModal] = useState(false);
 
@@ -110,9 +116,8 @@ const BookConsultationModal = ({ onClose }) => {
 };
 
 /* ─────────────────────────────────────────────
-   CREATABLE SELECT (With Disabled Logic)
+   CREATABLE SELECT
 ───────────────────────────────────────────── */
-// ... (Keep existing CreatableSelect exactly the same)
 const CreatableSelect = ({ field, register, setValue, watch }) => {
   const [isEditing, setIsEditing] = useState(false);
   const currentValue = watch(field.name);
@@ -136,7 +141,7 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
             <select
               {...register(field.name)}
               disabled={field.disabled}
-              className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${field.disabled ? 'opacity-60 cursor-not-allowed bg-gray-100' : 'focus:border-blue-500'}`}
+              className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${field.disabled ? 'opacity-60 cursor-not-allowed bg-gray-100 text-slate-500 font-bold' : 'focus:border-blue-500'}`}
             >
               <option value="" disabled>Select...</option>
               {field.options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -162,11 +167,6 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
   );
 };
 
-
-/* ─────────────────────────────────────────────
-   HELPERS & MAPPINGS
-───────────────────────────────────────────── */
-// ✅ Map activity types to their backend categories automatically
 const ACTIVITY_CATEGORIES = {
   "Next Medicine Order": "Follow-Up",
   "Follow-Up": "Follow-Up",
@@ -187,17 +187,22 @@ const ACTIVITY_CATEGORIES = {
 ───────────────────────────────────────────── */
 const CustomerProfilePage = () => {
   const searchParams = useSearchParams();
-  const userId = searchParams.get('userId'); 
+  const pathname = usePathname();
+  const router = useRouter();
   
-  const [showBookModal, setShowBookModal] = useState(false);
+  const userId = searchParams.get('userId'); 
+  const isNewUser = !userId; 
+
+  const isSuperAdminRoute = pathname.startsWith('/super-admin');
+  
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [customerData, setCustomerData] = useState(null);
   
   const [adminList, setAdminList] = useState([]);
+  const [showBookModal, setShowBookModal] = useState(false);
 
-  // ✅ Activity States
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [activities, setActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -205,64 +210,89 @@ const CustomerProfilePage = () => {
   const { register, handleSubmit, watch, setValue, resetField, reset } = useForm({
     defaultValues: {
       activityType: 'Next Medicine Order',
-      activityAssignTo: '' 
+      activityAssignTo: '',
+      leadSource: 'Manual',
+      pageStatus: 'manual'
     }
   });
 
-  // 1. Fetch Profile Data
+  const watchedLeadOwner = watch("leadOwner");
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
-      
+    if (watchedLeadOwner) {
+      setValue("activityAssignTo", watchedLeadOwner);
+    }
+  }, [watchedLeadOwner, setValue]);
+
+  // 1. Fetch Profile OR Initial Admin Data
+  useEffect(() => {
+    const fetchData = async () => {
       setLoading(true);
-      const res = await getPatientDetailsById(userId);
       
-      if (res.success && res.data) {
-        setCustomerData(res.data);
-        setAdminList(res.data.assignToDropdown || []);
+      const safeString = (val) => {
+        if (!val) return "";
+        if (typeof val === 'object') return val.fullName || val.username || "";
+        return String(val);
+      };
 
-        const safeString = (val) => {
-          if (!val) return "";
-          if (typeof val === 'object') return val.fullName || val.username || "";
-          return String(val);
-        };
+      if (isNewUser) {
+        // 🟢 CREATE MODE (Auto-Assigned Option 1)
+        const res = await getAdminDropdownData();
+        if (res.success && res.data) {
+           setCustomerData({ currentAdmin: res.data.currentAdmin });
+           setAdminList(res.data.assignToDropdown || []);
+           
+           const defaultOwnerName = res.data.currentAdmin?.fullName || "";
+           
+           reset({
+             leadOwner: defaultOwnerName, 
+             leadStage: "New",
+             leadSource: "Manual",
+             pageStatus: "manual",
+             activityAssignTo: defaultOwnerName
+           });
+        }
+      } else {
+        // 🔵 EDIT MODE
+        const res = await getPatientDetailsById(userId);
+        if (res.success && res.data) {
+          setCustomerData(res.data);
+          setAdminList(res.data.assignToDropdown || []);
 
-        const existingOwner = safeString(res.data.leadOwner);
-        const defaultOwnerName = existingOwner || res.data.currentAdmin?.fullName || "";
+          const existingOwner = safeString(res.data.leadOwner);
+          const defaultOwnerName = existingOwner || res.data.currentAdmin?.fullName || "";
 
-        reset({
-          name: res.data.name || "",
-          age: res.data.age || "",
-          contact: res.data.mobileNo || "",
-          whatsapp: res.data.whatsappNumber || "",
-          leadOwner: defaultOwnerName, 
-          leadStage: res.data.leadStage || "New",
-          city: res.data.city || "",
-          email: res.data.mailId || res.data.email || "",
-          leadSource: res.data.leadSource || "Website",
-          addressLabel: res.data.deliveryAddress?.label || "Home",
-          flatNo: res.data.deliveryAddress?.flatNo || "",
-          street: res.data.deliveryAddress?.streetArea || "",
-          landmark: res.data.deliveryAddress?.landmark || "",
-          pincode: res.data.deliveryAddress?.pinCode || "",
-          notes: res.data.notes || "",
-          sendWhatsApp: res.data.sendWhatsAppNotification || false,
-          activityType: "Next Medicine Order",
-          activityAssignTo: "" 
-        });
+          reset({
+            name: res.data.name || "",
+            age: res.data.age || "",
+            contact: res.data.mobileNo || "",
+            whatsapp: res.data.whatsappNumber || "",
+            leadOwner: defaultOwnerName, 
+            leadStage: res.data.leadStage || "New",
+            city: res.data.city || "",
+            email: res.data.mailId || res.data.email || "",
+            leadSource: res.data.leadSource || "Website",
+            addressLabel: res.data.deliveryAddress?.label || "Home",
+            flatNo: res.data.deliveryAddress?.flatNo || "",
+            street: res.data.deliveryAddress?.streetArea || "",
+            landmark: res.data.deliveryAddress?.landmark || "",
+            pincode: res.data.deliveryAddress?.pinCode || "",
+            notes: res.data.notes || "",
+            sendWhatsApp: res.data.sendWhatsAppNotification || false,
+            activityType: "Next Medicine Order",
+            activityAssignTo: defaultOwnerName
+          });
+        }
       }
       setLoading(false);
     };
 
-    fetchProfile();
-  }, [userId, reset]);
+    fetchData();
+  }, [userId, isNewUser, reset]);
 
-  // 2. ✅ Fetch Activities (Triggers on mount AND when tab changes)
+  // 2. Fetch Activities (Only if NOT a new user)
   const fetchActivities = useCallback(async () => {
-    if (!userId) return;
+    if (isNewUser || !userId) return;
     setLoadingActivities(true);
     const res = await getCustomerActivities(userId, activeTab);
     if (res.success && res.data) {
@@ -271,13 +301,13 @@ const CustomerProfilePage = () => {
       setActivities([]);
     }
     setLoadingActivities(false);
-  }, [userId, activeTab]);
+  }, [userId, activeTab, isNewUser]);
 
   useEffect(() => {
     fetchActivities();
   }, [fetchActivities]);
 
-  // 3. ✅ ADD NEW ACTIVITY LOG (Hits the POST API)
+  // 3. ADD NEW ACTIVITY LOG
   const addNewActivity = async () => {
     const type = watch('activityType');
     const notes = watch('activityNotes');
@@ -285,46 +315,93 @@ const CustomerProfilePage = () => {
     const time = watch('activityTime');
     const assignToName = watch('activityAssignTo');
 
-    // Auto-map category based on the selected type
     const category = ACTIVITY_CATEGORIES[type] || "Follow-Up";
 
-    // Build payload
     const payload = {
       type: type,
       category: category,
       notes: notes || "",
     };
 
-    // Only add date/time if provided
     if (date) payload.scheduledDate = date;
     if (time) payload.scheduledTime = time;
 
-    // Find admin ID if assigned
     if (assignToName) {
       const selectedAdmin = adminList.find(a => a.fullName === assignToName);
-      if (selectedAdmin) payload.assignedTo = selectedAdmin._id;
+      if (selectedAdmin) {
+        payload.assignedTo = selectedAdmin._id;
+      } else if (assignToName === customerData?.currentAdmin?.fullName) {
+        payload.assignedTo = customerData.currentAdmin._id;
+      }
     }
 
-    setIsAddingActivity(true);
-    const res = await addCustomerActivity(userId, payload);
-    
-    if (res.success) {
-      toast.success("Activity added successfully!");
-      // Clear form
+    if (isNewUser) {
+      // 🟢 CREATE MODE: Queue activity locally
+      const localActivity = {
+        activityId: `temp_${Date.now()}`,
+        type: payload.type,
+        category: payload.category,
+        notes: payload.notes,
+        scheduledDate: payload.scheduledDate || null,
+        scheduledTime: payload.scheduledTime || "",
+        assignedToId: payload.assignedTo || null,
+        assignedTo: assignToName,
+        status: "Pending",
+        createdBy: customerData?.currentAdmin?.fullName || 'You',
+        showActions: false 
+      };
+
+      setActivities([localActivity, ...activities]);
+      toast.success("Activity queued! Save profile to submit.");
+      
       resetField('activityNotes');
       resetField('activityDate');
       resetField('activityTime');
-      resetField('activityAssignTo');
-      
-      // Refresh the list immediately
-      fetchActivities(); 
+
     } else {
-      toast.error(res.message || "Failed to add activity");
+      // 🔵 EDIT MODE: Send to backend
+      setIsAddingActivity(true);
+      const res = await addCustomerActivity(userId, payload);
+      
+      if (res.success) {
+        toast.success("Activity added successfully!");
+        resetField('activityNotes');
+        resetField('activityDate');
+        resetField('activityTime');
+        fetchActivities(); 
+      } else {
+        toast.error(res.message || "Failed to add activity");
+      }
+      setIsAddingActivity(false);
     }
-    setIsAddingActivity(false);
   };
 
-  // 4. FINAL PROFILE SUBMIT HANDLER
+  // 4. UPDATE ACTIVITY STATUS HANDLER
+  const handleActivityStatusChange = async (activityId, newStatus) => {
+    if (isNewUser) return; 
+
+    const payload = { status: newStatus };
+
+    if (newStatus === "Not Interested") {
+      const userNotes = window.prompt("Add notes for marking as 'Not Interested' (Optional):");
+      if (userNotes === null) return; 
+      if (userNotes.trim() !== "") {
+        payload.notes = userNotes;
+      }
+    }
+
+    const toastId = toast.loading(`Marking as ${newStatus}...`);
+    const res = await updateCustomerActivity(userId, activityId, payload);
+
+    if (res.success) {
+      toast.success(`Activity marked as ${newStatus}`, { id: toastId });
+      fetchActivities(); 
+    } else {
+      toast.error(res.message || "Failed to update activity", { id: toastId });
+    }
+  };
+
+  // 5. FINAL PROFILE SUBMIT HANDLER
   const onFinalSubmit = async (data) => {
     setIsSaving(true);
 
@@ -345,11 +422,10 @@ const CustomerProfilePage = () => {
       city: data.city,
       leadSource: data.leadSource,
       leadStage: data.leadStage,
-      leadOwner: leadOwnerId,
       notes: data.notes,
       sendWhatsAppNotification: !!data.sendWhatsApp,
       deliveryAddress: {
-        label: data.addressLabel,
+        label: data.addressLabel || "Home",
         flatNo: data.flatNo,
         streetArea: data.street,
         landmark: data.landmark,
@@ -358,18 +434,47 @@ const CustomerProfilePage = () => {
       }
     };
 
-    const res = await submitCustomerProfile(userId, payload);
-    
-    if (res.success) {
-      toast.success("Successfully saved!", { duration: 5000 }); 
+    // ✅ If Editing an existing user, send the leadOwner field
+    if (!isNewUser) {
+        payload.leadOwner = leadOwnerId;
+    }
+
+    if (isNewUser) {
+      // 🟢 CREATE NEW USER
+      if (activities.length > 0) {
+        payload.activity = activities.map(act => ({
+          type: act.type,
+          category: act.category,
+          notes: act.notes,
+          scheduledDate: act.scheduledDate,
+          scheduledTime: act.scheduledTime,
+          assignedTo: act.assignedToId
+        }));
+      }
+
+      const res = await createCustomerProfile(payload);
+      if (res.success) {
+        toast.success("User created successfully!", { duration: 5000 }); 
+        const basePath = pathname.split('/newuser')[0];
+        // Ensure it directs to the generated ID!
+        const generatedUserId = res.data.userId || res.data._id || res.data.leadId;
+        router.push(`${basePath}/log-in-user/customerprofile?userId=${generatedUserId}`);
+      } else {
+        toast.error(res.message || "Failed to create user.", { duration: 5000 }); 
+      }
     } else {
-      toast.error(res.message || "Failed to update profile.", { duration: 5000 }); 
+      // 🔵 UPDATE EXISTING USER
+      const res = await submitCustomerProfile(userId, payload);
+      if (res.success) {
+        toast.success("Profile saved successfully!", { duration: 5000 }); 
+      } else {
+        toast.error(res.message || "Failed to update profile.", { duration: 5000 }); 
+      }
     }
     
     setIsSaving(false);
   };
 
-  // Helper to format date strings for the activity cards safely
   const formatActivityDate = (isoString) => {
     if (!isoString) return "--";
     return new Date(isoString).toLocaleDateString("en-IN", { 
@@ -381,12 +486,12 @@ const CustomerProfilePage = () => {
     return (
       <div className="bg-[#F8FAFC] min-h-screen flex flex-col items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
-        <p className="text-slate-500 font-medium">Loading customer profile...</p>
+        <p className="text-slate-500 font-medium">Loading form...</p>
       </div>
     );
   }
 
-  if (!customerData) {
+  if (!isNewUser && !customerData) {
     return (
       <div className="bg-[#F8FAFC] min-h-screen flex flex-col items-center justify-center">
         <p className="text-slate-500 font-medium">Customer profile not found or invalid user ID.</p>
@@ -400,7 +505,7 @@ const CustomerProfilePage = () => {
     );
   }
 
-  const isSuperAdmin = customerData.currentAdmin?.role === 'super_admin';
+  const isSuperAdmin = customerData?.currentAdmin?.role === 'super_admin';
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
@@ -422,9 +527,9 @@ const CustomerProfilePage = () => {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
-                Customer ID - {customerData.customerId || 'N/A'}
+                {isNewUser ? "Create New Customer" : `Customer ID - ${customerData?.customerId || 'N/A'}`}
               </h1>
-              <p className="text-sm font-medium text-slate-400 mt-1">Status: {customerData.pageStatus?.replace("_", " ").toUpperCase()}</p>
+              {!isNewUser && <p className="text-sm font-medium text-slate-400 mt-1">Status: {customerData?.pageStatus?.replace("_", " ").toUpperCase()}</p>}
             </div>
           </div>
           <div className="w-full md:w-64">
@@ -432,7 +537,7 @@ const CustomerProfilePage = () => {
             <div className="relative">
               <select {...register("leadSource")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
                 <option value="Website">Website</option>
-                <option value="Whats App">Whats App</option>
+                <option value="WhatsApp">WhatsApp</option>
                 <option value="Manual">Manual</option>
                 <option value="Self">Self</option>
                 <option value="Agent">Agent</option>
@@ -447,16 +552,16 @@ const CustomerProfilePage = () => {
         {/* BASIC INFORMATION */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           {[
-            { label: "Name", name: "name" }, 
+            { label: "Name", name: "name", required: true }, 
             { label: "Age", name: "age" },
-            { label: "Contact Number", name: "contact" }, 
+            { label: "Contact Number", name: "contact", required: true }, 
             { label: "WhatsApp Number", name: "whatsapp" },
             { 
               label: "Lead Owner", 
               name: "leadOwner", 
               type: "creatable", 
               options: adminList.map(a => a.fullName),
-              disabled: !isSuperAdmin 
+              disabled: isNewUser || !isSuperAdminRoute // ✅ Locked during creation & for regular admins
             }, 
             { 
                 label: "Lead Stage", 
@@ -464,14 +569,16 @@ const CustomerProfilePage = () => {
                 type: "select", 
                 options: ["New", "Interested", "Follow-Up", "Future", "N-Interested", "Cancel", "Regular"] 
             },
-            { label: "City", name: "city", type: "select", options: ["Nagpur", "Mumbai", "Pune", "Delhi", "Nashik", "Amravati"] },
+            { label: "City", name: "city" },
             { label: "Mail Id", name: "email" }
           ].map((f) => (
             <div key={f.name}>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">{f.label}</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
+                {f.label} {f.required && <span className="text-red-500">*</span>}
+              </label>
               {f.type === "select" ? (
                 <div className="relative">
-                    <select {...register(f.name)} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
+                    <select {...register(f.name, { required: f.required })} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
                       <option value="">Select...</option>
                       {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
@@ -480,7 +587,7 @@ const CustomerProfilePage = () => {
               ) : f.type === "creatable" ? (
                 <CreatableSelect field={f} register={register} setValue={setValue} watch={watch} />
               ) : (
-                <input {...register(f.name)} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+                <input {...register(f.name, { required: f.required })} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
               )}
             </div>
           ))}
@@ -522,9 +629,10 @@ const CustomerProfilePage = () => {
 
         {/* ACTIVITY LOG & REMINDERS */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-          <h3 className="font-bold text-slate-700 text-lg flex items-center gap-2">
-            Activity Log & Reminders
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-700 text-lg flex items-center gap-2">Activity Log & Reminders</h3>
+            {isNewUser && <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Queued Mode</span>}
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -556,14 +664,17 @@ const CustomerProfilePage = () => {
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (User)</label>
               <div className="relative">
-                {/* ✅ Renamed to activityAssignTo to avoid form conflict */}
-                <select {...register("activityAssignTo")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
-                  <option value="">Unassigned</option>
+                <select 
+                  {...register("activityAssignTo")} 
+                  disabled={!isSuperAdmin}
+                  className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${!isSuperAdmin ? 'opacity-60 cursor-not-allowed text-slate-500 bg-gray-100' : 'focus:border-blue-500'}`}
+                >
+                  <option value="" disabled>Unassigned</option>
                   {adminList.map(admin => (
                     <option key={admin._id} value={admin.fullName}>{admin.fullName}</option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
+                <ChevronDown className={`absolute right-3 top-3 ${!isSuperAdmin ? 'text-gray-300' : 'text-slate-400'} pointer-events-none`} size={16} />
               </div>
             </div>
           </div>
@@ -589,7 +700,7 @@ const CustomerProfilePage = () => {
               className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-100 transition-all active:scale-95 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isAddingActivity && <Loader2 size={16} className="animate-spin"/>}
-              Add Activity
+              {isNewUser ? "Queue Activity" : "Add Activity"}
             </button>
           </div>
 
@@ -637,12 +748,35 @@ const CustomerProfilePage = () => {
                       {act.assignedTo && <span className="before:content-['•'] before:mr-2 before:text-slate-300">Assigned To: {act.assignedTo}</span>}
                     </div>
 
-                    {act.showActions && (
+                    {act.showActions && !isNewUser && (
                       <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-50 mt-4">
-                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E8F5E9] text-[#2E7D32] border border-[#C8E6C9] px-4 py-1.5 rounded-full hover:bg-[#C8E6C9] transition-all"><CheckCircle2 size={13}/> Complete</button>
-                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#FFEBEE] text-[#C62828] border border-[#FFCDD2] px-4 py-1.5 rounded-full hover:bg-[#FFCDD2] transition-all"><XCircle size={13}/> Not Interested</button>
-                        <button type="button" className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E3F2FD] text-[#1565C0] border border-[#BBDEFB] px-4 py-1.5 rounded-full hover:bg-[#BBDEFB] transition-all"><Clock size={13}/> Postpone</button>
-                        <button type="button" className="ml-2 p-2 text-slate-300 hover:text-blue-500 transition-colors"><MessageSquare size={18}/></button>
+                        <button 
+                          type="button" 
+                          onClick={() => handleActivityStatusChange(act.activityId, 'Complete')}
+                          className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E8F5E9] text-[#2E7D32] border border-[#C8E6C9] px-4 py-1.5 rounded-full hover:bg-[#C8E6C9] transition-all"
+                        >
+                          <CheckCircle2 size={13}/> Complete
+                        </button>
+                        
+                        <button 
+                          type="button" 
+                          onClick={() => handleActivityStatusChange(act.activityId, 'Not Interested')}
+                          className="flex items-center gap-1.5 text-[11px] font-bold bg-[#FFEBEE] text-[#C62828] border border-[#FFCDD2] px-4 py-1.5 rounded-full hover:bg-[#FFCDD2] transition-all"
+                        >
+                          <XCircle size={13}/> Not Interested
+                        </button>
+                        
+                        <button 
+                          type="button" 
+                          onClick={() => handleActivityStatusChange(act.activityId, 'Postpone')}
+                          className="flex items-center gap-1.5 text-[11px] font-bold bg-[#E3F2FD] text-[#1565C0] border border-[#BBDEFB] px-4 py-1.5 rounded-full hover:bg-[#BBDEFB] transition-all"
+                        >
+                          <Clock size={13}/> Postpone
+                        </button>
+                        
+                        <button type="button" className="ml-2 p-2 text-slate-300 hover:text-blue-500 transition-colors">
+                          <MessageSquare size={18}/>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -668,7 +802,7 @@ const CustomerProfilePage = () => {
               className="px-12 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} 
-              {isSaving ? "Saving..." : "Save Profile"}
+              {isSaving ? "Saving..." : (isNewUser ? "Create Customer" : "Save Profile")}
             </button>
           </div>
         </div>

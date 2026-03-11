@@ -167,6 +167,9 @@ const AssessmentModal = ({ assessment, onClose }) => {
 const AdminLoginInUserPage = () => {
   const router = useRouter();
 
+  const pathname = usePathname();
+  
+
   // States for API Params
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("today");
@@ -315,10 +318,13 @@ const AdminLoginInUserPage = () => {
             />
           </div>
         </div>
-
-        {/* ── ONLY CHANGE: onClick added for redirect ── */}
+{/* ── ONLY CHANGE: onClick updated to target base path ── */}
         <button
-          onClick={() => router.push("/super-admin/newuser")}
+          onClick={() => {
+            // Check if user is super-admin or admin, and route to the correct base path
+            const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
+            router.push(`${basePath}/newuser`);
+          }}
           className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" />

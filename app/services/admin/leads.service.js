@@ -78,3 +78,43 @@ export const addCustomerActivity = async (userId, payload) => {
     };
   }
 };
+
+
+export const updateCustomerActivity = async (userId, activityId, payload) => {
+  try {
+    const response = await api.patch(`${Constants.urlEndPoints.CUSTOMER_ACTIVITY}/${userId}/${activityId}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating activity:", error);
+    return { 
+      success: false, 
+      message: error?.response?.data?.message || "Failed to update activity status" 
+    };
+  }
+};
+
+
+// ✅ Create New Customer (Manual Entry)
+export const createCustomerProfile = async (payload) => {
+  try {
+    const response = await api.post(`/customer/manual`, payload); 
+    return response.data;
+  } catch (error) {
+    console.error("Error creating manual customer:", error);
+    return { 
+      success: false, 
+      message: error?.response?.data?.message || "Failed to create user" 
+    };
+  }
+};
+
+// ✅ Option 1 Dummy Data: Tells the UI to auto-assign the owner
+export const getAdminDropdownData = async () => {
+  return { 
+    success: true, 
+    data: { 
+      currentAdmin: { fullName: "Auto-assigned to you", _id: "auto" }, 
+      assignToDropdown: [] 
+    } 
+  };
+};
