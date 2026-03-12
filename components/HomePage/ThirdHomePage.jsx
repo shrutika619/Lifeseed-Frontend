@@ -6,31 +6,37 @@ const treatments = [
     title: "Sexual Dysfunction",
     description: "Provide compassionate support to improve intimacy and satisfaction.",
     icon: <Heart className="w-6 h-6 text-green-500" />,
+    href: "/conditionswetreat/sexual-dysfunction",
   },
   {
     title: "Erectile Dysfunction",
     description: "Offer personalized treatment to enhance performance and confidence.",
     icon: <CheckCircle className="w-6 h-6 text-green-400" />,
+    href: "/conditionswetreat/erectile-dysfunction",
   },
   {
     title: "Premature Ejaculation",
     description: "Help users manage early ejaculation and reduce stress in relationships.",
     icon: <AlertCircle className="w-6 h-6 text-yellow-400" />,
+    href: "/conditionswetreat/premature-ejaculation",
   },
   {
     title: "Delayed Ejaculation",
     description: "Explain possible causes and provide effective treatment options.",
     icon: <Clock className="w-6 h-6 text-blue-400" />,
+    href: "/conditionswetreat/delayed-ejaculation",
   },
   {
     title: "Couple Sex Problems",
     description: "Provide counseling and solutions to help couples reconnect.",
     icon: <Users className="w-6 h-6 text-pink-500" />,
+    href: "/conditionswetreat/couple-sex-problems",
   },
   {
     title: "Low Sperm Count",
     description: "Offer therapies and lifestyle advice to improve reproductive health.",
     icon: <Droplet className="w-6 h-6 text-blue-500" />,
+    href: "/conditionswetreat/low-sperm-count",
   },
 ];
 
@@ -58,7 +64,8 @@ function App() {
                 <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
                 <p className="text-sm text-gray-600 flex-grow">{item.description}</p>
                 <a
-                  href="#"
+
+                  href={item.href}
                   className="text-blue-600 text-sm font-medium mt-4 inline-flex items-center"
                 >
                   Learn More <span className="ml-1">→</span>

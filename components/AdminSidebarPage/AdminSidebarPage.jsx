@@ -40,22 +40,16 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
 
   const [activePermissions, setActivePermissions] = useState([]);
 
-  // Check if they are a super admin based on the PROP
   const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
   const basePath = isSuperAdmin ? "/super-admin" : "/admin";
 
   useEffect(() => {
-    // If they are a super admin, they get everything. No API call needed.
     if (isSuperAdmin) return;
-
-    // If Redux hasn't loaded the user ID yet, wait for it.
     if (!currentUser?._id) return;
 
     const fetchFreshPermissions = async () => {
       try {
         const res = await getAdminById(currentUser._id);
-        
-        // ✅ Use res.data.admin because your service function fixed the structure!
         if (res.success && res.data?.admin?.modulePermissions) {
           setActivePermissions(res.data.admin.modulePermissions);
         }
@@ -65,10 +59,8 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
     };
 
     fetchFreshPermissions();
-  }, [currentUser?._id, isSuperAdmin]); // Trigger the moment currentUser._id becomes available
+  }, [currentUser?._id, isSuperAdmin]);
 
-
-  // FILTER THE MENU
   const filteredMenu = menuItems.filter((item) => {
     if (isSuperAdmin) return true;
     if (item.moduleKey === "super_admin_only") return false; 
@@ -108,7 +100,12 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
       >
         {/* Logo */}
         <div className="flex items-center justify-between p-6">
-          <h1 className="text-blue-600 font-bold text-2xl">MEN10</h1>
+          <img
+            src="/Images/Logo.svg"
+            alt="MEN10 Logo"
+            className="h-20 w-auto cursor-pointer"
+            onClick={() => router.push("/")}
+          />
 
           <button
             onClick={onClose}
@@ -140,7 +137,6 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
             </button>
           ))}
 
-          {/* Show a message if admin has 0 permissions */}
           {filteredMenu.length === 0 && !isSuperAdmin && (
             <div className="text-sm text-gray-500 text-center py-4 px-2">
               Loading modules...
