@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, X, Loader2 } from 'lucide-react';
 import { getAllCities } from '@/app/services/patient/clinic.service';
-import { bookTeleconsultation } from '@/app/services/patient/appointment.service'; 
+import { bookTeleconsultation, getPatientTeleSlots } from '@/app/services/patient/appointment.service';
 import Link from "next/link";
 import { useRouter } from 'next/navigation'; 
 import { toast } from 'sonner'; 
@@ -149,7 +149,7 @@ const FreeConsultationPage = () => {
     fetchCityData();
   }, []);
 
-  // Fetch Slots when Date changes
+// Fetch Slots when Date changes
   useEffect(() => {
     const fetchSlots = async () => {
       if (!selectedDate) return;
@@ -159,25 +159,19 @@ const FreeConsultationPage = () => {
       setActiveGroupId(null);
       setTopLevelAvailabilityId(null); // Reset on date change
 
-      try {
-        const res = await api.get(`${Constants.urlEndPoints.GET_PATIENT_TELE_SLOTS}?date=${selectedDate}`);
-        console.log(res.data)
-        if (res.data.success && res.data.slotGroups) {
-          // ✅ Capture the root availability ID here
-          setTopLevelAvailabilityId(res.data.availabilityId); 
-
-          const sortedGroups = sortPeriodsChronologically(res.data.slotGroups);
-          setSlotGroups(sortedGroups);
-          setPatientLimit(res.data.patientLimit || 1);
-        } else {
-          setSlotGroups([]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch slots:", error);
+      // ✅ Use the new service function here
+      const res = await getPatientTeleSlots(selectedDate);
+      
+      if (res.success && res.slotGroups) {
+        setTopLevelAvailabilityId(res.availabilityId); 
+        const sortedGroups = sortPeriodsChronologically(res.slotGroups);
+        setSlotGroups(sortedGroups);
+        setPatientLimit(res.patientLimit || 1);
+      } else {
         setSlotGroups([]);
-      } finally {
-        setLoadingSlots(false);
       }
+      
+      setLoadingSlots(false);
     };
 
     fetchSlots();
