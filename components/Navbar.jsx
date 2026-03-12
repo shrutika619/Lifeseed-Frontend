@@ -245,8 +245,9 @@ const Navbar = () => {
                 </div>
 
                 <div className="flex flex-col items-start">
-                   <span className="text-sm font-semibold text-gray-700 max-w-[100px] truncate leading-tight">
-                     {user?.fullName || "User"}
+                   {/* ✅ Changed fallback to Complete Profile */}
+                   <span className="text-sm font-semibold text-gray-700 max-w-[120px] truncate leading-tight">
+                     {user?.fullName || "Complete Profile"} 
                    </span>
                 </div>
                 
@@ -256,7 +257,10 @@ const Navbar = () => {
               {openDropdown === "profile" && (
                 <ul className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 border border-gray-100">
                   <li className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{user?.fullName || "User"}</p>
+                    {/* ✅ Changed fallback to Complete Profile */}
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {user?.fullName || "Complete Profile"}
+                    </p>
                     <p className="text-xs text-gray-500 truncate">{user?.mobileNo || user?.email}</p>
                   </li>
                   <li>
@@ -404,8 +408,9 @@ const Navbar = () => {
                       )}
                     </div>
                     <div>
+                      {/* ✅ Changed fallback to Complete Profile */}
                       <p className="text-sm font-semibold text-gray-800 truncate max-w-[180px]">
-                        {user?.fullName || "User"}
+                        {user?.fullName || "Complete Profile"}
                       </p>
                       <p className="text-xs text-gray-500 truncate max-w-[180px]">
                         {user?.mobileNo || user?.email}

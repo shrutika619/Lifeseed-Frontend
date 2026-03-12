@@ -68,6 +68,8 @@ export class Constants {
     GET_SUPER_SPECIALIZATIONS: `/master/super-specializations`,
     GET_PRIMARY_SPECIALTIES: `/master/primary-specialties`,
     
+
+
     //--- PATIENT ---
     SAVE_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile/save`,
     GET_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile`,
@@ -83,7 +85,10 @@ export class Constants {
     GET_CLINIC_DOCTORS: `${this.API_BASE_URL}/clinicDoctor`,
     GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/appoinntmentslot`, 
     
-    GET_PATIENT_TELE_SLOTS: "/teleconsultation/slots",
+    GET_PATIENT_TELE_SLOTS: `${this.API_BASE_URL}/teleconsultation/slots`,
+
+    // -- APPOINTMENT BOOKING --
+    BOOK_TELECONSULTATION: `${this.API_BASE_URL}/appoinntmentBooking/teleconsultation`,
     
     GET_CLINICS: `${this.API_BASE_URL}/public/clinics`,
     GET_CLINICS_city: `${this.API_BASE_URL}/cities`,

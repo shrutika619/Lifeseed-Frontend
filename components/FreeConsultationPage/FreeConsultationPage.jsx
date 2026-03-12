@@ -2,9 +2,20 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, X, Loader2 } from 'lucide-react';
 import { getAllCities } from '@/app/services/patient/clinic.service';
+import { bookTeleconsultation } from '@/app/services/patient/appointment.service'; 
 import Link from "next/link";
+import { useRouter } from 'next/navigation'; 
+import { toast } from 'sonner'; 
 import api from "@/lib/axios"; 
 import { Constants } from "@/app/utils/constants"; 
+
+// ✅ Imported Redux Hooks & Actions
+import { useSelector, useDispatch } from "react-redux";
+import { 
+  selectUser, 
+  selectIsAuthenticated, 
+  fetchProfileDetails 
+} from "@/redux/slices/authSlice";
 
 // Helper to generate the next 3 days dynamically
 const generateUpcomingDates = (numDays = 3) => {
@@ -22,13 +33,13 @@ const generateUpcomingDates = (numDays = 3) => {
   return dates;
 };
 
-// ✅ HELPER: Sort periods chronologically starting at midnight
+// Sort periods chronologically starting at midnight
 const sortPeriodsChronologically = (groups) => {
   const orderMap = {
-    night: 1,      // 12:00 AM - 6:00 AM
-    morning: 2,    // 6:00 AM - 12:00 PM
-    afternoon: 3,  // 12:00 PM - 6:00 PM
-    evening: 4     // 6:00 PM - 12:00 AM
+    night: 1,      
+    morning: 2,    
+    afternoon: 3,  
+    evening: 4     
   };
 
   return [...groups].sort((a, b) => {
@@ -37,6 +48,13 @@ const sortPeriodsChronologically = (groups) => {
 };
 
 const FreeConsultationPage = () => {
+  const router = useRouter(); 
+  const dispatch = useDispatch();
+
+  // ✅ Read Auth State from Redux
+  const user = useSelector(selectUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+
   // Dynamic Date & Slot States
   const [availableDates, setAvailableDates] = useState(generateUpcomingDates());
   const [selectedDate, setSelectedDate] = useState(availableDates[0].fullDate);
@@ -44,6 +62,13 @@ const FreeConsultationPage = () => {
   const [patientLimit, setPatientLimit] = useState(1);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null); 
+  const [activeGroupId, setActiveGroupId] = useState(null); 
+  const [topLevelAvailabilityId, setTopLevelAvailabilityId] = useState(null); // ✅ Added state to hold the root ID
+
+  // Auth & Profile States
+  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const [fetchingProfile, setFetchingProfile] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false); // Prevents overwriting user inputs
 
   // Form States
   const [gender, setGender] = useState('');
@@ -55,6 +80,7 @@ const FreeConsultationPage = () => {
   const [showCityPopup, setShowCityPopup] = useState(false);
   const [activeTab, setActiveTab] = useState('online');
   const [isBooked, setIsBooked] = useState(false);
+  const [isBooking, setIsBooking] = useState(false); 
   const [bookingData, setBookingData] = useState(null);
   const [clinicLinks, setClinicLinks] = useState({});
 
@@ -66,6 +92,39 @@ const FreeConsultationPage = () => {
     'Couple Sex Problem',
     'Other'
   ];
+
+  // ✅ SYNC PROFILE FROM REDUX
+  useEffect(() => {
+    const loadProfile = async () => {
+      // 1. If completely logged out
+      if (!isAuthenticated) {
+        setIsLoggedIn(false);
+        setFetchingProfile(false);
+        return;
+      }
+
+      setIsLoggedIn(true);
+
+      // 2. If logged in but Redux hasn't fetched the profile data yet
+      if (!user?.fullName && !profileLoaded) {
+        setFetchingProfile(true);
+        await dispatch(fetchProfileDetails());
+        setFetchingProfile(false);
+      } 
+      
+      // 3. If Redux has the data, auto-fill the form (only once)
+      if (user && !profileLoaded) {
+        if (user.fullName) setFullName(user.fullName);
+        if (user.age) setAge(user.age.toString());
+        if (user.gender) setGender(user.gender.toLowerCase());
+        
+        setProfileLoaded(true); // Mark loaded so we don't wipe out user edits later
+        setFetchingProfile(false);
+      }
+    };
+
+    loadProfile();
+  }, [isAuthenticated, user, dispatch, profileLoaded]);
 
   // Fetch Cities 
   useEffect(() => {
@@ -97,14 +156,17 @@ const FreeConsultationPage = () => {
       
       setLoadingSlots(true);
       setSelectedSlot(null); 
+      setActiveGroupId(null);
+      setTopLevelAvailabilityId(null); // Reset on date change
 
       try {
         const res = await api.get(`${Constants.urlEndPoints.GET_PATIENT_TELE_SLOTS}?date=${selectedDate}`);
+        console.log(res.data)
         if (res.data.success && res.data.slotGroups) {
-          
-          // ✅ Sort the groups so Night is always first
+          // ✅ Capture the root availability ID here
+          setTopLevelAvailabilityId(res.data.availabilityId); 
+
           const sortedGroups = sortPeriodsChronologically(res.data.slotGroups);
-          
           setSlotGroups(sortedGroups);
           setPatientLimit(res.data.patientLimit || 1);
         } else {
@@ -121,39 +183,71 @@ const FreeConsultationPage = () => {
     fetchSlots();
   }, [selectedDate]);
 
-  const handleBooking = () => {
-    if (!selectedSlot || !fullName || !age || !gender || !concern) {
-      alert("Please fill all details and select a time slot.");
+  // ✅ BOOKING HANDLER
+  const handleBooking = async () => {
+    // 1. Redirect if not logged in
+    if (!isLoggedIn) {
+      router.push('/login?from=/free-consultation'); 
       return;
     }
 
-    const displayDate = new Date(selectedDate).toLocaleDateString('en-US', { 
-      month: 'long', day: 'numeric', year: 'numeric' 
-    });
+    // 2. Validate details
+    if (!selectedSlot || !activeGroupId || !fullName || !age || !gender || !concern) {
+      toast.error("Please fill all details and select a time slot."); 
+      return;
+    }
 
-    const data = {
-      orderId: 'TC' + Math.floor(Math.random() * 10000), 
-      date: displayDate,
-      time: selectedSlot.time,
-      name: fullName,
-      age: age,
-      gender: gender,
-      concern: concern
+    setIsBooking(true);
+
+    // ✅ Fixed Payload mapping
+    const payload = {
+      availabilityId: topLevelAvailabilityId, // Taken from the root of API response
+      slotGroupId: activeGroupId,             // Set when clicking a slot
+      slotId: selectedSlot._id                // The ID of the slot itself
     };
+
+    const res = await bookTeleconsultation(payload);
+
+    console.log(res)
+
+    // Fallback if session expired mid-booking
+    if (res.message?.toLowerCase().includes("unauthorized") || res.statusCode === 401) {
+       router.push('/login?from=/free-consultation');
+       return;
+    }
+
+    if (res.success || res.message === "Teleconsultation slot booked successfully") {
+      const responseData = res.data;
+      
+      const displayDate = new Date(responseData.date).toLocaleDateString('en-US', { 
+        month: 'long', day: 'numeric', year: 'numeric' 
+      });
+
+      setBookingData({
+        orderId: responseData.appointmentId, 
+        date: displayDate,
+        time: responseData.timeSlot,
+        name: fullName,
+        age: age,
+        gender: gender,
+        concern: concern
+      });
+      
+      setIsBooked(true);
+    } else {
+      toast.error(res.message || "Something went wrong while booking. Please try again.");
+    }
     
-    setBookingData(data);
-    setIsBooked(true);
+    setIsBooking(false);
   };
 
   const handleCancelAppointment = () => {
     setIsBooked(false);
     setBookingData(null);
-    setFullName('');
-    setAge('');
-    setGender('');
-    setConcern('');
+    setConcern(''); // Keep name, age, and gender populated in case they re-book
     setSelectedDate(availableDates[0].fullDate);
     setSelectedSlot(null);
+    setActiveGroupId(null);
   };
 
   const handleTabClick = (tab) => {
@@ -259,7 +353,7 @@ const FreeConsultationPage = () => {
                   onClick={handleCancelAppointment}
                   className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition"
                 >
-                  Cancel Appointment
+                  Book Another Slot
                 </button>
               </div>
             </div>
@@ -269,7 +363,6 @@ const FreeConsultationPage = () => {
     );
   }
 
-  // Active slot groups that actually contain slots
   const activeGroups = slotGroups.filter(g => g.slots && g.slots.length > 0);
 
   return (
@@ -316,7 +409,14 @@ const FreeConsultationPage = () => {
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Left Section - Your Details */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-lg shadow-sm p-6 relative">
+            
+            {fetchingProfile && (
+               <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+               </div>
+            )}
+
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Consulting Expert</h2>
             
             {/* Doctor Card */}
@@ -335,7 +435,6 @@ const FreeConsultationPage = () => {
 
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Details</h2>
             
-            {/* Full Name */}
             <div className="mb-4">
               <label className="block text-sm text-gray-600 mb-2">Full Name</label>
               <input 
@@ -347,7 +446,6 @@ const FreeConsultationPage = () => {
               />
             </div>
 
-            {/* Age and Gender */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm text-gray-600 mb-2">Age</label>
@@ -374,7 +472,6 @@ const FreeConsultationPage = () => {
               </div>
             </div>
 
-            {/* Concerns */}
             <div className="mb-4">
               <label className="block text-sm text-gray-600 mb-2">What are you concerned about?</label>
               <div className="grid grid-cols-2 gap-2">
@@ -399,7 +496,6 @@ const FreeConsultationPage = () => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Date & Time</h2>
             
-            {/* Dynamic Date Selection */}
             <div className="mb-6">
               <label className="block text-sm text-gray-600 mb-3">Select a Date</label>
               <div className="grid grid-cols-7 gap-2">
@@ -422,7 +518,6 @@ const FreeConsultationPage = () => {
               </div>
             </div>
 
-            {/* Dynamic Time Selection from API */}
             <div className="min-h-[250px]">
               <label className="block text-sm text-gray-600 mb-3">Select a Time Slot</label>
               
@@ -438,9 +533,8 @@ const FreeConsultationPage = () => {
                 </div>
               ) : (
                 <div className="space-y-5">
-                  {/* ✅ Mapped using the newly sorted array */}
                   {activeGroups.map((group) => (
-                    <div key={group.period}>
+                    <div key={group._id || group.period}>
                       <p className="text-xs font-semibold text-gray-500 mb-2 capitalize tracking-wide">
                         {group.period}
                       </p>
@@ -454,7 +548,10 @@ const FreeConsultationPage = () => {
                             <button
                               key={slot._id}
                               disabled={!isBookable}
-                              onClick={() => setSelectedSlot(slot)}
+                              onClick={() => {
+                                setSelectedSlot(slot);
+                                setActiveGroupId(group._id); // ✅ Save Group ID
+                              }}
                               className={`
                                 py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
                                 ${isSelected 
@@ -482,18 +579,26 @@ const FreeConsultationPage = () => {
         </div>
 
         {/* Book Button */}
-        <div className="text-center mt-8">
+        <div className="text-center mt-8 flex justify-center">
           <button 
             onClick={handleBooking}
-            disabled={!selectedSlot}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-12 py-4 rounded-xl shadow-lg transition-all transform active:scale-95"
+            disabled={isBooking}
+            className={`flex items-center justify-center min-w-[320px] gap-2 text-white font-semibold px-12 py-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
+              !selectedSlot ? 'bg-gray-400 hover:bg-gray-500' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
-            {selectedSlot ? 'Confirm & Book Free Consultation' : 'Select a Slot to Book'}
+            {isBooking ? (
+              <><Loader2 className="w-5 h-5 animate-spin" /> Booking...</>
+            ) : selectedSlot ? (
+              'Confirm & Book Free Consultation'
+            ) : (
+              'Select a Slot to Book'
+            )}
           </button>
         </div>
       </div>
 
-      {/* City Selection Popup (Unchanged) */}
+      {/* City Selection Popup */}
       {showCityPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden">
