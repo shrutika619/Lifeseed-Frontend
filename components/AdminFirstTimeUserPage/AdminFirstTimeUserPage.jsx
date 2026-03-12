@@ -165,7 +165,7 @@ const AssessmentModal = ({ assessment, onClose }) => {
 const AdminFirstTimeUserPage = () => {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDate, setSelectedDate] = useState("today");
+  const [selectedDate, setSelectedDate] = useState(""); 
 
   const [leads, setLeads] = useState([]);
   const [totalNew, setTotalNew] = useState(0);
@@ -226,9 +226,10 @@ const AdminFirstTimeUserPage = () => {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-              <option>Today</option>
-              <option>Yesterday</option>
-              <option>Last 7 Days</option>
+              <option value="">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
