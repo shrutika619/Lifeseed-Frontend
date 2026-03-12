@@ -11,15 +11,14 @@ import {
   ScrollText,
   Users,
   X,
-  Truck, // Added for Delivery Manager
-  UserCheck // Added for Login Users
+  Truck, 
+  UserCheck 
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 import { selectUser } from "@/redux/slices/authSlice";
 import { getAdminById } from "@/app/services/admin/adminUsers.service";
 
-// ✅ UPDATED: Aligned exactly with APP_MODULES keys
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "dashboard", moduleKey: "dashboard" },
   { label: "First Time User", icon: MessageSquare, path: "first-time-user", moduleKey: "first_time" },
@@ -39,49 +38,41 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
 
   const currentUser = useSelector(selectUser);
 
-  const [activePermissions, setActivePermissions] = useState(currentUser?.modulePermissions || []);
+  const [activePermissions, setActivePermissions] = useState([]);
+
+  // Check if they are a super admin based on the PROP
+  const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
+  const basePath = isSuperAdmin ? "/super-admin" : "/admin";
 
   useEffect(() => {
-    // Super Admins don't need to fetch permissions to filter the sidebar
-    if (role === "SUPER_ADMIN" || role === "super_admin") return;
+    // If they are a super admin, they get everything. No API call needed.
+    if (isSuperAdmin) return;
+
+    // If Redux hasn't loaded the user ID yet, wait for it.
+    if (!currentUser?._id) return;
 
     const fetchFreshPermissions = async () => {
-      if (currentUser?._id) {
-        try {
-          const res = await getAdminById(currentUser._id);
-          if (res.success) {
-            const fetchedPermissions = res.data?.admin?.modulePermissions || [];
-            setActivePermissions(fetchedPermissions);
-          }
-        } catch (error) {
-          console.error("Failed to fetch fresh permissions", error);
+      try {
+        const res = await getAdminById(currentUser._id);
+        
+        // ✅ Use res.data.admin because your service function fixed the structure!
+        if (res.success && res.data?.admin?.modulePermissions) {
+          setActivePermissions(res.data.admin.modulePermissions);
         }
+      } catch (error) {
+        console.error("Failed to fetch fresh permissions", error);
       }
     };
 
     fetchFreshPermissions();
-  }, [currentUser?._id, role]);
+  }, [currentUser?._id, isSuperAdmin]); // Trigger the moment currentUser._id becomes available
 
 
-  // BASE PATH
-  const basePath = role === "SUPER_ADMIN" || role === "super_admin" ? "/super-admin" : "/admin";
-
-  // Role & Permission based filtering
+  // FILTER THE MENU
   const filteredMenu = menuItems.filter((item) => {
-    // 1. Super Admins see everything
-    if (role === "SUPER_ADMIN" || role === "super_admin") {
-      return true;
-    }
-
-    // 2. Standard Admins only see what is in their API permissions array
-    if (role === "ADMIN" || role === "admin") {
-      // If you want certain items to ALWAYS be hidden from standard admins regardless of DB:
-      if (item.moduleKey === "super_admin_only") return false; 
-      
-      return activePermissions.includes(item.moduleKey);
-    }
-
-    return false;
+    if (isSuperAdmin) return true;
+    if (item.moduleKey === "super_admin_only") return false; 
+    return activePermissions.includes(item.moduleKey);
   });
 
   const handleNavigation = (path) => {
@@ -150,9 +141,9 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
           ))}
 
           {/* Show a message if admin has 0 permissions */}
-          {filteredMenu.length === 0 && (
+          {filteredMenu.length === 0 && !isSuperAdmin && (
             <div className="text-sm text-gray-500 text-center py-4 px-2">
-              No modules assigned. Please contact Super Admin.
+              Loading modules...
             </div>
           )}
         </nav>

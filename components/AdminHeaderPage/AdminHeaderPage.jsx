@@ -28,7 +28,7 @@ const AdminHeaderPage = ({
   const userRole = useSelector(selectUserRole);
 
   // ✅ Dynamically determine what to display based on Role & Data
-  const displayName = currentUser?.profile?.fullName || currentUser?.username || "Super Admin";
+  const displayName = currentUser?.username || "Super Admin";
   const displayPhone = currentUser?.mobileNo || "9999999999";
   const displayRole = userRole === "super_admin" || userRole === "SUPER_ADMIN" ? "Super Admin" : "Admin";
 

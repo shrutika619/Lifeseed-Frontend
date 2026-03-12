@@ -4,8 +4,15 @@ import { useState } from "react";
 import AdminSidebarPage from "@/components/AdminSidebarPage/AdminSidebarPage";
 import AdminHeaderPage from "@/components/AdminHeaderPage/AdminHeaderPage";
 
+// ✅ 1. Import Redux Hooks
+import { useSelector } from "react-redux";
+import { selectUser } from "@/redux/slices/authSlice";
+
 export default function AdminLayout({ children }) {
-  const role = "ADMIN"; // later auth / context se
+  const currentUser = useSelector(selectUser);
+  
+  const role = currentUser?.role || "amin"; 
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -29,7 +36,7 @@ export default function AdminLayout({ children }) {
         `}
       >
         <AdminSidebarPage
-          role={role}
+          role={role} 
           isMobileOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
@@ -40,7 +47,7 @@ export default function AdminLayout({ children }) {
 
         {/* HEADER (TOP) */}
         <AdminHeaderPage
-          role={role}
+          role={role} 
           onMenuToggle={() => setIsSidebarOpen(true)}
         />
 
