@@ -1,13 +1,14 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation"; 
+import { useRouter, useSearchParams } from "next/navigation"; 
 import { useDispatch, useSelector } from "react-redux"; 
-// ✅ Import Redux Selectors
 import { logoutSuccess, selectUser, selectUserRole } from "@/redux/slices/authSlice"; 
 import { toast } from "sonner"; 
-import { Bell, Menu, User, LogOut, ChevronDown, ShieldCheck } from "lucide-react";
+import { Bell, Menu, LogOut, ChevronDown, ShieldCheck } from "lucide-react";
 
 import { logoutUser } from "@/app/services/auth/auth.service"; 
+// ✅ Import the API service
+import { getAdminById } from "@/app/services/admin/adminUsers.service";
 
 const AdminHeaderPage = ({ 
   title = "Dashboard", 
@@ -18,19 +19,50 @@ const AdminHeaderPage = ({
   onNotificationClick
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [fetchedAdminData, setFetchedAdminData] = useState(null); // ✅ State to store API data
   const dropdownRef = useRef(null);
   
   const router = useRouter();
   const dispatch = useDispatch();
+  
+  const searchParams = useSearchParams();
+  const adminId = searchParams.get("adminId");
 
-  // ✅ Pull current user data from Redux
   const currentUser = useSelector(selectUser);
   const userRole = useSelector(selectUserRole);
+  
+  const isSuperAdmin = userRole === "super_admin" || userRole === "SUPER_ADMIN";
 
-  // ✅ Dynamically determine what to display based on Role & Data
-  const displayName = currentUser?.username || "Super Admin";
-  const displayPhone = currentUser?.mobileNo || "9999999999";
-  const displayRole = userRole === "super_admin" || userRole === "SUPER_ADMIN" ? "Super Admin" : "Admin";
+  // ✅ Fetch Admin Details using the ID from the URL
+  useEffect(() => {
+    // Super admins don't have the param, so skip fetching for them
+    if (isSuperAdmin || !adminId) return;
+
+    const fetchAdminDetails = async () => {
+      try {
+        const res = await getAdminById(adminId);
+        if (res.success && res.data?.admin) {
+          setFetchedAdminData(res.data.admin);
+        }
+      } catch (error) {
+        console.error("Failed to fetch admin details for header:", error);
+      }
+    };
+
+    fetchAdminDetails();
+  }, [adminId, isSuperAdmin]);
+
+  // ✅ Dynamically determine what to display
+  // Prioritize Fetched Data -> Fallback to Redux -> Fallback to Defaults
+  const displayName = isSuperAdmin 
+    ? currentUser?.username || "Super Admin"
+    : fetchedAdminData?.profile?.fullName || fetchedAdminData?.username || currentUser?.username || "Admin";
+
+  const displayPhone = isSuperAdmin
+    ? currentUser?.mobileNo || "9999999999"
+    : fetchedAdminData?.mobileNo || currentUser?.mobileNo || "9999999999";
+
+  const displayRole = isSuperAdmin ? "Super Admin" : "Admin";
 
   const handleMenuClick = () => {
     if (onMenuToggle) {
@@ -121,7 +153,7 @@ const AdminHeaderPage = ({
               onClick={toggleDropdown}
               className="flex items-center gap-2 hover:bg-gray-50 rounded-lg transition-colors p-1"
             >
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white ${userRole === 'super_admin' ? 'bg-indigo-600' : 'bg-blue-600'}`}>
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base text-white ${isSuperAdmin ? 'bg-indigo-600' : 'bg-blue-600'}`}>
                 {displayName.charAt(0).toUpperCase()}
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform hidden sm:block ${isDropdownOpen ? 'rotate-180' : ''}`} />
@@ -134,26 +166,18 @@ const AdminHeaderPage = ({
                 <div className="px-4 py-4 border-b border-gray-100">
                   <div className="flex items-center gap-2 mb-1">
                     <h2 className="text-sm font-bold text-gray-800 truncate">{displayName}</h2>
-                    {userRole === 'super_admin' && (
+                    {isSuperAdmin && (
                       <ShieldCheck className="w-4 h-4 text-indigo-500 flex-shrink-0" />
                     )}
                   </div>
                   <p className="text-xs text-gray-500 font-medium">{displayPhone}</p>
-                  <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${userRole === 'super_admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                  <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isSuperAdmin ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
                     {displayRole}
                   </span>
                 </div>
 
                 {/* Menu Items */}
                 <div className="py-1">
-                  {/* <button
-                    onClick={handleProfileClick}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <User className="w-4 h-4 text-gray-500" />
-                    <span>My Profile</span>
-                  </button> */}
-
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"

@@ -3,16 +3,12 @@
 import { useState } from "react";
 import AdminSidebarPage from "@/components/AdminSidebarPage/AdminSidebarPage";
 import AdminHeaderPage from "@/components/AdminHeaderPage/AdminHeaderPage";
-
-// ✅ 1. Import Redux Hooks
 import { useSelector } from "react-redux";
 import { selectUser } from "@/redux/slices/authSlice";
 
 export default function AdminLayout({ children }) {
   const currentUser = useSelector(selectUser);
-  
-  const role = currentUser?.role || "amin"; 
-
+  const role = currentUser?.role?.toLowerCase() || "admin"; 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -27,7 +23,6 @@ export default function AdminLayout({ children }) {
       )}
 
       {/* SIDEBAR */}
-      {/* On mobile: fixed overlay, slides in/out. On desktop: static in flow. */}
       <div
         className={`
           fixed top-0 left-0 h-full z-30 transition-transform duration-300 ease-in-out
@@ -36,7 +31,7 @@ export default function AdminLayout({ children }) {
         `}
       >
         <AdminSidebarPage
-          role={role} 
+          role={role} // ✅ Passes dynamic role instantly
           isMobileOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
@@ -47,7 +42,7 @@ export default function AdminLayout({ children }) {
 
         {/* HEADER (TOP) */}
         <AdminHeaderPage
-          role={role} 
+          role={role} // ✅ Passes dynamic role instantly
           onMenuToggle={() => setIsSidebarOpen(true)}
         />
 

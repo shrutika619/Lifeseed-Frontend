@@ -12,11 +12,10 @@ import {
   Users,
   X,
   Truck, 
-  UserCheck 
+  UserCheck,
+  Loader2 
 } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
-import { useSelector } from "react-redux";
-import { selectUser } from "@/redux/slices/authSlice";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { getAdminById } from "@/app/services/admin/adminUsers.service";
 
 const menuItems = [
@@ -35,31 +34,44 @@ const menuItems = [
 const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   const router = useRouter();
   const pathname = usePathname();
-
-  const currentUser = useSelector(selectUser);
+  
+  const searchParams = useSearchParams();
+  const adminId = searchParams.get("adminId");
 
   const [activePermissions, setActivePermissions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true); 
 
   const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
   const basePath = isSuperAdmin ? "/super-admin" : "/admin";
 
   useEffect(() => {
-    if (isSuperAdmin) return;
-    if (!currentUser?._id) return;
+    if (isSuperAdmin) {
+      setIsLoading(false);
+      return;
+    }
 
-    const fetchFreshPermissions = async () => {
+    if (!adminId) {
+      setIsLoading(true);
+      return; 
+    }
+
+    const fetchPermissions = async () => {
+      setIsLoading(true);
       try {
-        const res = await getAdminById(currentUser._id);
+        const res = await getAdminById(adminId);
+        
         if (res.success && res.data?.admin?.modulePermissions) {
           setActivePermissions(res.data.admin.modulePermissions);
         }
       } catch (error) {
-        console.error("Failed to fetch fresh permissions", error);
+        console.error("Failed to fetch permissions via URL param", error);
+      } finally {
+        setIsLoading(false); 
       }
     };
 
-    fetchFreshPermissions();
-  }, [currentUser?._id, isSuperAdmin]);
+    fetchPermissions();
+  }, [adminId, isSuperAdmin]); 
 
   const filteredMenu = menuItems.filter((item) => {
     if (isSuperAdmin) return true;
@@ -68,7 +80,12 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   });
 
   const handleNavigation = (path) => {
-    router.push(`${basePath}/${path}`);
+    // ✅ Keep URL clean for Super Admin, append param for regular Admin
+    const dest = (!isSuperAdmin && adminId) 
+      ? `${basePath}/${path}?adminId=${adminId}` 
+      : `${basePath}/${path}`;
+      
+    router.push(dest);
     onClose?.();
   };
 
@@ -76,29 +93,18 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile Backdrop */}
       {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
-          fixed lg:sticky
-          top-0 left-0
-          h-screen w-72
-          bg-white border-r border-gray-200
-          z-50
+          fixed lg:sticky top-0 left-0 h-screen w-72 bg-white border-r border-gray-200 z-50
           transform transition-transform duration-300 ease-in-out
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0
-          overflow-y-auto
+          lg:translate-x-0 overflow-y-auto flex flex-col
         `}
       >
-        {/* Logo */}
         <div className="flex items-center justify-between p-6">
           <img
             src="/Images/Logo.svg"
@@ -116,31 +122,35 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-3">
-          {filteredMenu.map(({ label, icon: Icon, path }) => (
-            <button
-              key={label}
-              onClick={() => handleNavigation(path)}
-              className={`
-                w-full flex items-center gap-6 px-4 py-3.5 rounded-lg text-left
-                transition-all duration-200 font-medium
-                ${
-                  isActive(path)
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-800 hover:bg-blue-50 hover:text-blue-600"
-                }
-              `}
-            >
-              <Icon className="w-5 h-5" />
-              <span>{label}</span>
-            </button>
-          ))}
-
-          {filteredMenu.length === 0 && !isSuperAdmin && (
-            <div className="text-sm text-gray-500 text-center py-4 px-2">
-              Loading modules...
+        <nav className="p-4 space-y-3 flex-1">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+              <span className="text-sm font-medium">Verifying Access...</span>
             </div>
+          ) : (
+            <>
+              {filteredMenu.map(({ label, icon: Icon, path }) => (
+                <button
+                  key={label}
+                  onClick={() => handleNavigation(path)}
+                  className={`
+                    w-full flex items-center gap-6 px-4 py-3.5 rounded-lg text-left
+                    transition-all duration-200 font-medium
+                    ${isActive(path) ? "bg-blue-100 text-blue-700" : "text-gray-800 hover:bg-blue-50 hover:text-blue-600"}
+                  `}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{label}</span>
+                </button>
+              ))}
+
+              {filteredMenu.length === 0 && !isSuperAdmin && (
+                <div className="text-sm text-gray-500 text-center py-4 px-2 bg-gray-50 rounded-lg border border-gray-100">
+                  No modules assigned. Please contact Super Admin.
+                </div>
+              )}
+            </>
           )}
         </nav>
       </aside>
