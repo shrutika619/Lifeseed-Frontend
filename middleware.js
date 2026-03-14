@@ -108,7 +108,7 @@ export async function middleware(request) {
        // ⛔ UNAUTHORIZED ACCESS ATTEMPT
        // Redirect them to their appropriate home to stop them
        if (ROLES.CLINIC.includes(userRole)) return NextResponse.redirect(new URL('/hospitaldashboard', request.url));
-       if (userRole === 'patient') return NextResponse.redirect(new URL('/dashboard', request.url));
+       if (userRole === 'patient') return NextResponse.redirect(new URL('/', request.url));
        
        return NextResponse.redirect(new URL('/', request.url)); // Fallback
     }

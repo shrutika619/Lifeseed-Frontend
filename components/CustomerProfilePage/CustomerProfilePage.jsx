@@ -144,7 +144,9 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
               className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${field.disabled ? 'opacity-60 cursor-not-allowed bg-gray-100 text-slate-500 font-bold' : 'focus:border-blue-500'}`}
             >
               <option value="" disabled>Select...</option>
-              {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+              {[...new Set(field.options)].map((o, index) => (
+                <option key={`${o}-${index}`} value={o}>{o}</option>
+              ))}
               {!field.options.includes(currentValue) && currentValue && (
                 <option value={currentValue}>{currentValue}</option>
               )}

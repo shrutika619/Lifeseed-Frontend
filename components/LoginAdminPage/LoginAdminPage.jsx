@@ -24,19 +24,13 @@ const LoginAdminPage = () => {
   const [loginMode, setLoginMode] = useState("ADMIN"); 
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ 1. Auto-Redirect: Append adminId ONLY for regular admin
+  // ✅ 1. Auto-Redirect: Clean URLs for everyone
   useEffect(() => {
     if (isAuthenticated && (userRole === 'admin' || userRole === 'super_admin')) {
-      const adminId = currentUser?.id || currentUser?._id || "";
-      
-      // Super Admin gets a clean URL
-      const dest = userRole === 'super_admin' 
-        ? '/super-admin/dashboard' 
-        : `/admin/dashboard?adminId=${adminId}`;
-        
+      const dest = userRole === 'super_admin' ? '/super-admin/dashboard' : '/admin/dashboard';
       router.replace(dest);
     }
-  }, [isAuthenticated, userRole, currentUser, router]);
+  }, [isAuthenticated, userRole, router]);    
 
   const handleLogout = async () => {
     await logoutUser();
@@ -94,21 +88,22 @@ const LoginAdminPage = () => {
 
     if (result.success) {
       const { accessToken, user } = result.data;
-      const adminId = user.id || user._id;
 
+      // ✅ Saves user object (INCLUDING modulePermissions!) directly to Redux
       dispatch(setCredentials({ 
         accessToken, 
         user, 
-        role: user.role 
+        role: user.role ,
+        // modulePermissions: user.modulePermissions
       }));
 
       toast.success(`Welcome back, ${user.username || 'Admin'}`);
 
-      // ✅ 2. Manual Login Redirect: Clean URL for Super Admin
+      // ✅ 2. Clean routing! No more URL parameters needed.
       if (user.role === 'super_admin') {
         router.push('/super-admin/dashboard');
       } else {
-        router.push(`/admin/dashboard?adminId=${adminId}`);
+        router.push('/admin/dashboard');
       }
     } else {
       toast.error(result.message);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -12,11 +12,11 @@ import {
   Users,
   X,
   Truck, 
-  UserCheck,
-  Loader2 
+  UserCheck
 } from "lucide-react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { getAdminById } from "@/app/services/admin/adminUsers.service";
+import { useRouter, usePathname } from "next/navigation";
+import { useSelector } from "react-redux";
+import { selectUser } from "@/redux/slices/authSlice";
 
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "dashboard", moduleKey: "dashboard" },
@@ -35,44 +35,14 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   const router = useRouter();
   const pathname = usePathname();
   
-  const searchParams = useSearchParams();
-  const adminId = searchParams.get("adminId");
-
-  const [activePermissions, setActivePermissions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); 
+  // 1. Instantly grab user and permissions from Redux
+  const currentUser = useSelector(selectUser);
+  const activePermissions = currentUser?.modulePermissions || [];
 
   const isSuperAdmin = role === "SUPER_ADMIN" || role === "super_admin";
   const basePath = isSuperAdmin ? "/super-admin" : "/admin";
 
-  useEffect(() => {
-    if (isSuperAdmin) {
-      setIsLoading(false);
-      return;
-    }
-
-    if (!adminId) {
-      setIsLoading(true);
-      return; 
-    }
-
-    const fetchPermissions = async () => {
-      setIsLoading(true);
-      try {
-        const res = await getAdminById(adminId);
-        
-        if (res.success && res.data?.admin?.modulePermissions) {
-          setActivePermissions(res.data.admin.modulePermissions);
-        }
-      } catch (error) {
-        console.error("Failed to fetch permissions via URL param", error);
-      } finally {
-        setIsLoading(false); 
-      }
-    };
-
-    fetchPermissions();
-  }, [adminId, isSuperAdmin]); 
-
+  // 2. Instantly filter the menu
   const filteredMenu = menuItems.filter((item) => {
     if (isSuperAdmin) return true;
     if (item.moduleKey === "super_admin_only") return false; 
@@ -80,12 +50,7 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
   });
 
   const handleNavigation = (path) => {
-    // ✅ Keep URL clean for Super Admin, append param for regular Admin
-    const dest = (!isSuperAdmin && adminId) 
-      ? `${basePath}/${path}?adminId=${adminId}` 
-      : `${basePath}/${path}`;
-      
-    router.push(dest);
+    router.push(`${basePath}/${path}`);
     onClose?.();
   };
 
@@ -112,45 +77,31 @@ const AdminSidebarPage = ({ role = "SUPER_ADMIN", isMobileOpen, onClose }) => {
             className="h-20 w-auto cursor-pointer"
             onClick={() => router.push("/")}
           />
-
-          <button
-            onClick={onClose}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
-            aria-label="Close sidebar"
-          >
+          <button onClick={onClose} className="lg:hidden p-2 rounded-lg hover:bg-gray-100">
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
 
         <nav className="p-4 space-y-3 flex-1">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-              <span className="text-sm font-medium">Verifying Access...</span>
-            </div>
-          ) : (
-            <>
-              {filteredMenu.map(({ label, icon: Icon, path }) => (
-                <button
-                  key={label}
-                  onClick={() => handleNavigation(path)}
-                  className={`
-                    w-full flex items-center gap-6 px-4 py-3.5 rounded-lg text-left
-                    transition-all duration-200 font-medium
-                    ${isActive(path) ? "bg-blue-100 text-blue-700" : "text-gray-800 hover:bg-blue-50 hover:text-blue-600"}
-                  `}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{label}</span>
-                </button>
-              ))}
+          {filteredMenu.map(({ label, icon: Icon, path }) => (
+            <button
+              key={label}
+              onClick={() => handleNavigation(path)}
+              className={`
+                w-full flex items-center gap-6 px-4 py-3.5 rounded-lg text-left
+                transition-all duration-200 font-medium
+                ${isActive(path) ? "bg-blue-100 text-blue-700" : "text-gray-800 hover:bg-blue-50 hover:text-blue-600"}
+              `}
+            >
+              <Icon className="w-5 h-5" />
+              <span>{label}</span>
+            </button>
+          ))}
 
-              {filteredMenu.length === 0 && !isSuperAdmin && (
-                <div className="text-sm text-gray-500 text-center py-4 px-2 bg-gray-50 rounded-lg border border-gray-100">
-                  No modules assigned. Please contact Super Admin.
-                </div>
-              )}
-            </>
+          {filteredMenu.length === 0 && !isSuperAdmin && (
+            <div className="text-sm text-gray-500 text-center py-4 px-2 bg-gray-50 rounded-lg border border-gray-100">
+              No modules assigned. Please contact Super Admin.
+            </div>
           )}
         </nav>
       </aside>
