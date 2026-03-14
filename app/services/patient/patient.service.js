@@ -16,15 +16,18 @@ export const getPatientProfile = async () => {
       data: response.data.data || response.data
     };
   } catch (error) {
-    console.error("Get profile error:", error);
-    
+    // ✅ Silently handle 404 (New User) WITHOUT logging an error
     if (error.response?.status === 404) {
       return {
         success: false,
-        isNotFound: true,
-        message: "Profile not found"
+        isNotFound: true, // Frontend can check this to show the setup screen
+        data: null,
+        message: "New user - Profile not setup yet"
       };
     }
+
+    // Only log actual unexpected errors (500s, network failures, etc.)
+    console.error("Get profile error:", error);
     
     return {
       success: false,

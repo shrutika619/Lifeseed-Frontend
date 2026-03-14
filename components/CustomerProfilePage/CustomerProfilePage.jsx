@@ -1,6 +1,8 @@
 "use client"
 import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'; 
 import { 
   getPatientDetailsById, 
@@ -11,12 +13,16 @@ import {
   createCustomerProfile, 
   getAdminDropdownData   
 } from '@/app/services/admin/leads.service'; 
+import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
 import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
   XCircle, Save, ChevronDown, RotateCcw,
-  Monitor, MapPin, X, ArrowLeft, Loader2
+  Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil
 } from 'lucide-react';
+import { customerProfileSchema } from '@/app/utils/validation/customerProfileSchema';
+
+
 
 /* ─────────────────────────────────────────────
    CITY SELECT MODAL
@@ -118,7 +124,7 @@ const BookConsultationModal = ({ onClose }) => {
 /* ─────────────────────────────────────────────
    CREATABLE SELECT
 ───────────────────────────────────────────── */
-const CreatableSelect = ({ field, register, setValue, watch }) => {
+const CreatableSelect = ({ field, register, setValue, watch, error }) => {
   const [isEditing, setIsEditing] = useState(false);
   const currentValue = watch(field.name);
 
@@ -130,8 +136,8 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
             autoFocus
             defaultValue={currentValue}
             placeholder="Type new name..."
-            onBlur={(e) => { setValue(field.name, e.target.value); setIsEditing(false); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { setValue(field.name, e.target.value); setIsEditing(false); } if (e.key === 'Escape') setIsEditing(false); }}
+            onBlur={(e) => { setValue(field.name, e.target.value, { shouldValidate: true }); setIsEditing(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setValue(field.name, e.target.value, { shouldValidate: true }); setIsEditing(false); } if (e.key === 'Escape') setIsEditing(false); }}
             className="flex-1 p-2.5 border-2 border-blue-400 rounded-xl text-sm outline-none bg-white"
           />
         </div>
@@ -141,7 +147,7 @@ const CreatableSelect = ({ field, register, setValue, watch }) => {
             <select
               {...register(field.name)}
               disabled={field.disabled}
-              className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${field.disabled ? 'opacity-60 cursor-not-allowed bg-gray-100 text-slate-500 font-bold' : 'focus:border-blue-500'}`}
+              className={`w-full appearance-none p-2.5 bg-slate-50 border ${error ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none ${field.disabled ? 'opacity-60 cursor-not-allowed bg-gray-100 text-slate-500 font-bold' : 'focus:border-blue-500'}`}
             >
               <option value="" disabled>Select...</option>
               {[...new Set(field.options)].map((o, index) => (
@@ -209,7 +215,18 @@ const CustomerProfilePage = () => {
   const [activities, setActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
-  const { register, handleSubmit, watch, setValue, resetField, reset } = useForm({
+  // ADDRESS STATE
+  const [addresses, setAddresses] = useState([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [editAddressId, setEditAddressId] = useState(null);
+  const [addressForm, setAddressForm] = useState({
+    label: "Home", flatNo: "", streetArea: "", landmark: "", pinCode: "", contactNumber: ""
+  });
+
+  // ✅ React Hook Form connected to YUP Resolver
+  const { register, handleSubmit, watch, setValue, resetField, reset, formState: { errors } } = useForm({
+    resolver: yupResolver(customerProfileSchema), // <--- Linked here!
     defaultValues: {
       activityType: 'Next Medicine Order',
       activityAssignTo: '',
@@ -226,7 +243,7 @@ const CustomerProfilePage = () => {
     }
   }, [watchedLeadOwner, setValue]);
 
-  // 1. Fetch Profile OR Initial Admin Data
+  // 1. Fetch Profile, Admins & Addresses
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -238,12 +255,10 @@ const CustomerProfilePage = () => {
       };
 
       if (isNewUser) {
-        // 🟢 CREATE MODE (Auto-Assigned Option 1)
         const res = await getAdminDropdownData();
         if (res.success && res.data) {
            setCustomerData({ currentAdmin: res.data.currentAdmin });
            setAdminList(res.data.assignToDropdown || []);
-           
            const defaultOwnerName = res.data.currentAdmin?.fullName || "";
            
            reset({
@@ -255,35 +270,37 @@ const CustomerProfilePage = () => {
            });
         }
       } else {
-        // 🔵 EDIT MODE
-        const res = await getPatientDetailsById(userId);
-        if (res.success && res.data) {
-          setCustomerData(res.data);
-          setAdminList(res.data.assignToDropdown || []);
+        const [profileRes, addressRes] = await Promise.all([
+          getPatientDetailsById(userId).catch(e => e),
+          adminAddressService.getAllUserAddresses(userId).catch(e => e)
+        ]);
 
-          const existingOwner = safeString(res.data.leadOwner);
-          const defaultOwnerName = existingOwner || res.data.currentAdmin?.fullName || "";
+        if (profileRes?.success && profileRes?.data) {
+          setCustomerData(profileRes.data);
+          setAdminList(profileRes.data.assignToDropdown || []);
+
+          const existingOwner = safeString(profileRes.data.leadOwner);
+          const defaultOwnerName = existingOwner || profileRes.data.currentAdmin?.fullName || "";
 
           reset({
-            name: res.data.name || "",
-            age: res.data.age || "",
-            contact: res.data.mobileNo || "",
-            whatsapp: res.data.whatsappNumber || "",
+            name: profileRes.data.name || "",
+            age: profileRes.data.age || "",
+            contact: profileRes.data.mobileNo || "",
+            whatsapp: profileRes.data.whatsappNumber || "",
             leadOwner: defaultOwnerName, 
-            leadStage: res.data.leadStage || "New",
-            city: res.data.city || "",
-            email: res.data.mailId || res.data.email || "",
-            leadSource: res.data.leadSource || "Website",
-            addressLabel: res.data.deliveryAddress?.label || "Home",
-            flatNo: res.data.deliveryAddress?.flatNo || "",
-            street: res.data.deliveryAddress?.streetArea || "",
-            landmark: res.data.deliveryAddress?.landmark || "",
-            pincode: res.data.deliveryAddress?.pinCode || "",
-            notes: res.data.notes || "",
-            sendWhatsApp: res.data.sendWhatsAppNotification || false,
+            leadStage: profileRes.data.leadStage || "New",
+            city: profileRes.data.city || "",
+            email: profileRes.data.mailId || profileRes.data.email || "",
+            leadSource: profileRes.data.leadSource || "Website",
+            notes: profileRes.data.notes || "",
+            sendWhatsApp: profileRes.data.sendWhatsAppNotification || false,
             activityType: "Next Medicine Order",
             activityAssignTo: defaultOwnerName
           });
+        }
+
+        if (addressRes?.success && addressRes?.data?.addresses) {
+          setAddresses(addressRes.data.addresses);
         }
       }
       setLoading(false);
@@ -292,7 +309,7 @@ const CustomerProfilePage = () => {
     fetchData();
   }, [userId, isNewUser, reset]);
 
-  // 2. Fetch Activities (Only if NOT a new user)
+  // 2. Fetch Activities
   const fetchActivities = useCallback(async () => {
     if (isNewUser || !userId) return;
     setLoadingActivities(true);
@@ -309,22 +326,28 @@ const CustomerProfilePage = () => {
     fetchActivities();
   }, [fetchActivities]);
 
-  // 3. ADD NEW ACTIVITY LOG
+  // ✅ 3. ADD NEW ACTIVITY LOG (With Strict Validation)
   const addNewActivity = async () => {
     const type = watch('activityType');
     const notes = watch('activityNotes');
+    const assignToName = watch('activityAssignTo');
     const date = watch('activityDate');
     const time = watch('activityTime');
-    const assignToName = watch('activityAssignTo');
+
+    // Strict Validation Checks for Activity
+    if (!type) {
+      return toast.error("Activity Reason / Type is required.");
+    }
+    if (!assignToName) {
+      return toast.error("Please assign this activity to a user.");
+    }
+    if (!notes || notes.trim() === "") {
+      return toast.error("Activity Note is required.");
+    }
 
     const category = ACTIVITY_CATEGORIES[type] || "Follow-Up";
 
-    const payload = {
-      type: type,
-      category: category,
-      notes: notes || "",
-    };
-
+    const payload = { type, category, notes: notes.trim() };
     if (date) payload.scheduledDate = date;
     if (time) payload.scheduledTime = time;
 
@@ -338,38 +361,22 @@ const CustomerProfilePage = () => {
     }
 
     if (isNewUser) {
-      // 🟢 CREATE MODE: Queue activity locally
       const localActivity = {
-        activityId: `temp_${Date.now()}`,
-        type: payload.type,
-        category: payload.category,
-        notes: payload.notes,
-        scheduledDate: payload.scheduledDate || null,
-        scheduledTime: payload.scheduledTime || "",
-        assignedToId: payload.assignedTo || null,
-        assignedTo: assignToName,
-        status: "Pending",
-        createdBy: customerData?.currentAdmin?.fullName || 'You',
+        activityId: `temp_${Date.now()}`, type: payload.type, category: payload.category,
+        notes: payload.notes, scheduledDate: payload.scheduledDate || null,
+        scheduledTime: payload.scheduledTime || "", assignedToId: payload.assignedTo || null,
+        assignedTo: assignToName, status: "Pending", createdBy: customerData?.currentAdmin?.fullName || 'You',
         showActions: false 
       };
-
       setActivities([localActivity, ...activities]);
       toast.success("Activity queued! Save profile to submit.");
-      
-      resetField('activityNotes');
-      resetField('activityDate');
-      resetField('activityTime');
-
+      resetField('activityNotes'); resetField('activityDate'); resetField('activityTime');
     } else {
-      // 🔵 EDIT MODE: Send to backend
       setIsAddingActivity(true);
       const res = await addCustomerActivity(userId, payload);
-      
       if (res.success) {
         toast.success("Activity added successfully!");
-        resetField('activityNotes');
-        resetField('activityDate');
-        resetField('activityTime');
+        resetField('activityNotes'); resetField('activityDate'); resetField('activityTime');
         fetchActivities(); 
       } else {
         toast.error(res.message || "Failed to add activity");
@@ -383,13 +390,10 @@ const CustomerProfilePage = () => {
     if (isNewUser) return; 
 
     const payload = { status: newStatus };
-
     if (newStatus === "Not Interested") {
       const userNotes = window.prompt("Add notes for marking as 'Not Interested' (Optional):");
       if (userNotes === null) return; 
-      if (userNotes.trim() !== "") {
-        payload.notes = userNotes;
-      }
+      if (userNotes.trim() !== "") payload.notes = userNotes;
     }
 
     const toastId = toast.loading(`Marking as ${newStatus}...`);
@@ -403,8 +407,80 @@ const CustomerProfilePage = () => {
     }
   };
 
+  /* ─────────────────────────────────────────────
+     ADDRESS CRUD HANDLERS
+  ───────────────────────────────────────────── */
+  const handleAddressInputChange = (e) => {
+    const { name, value } = e.target;
+    setAddressForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const openAddAddressModal = () => {
+    setAddressForm({ label: "Home", flatNo: "", streetArea: "", landmark: "", pinCode: "", contactNumber: "" });
+    setEditAddressId(null);
+    setShowAddressModal(true);
+  };
+
+  const openEditAddressModal = (address) => {
+    setAddressForm({
+      label: address.label || "Other", flatNo: address.flatNo || "",
+      streetArea: address.streetArea || "", landmark: address.landmark || "",
+      pinCode: address.pinCode || "", contactNumber: address.contactNumber || ""
+    });
+    setEditAddressId(address._id);
+    setShowAddressModal(true);
+  };
+
+  const handleSaveAddress = async (e) => {
+    e.preventDefault();
+    if (!addressForm.flatNo || !addressForm.streetArea || !addressForm.pinCode) {
+      return toast.error("Flat No, Street, and PIN Code are required.");
+    }
+    setIsSavingAddress(true);
+    try {
+      if (editAddressId) {
+        const res = await adminAddressService.updateUserAddress(userId, editAddressId, addressForm);
+        if (res.success) {
+          toast.success("Address updated!");
+          setAddresses(prev => prev.map(addr => addr._id === editAddressId ? { ...addr, ...addressForm } : addr));
+        } else toast.error(res.message);
+      } else {
+        const res = await adminAddressService.createUserAddress(userId, addressForm);
+        if (res.success) {
+          toast.success("Address added!");
+          setAddresses(prev => [...prev, res.data]); 
+        } else toast.error(res.message);
+      }
+      setShowAddressModal(false);
+    } catch (error) {
+      toast.error(error.message || "Failed to save address");
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addressId) => {
+    if (!window.confirm("Are you sure you want to delete this address?")) return;
+    try {
+      const res = await adminAddressService.deleteUserAddress(userId, addressId);
+      if (res.success) {
+        toast.success("Address deleted");
+        setAddresses(prev => prev.filter(addr => addr._id !== addressId));
+      } else toast.error(res.message);
+    } catch (error) {
+      toast.error(error.message || "Failed to delete address");
+    }
+  };
+
   // 5. FINAL PROFILE SUBMIT HANDLER
   const onFinalSubmit = async (data) => {
+    // Prevent submission if initial address details are incomplete for a new user
+    if (isNewUser) {
+      if (!data.flatNo || !data.street || !data.pincode) {
+        return toast.error("Flat No, Street Area, and Pin Code are required for the initial address.");
+      }
+    }
+
     setIsSaving(true);
 
     const selectedAdmin = adminList.find(a => a.fullName === data.leadOwner);
@@ -426,31 +502,28 @@ const CustomerProfilePage = () => {
       leadStage: data.leadStage,
       notes: data.notes,
       sendWhatsAppNotification: !!data.sendWhatsApp,
-      deliveryAddress: {
+    };
+
+    if (isNewUser) {
+      payload.deliveryAddress = {
         label: data.addressLabel || "Home",
         flatNo: data.flatNo,
         streetArea: data.street,
         landmark: data.landmark,
         pinCode: data.pincode,
         contactNumber: data.contact 
-      }
-    };
+      };
+    }
 
-    // ✅ If Editing an existing user, send the leadOwner field
     if (!isNewUser) {
         payload.leadOwner = leadOwnerId;
     }
 
     if (isNewUser) {
-      // 🟢 CREATE NEW USER
       if (activities.length > 0) {
         payload.activity = activities.map(act => ({
-          type: act.type,
-          category: act.category,
-          notes: act.notes,
-          scheduledDate: act.scheduledDate,
-          scheduledTime: act.scheduledTime,
-          assignedTo: act.assignedToId
+          type: act.type, category: act.category, notes: act.notes,
+          scheduledDate: act.scheduledDate, scheduledTime: act.scheduledTime, assignedTo: act.assignedToId
         }));
       }
 
@@ -458,14 +531,12 @@ const CustomerProfilePage = () => {
       if (res.success) {
         toast.success("User created successfully!", { duration: 5000 }); 
         const basePath = pathname.split('/newuser')[0];
-        // Ensure it directs to the generated ID!
         const generatedUserId = res.data.userId || res.data._id || res.data.leadId;
         router.push(`${basePath}/log-in-user/customerprofile?userId=${generatedUserId}`);
       } else {
         toast.error(res.message || "Failed to create user.", { duration: 5000 }); 
       }
     } else {
-      // 🔵 UPDATE EXISTING USER
       const res = await submitCustomerProfile(userId, payload);
       if (res.success) {
         toast.success("Profile saved successfully!", { duration: 5000 }); 
@@ -519,13 +590,8 @@ const CustomerProfilePage = () => {
         {/* HEADER AREA */}
         <div className="flex flex-wrap justify-between items-end bg-white p-6 rounded-2xl shadow-sm border border-slate-200 gap-4">
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
-            >
-              <ArrowLeft size={16} />
-              Back
+            <button type="button" onClick={() => window.history.back()} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all">
+              <ArrowLeft size={16} /> Back
             </button>
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
@@ -537,7 +603,7 @@ const CustomerProfilePage = () => {
           <div className="w-full md:w-64">
             <label className="text-[11px] font-bold text-slate-400 uppercase mb-1 block">Lead Source</label>
             <div className="relative">
-              <select {...register("leadSource")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
+              <select {...register("leadSource")} className={`w-full appearance-none p-2.5 bg-slate-50 border ${errors.leadSource ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-500`}>
                 <option value="Website">Website</option>
                 <option value="WhatsApp">WhatsApp</option>
                 <option value="Manual">Manual</option>
@@ -548,6 +614,7 @@ const CustomerProfilePage = () => {
               </select>
               <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
             </div>
+            {errors.leadSource && <p className="text-red-500 text-[10px] mt-1">{errors.leadSource.message}</p>}
           </div>
         </div>
 
@@ -559,16 +626,11 @@ const CustomerProfilePage = () => {
             { label: "Contact Number", name: "contact", required: true }, 
             { label: "WhatsApp Number", name: "whatsapp" },
             { 
-              label: "Lead Owner", 
-              name: "leadOwner", 
-              type: "creatable", 
-              options: adminList.map(a => a.fullName),
-              disabled: isNewUser || !isSuperAdminRoute // ✅ Locked during creation & for regular admins
+              label: "Lead Owner", name: "leadOwner", type: "creatable", 
+              options: adminList.map(a => a.fullName), disabled: isNewUser || !isSuperAdminRoute 
             }, 
             { 
-                label: "Lead Stage", 
-                name: "leadStage", 
-                type: "select", 
+                label: "Lead Stage", name: "leadStage", type: "select", 
                 options: ["New", "Interested", "Follow-Up", "Future", "N-Interested", "Cancel", "Regular"] 
             },
             { label: "City", name: "city" },
@@ -580,56 +642,124 @@ const CustomerProfilePage = () => {
               </label>
               {f.type === "select" ? (
                 <div className="relative">
-                    <select {...register(f.name, { required: f.required })} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
+                    <select {...register(f.name)} className={`w-full appearance-none p-2.5 bg-slate-50 border ${errors[f.name] ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-500`}>
                       <option value="">Select...</option>
                       {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                     <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
                 </div>
               ) : f.type === "creatable" ? (
-                <CreatableSelect field={f} register={register} setValue={setValue} watch={watch} />
+                <CreatableSelect field={f} register={register} setValue={setValue} watch={watch} error={errors[f.name]} />
               ) : (
-                <input {...register(f.name, { required: f.required })} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+                <input {...register(f.name)} placeholder="Enter" className={`w-full p-2.5 border ${errors[f.name] ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400`} />
               )}
+              {errors[f.name] && <p className="text-red-500 text-[10px] mt-1">{errors[f.name]?.message}</p>}
             </div>
           ))}
         </div>
 
-        {/* DELIVERY ADDRESS */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-            <h3 className="font-bold text-slate-700">Delivery Address</h3>
+        {/* DELIVERY ADDRESS BLOCK */}
+        {isNewUser ? (
+          /* INITIAL SETUP (NEW USER) */
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+              <h3 className="font-bold text-slate-700">Initial Delivery Address <span className="text-red-500">*</span></h3>
+            </div>
+            <div className="flex gap-3">
+              {['Home', 'Office', 'Other'].map(l => (
+                <button key={l} type="button" onClick={() => setValue('addressLabel', l)} className={`px-6 py-2 text-xs font-bold border rounded-xl transition-all ${watch('addressLabel') === l ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}>{l}</button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <input {...register("flatNo")} placeholder="Flat No / House No *" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <input {...register("street")} placeholder="Street / Area *" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <input {...register("landmark")} placeholder="Landmark" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <input {...register("pincode")} placeholder="Pin Code *" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 italic">Flat No, Street, and Pin Code are required for new profiles.</p>
           </div>
-          <div className="flex gap-3">
-            {['Home', 'Office', 'Other'].map(l => (
-              <button key={l} type="button" onClick={() => setValue('addressLabel', l)} className={`px-6 py-2 text-xs font-bold border rounded-xl transition-all ${watch('addressLabel') === l ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}>{l}</button>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input {...register("flatNo")} placeholder="Flat No / House No" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-            <input {...register("street")} placeholder="Street / Area" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-            <input {...register("landmark")} placeholder="Landmark" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-            <input {...register("pincode")} placeholder="Pin Code" className="p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-          </div>
-        </div>
+        ) : (
+          /* FULL ADDRESS BOOK (EXISTING USER) */
+          <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+              <div className="flex items-center gap-2">
+                <MapPin className="text-blue-600" size={20} />
+                <h3 className="font-bold text-slate-700">Address Book</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={openAddAddressModal} 
+                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Plus size={16} /> Add Address
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {addresses.length === 0 ? (
+                <div className="col-span-full p-6 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  No addresses saved yet. Click "Add Address" to create one.
+                </div>
+              ) : (
+                addresses.map((addr) => (
+                  <div key={addr._id} className="border border-gray-100 rounded-xl p-5 bg-[#FAFBFC] hover:shadow-sm transition-all relative overflow-hidden group">
+                    <div className={`absolute top-0 left-0 w-1.5 h-full ${addr.label === 'Home' ? 'bg-blue-500' : addr.label === 'Work' || addr.label === 'Office' ? 'bg-orange-400' : 'bg-purple-500'}`} />
+                    
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">{addr.label}</span>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button type="button" onClick={() => openEditAddressModal(addr)} className="text-gray-400 hover:text-blue-600 p-1"><Pencil size={14}/></button>
+                        <button type="button" onClick={() => handleDeleteAddress(addr._id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                      </div>
+                    </div>
+                    
+                    <div className="text-sm text-gray-700 leading-relaxed font-medium">
+                      <p>{addr.flatNo}, {addr.streetArea}</p>
+                      {addr.landmark && <p className="text-gray-500 font-normal">Landmark: {addr.landmark}</p>}
+                      <p className="text-gray-500 font-normal">PIN: {addr.pinCode}</p>
+                      {addr.contactNumber && <p className="text-gray-500 font-normal mt-1">📞 {addr.contactNumber}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
 
         {/* NOTES SECTION */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
            <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block">General Notes</label>
            <textarea {...register("notes")} className="w-full p-3 border border-slate-200 rounded-xl text-sm h-24 mb-4 outline-none focus:border-blue-400 resize-none" placeholder="Enter patient summary or general observations..."></textarea>
            
-           <div className="flex justify-end gap-3">
-             <button
-               type="button"
-               onClick={() => setShowBookModal(true)}
-               className="px-6 py-2.5 bg-[#0097A7] text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 flex items-center gap-2 hover:bg-[#00838F] transition-colors"
-             >
-               <Calendar size={16}/> Book Consultation
-             </button>
-           </div>
+           {/* ✅ Conditional Rendering: Only show Book Consultation if the user is saved (not new) */}
+           {!isNewUser && (
+             <div className="flex justify-end gap-3">
+               <button
+                 type="button"
+                 onClick={() => setShowBookModal(true)}
+                 className="px-6 py-2.5 bg-[#0097A7] text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 flex items-center gap-2 hover:bg-[#00838F] transition-colors"
+               >
+                 <Calendar size={16}/> Book Consultation
+               </button>
+             </div>
+           )}
+           
+           {isNewUser && (
+             <div className="flex justify-end gap-3">
+                 <p className="text-[11px] text-slate-400 italic">Save profile to unlock consultation booking.</p>
+             </div>
+           )}
         </div>
 
-        {/* ACTIVITY LOG & REMINDERS */}
+        {/* ✅ ACTIVITY LOG & REMINDERS */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-700 text-lg flex items-center gap-2">Activity Log & Reminders</h3>
@@ -638,7 +768,7 @@ const CustomerProfilePage = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Add New (Categorized)</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Activity Reason / Type <span className="text-red-500">*</span></label>
               <div className="relative">
                 <select {...register("activityType")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 font-medium">
                   <optgroup label="Follow-Up">
@@ -664,7 +794,7 @@ const CustomerProfilePage = () => {
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (User)</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (User) <span className="text-red-500">*</span></label>
               <div className="relative">
                 <select 
                   {...register("activityAssignTo")} 
@@ -682,8 +812,8 @@ const CustomerProfilePage = () => {
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Activity Specific Notes</label>
-            <textarea {...register("activityNotes")} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm h-20 outline-none focus:border-blue-400 resize-none" placeholder="Enter notes for this specific task..."></textarea>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Activity Note <span className="text-red-500">*</span></label>
+            <textarea {...register("activityNotes")} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm h-20 outline-none focus:border-blue-400 resize-none" placeholder="Enter reason or notes for this specific task (Required)"></textarea>
           </div>
           
           <div className="flex flex-wrap items-end gap-4">
@@ -809,6 +939,59 @@ const CustomerProfilePage = () => {
           </div>
         </div>
       </form>
+
+      {/* ---------------- ADDRESS MODAL ---------------- */}
+      {showAddressModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-bold text-gray-900">{editAddressId ? "Edit Address" : "Add New Address"}</h3>
+              <button onClick={() => setShowAddressModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+            </div>
+            
+            <form onSubmit={handleSaveAddress} className="space-y-4">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Label</label>
+                <select name="label" value={addressForm.label} onChange={handleAddressInputChange} className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50">
+                  <option value="Home">Home</option>
+                  <option value="Work">Work</option>
+                  <option value="Office">Office</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Flat / House No. *</label>
+                  <input required name="flatNo" value={addressForm.flatNo} onChange={handleAddressInputChange} placeholder="e.g. B-202" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Street / Area *</label>
+                  <input required name="streetArea" value={addressForm.streetArea} onChange={handleAddressInputChange} placeholder="e.g. Koregaon Park" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Landmark</label>
+                  <input name="landmark" value={addressForm.landmark} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">PIN Code *</label>
+                  <input required name="pinCode" value={addressForm.pinCode} onChange={handleAddressInputChange} placeholder="e.g. 411001" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Contact Number</label>
+                  <input name="contactNumber" value={addressForm.contactNumber} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowAddressModal(false)} className="flex-1 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold transition-colors">Cancel</button>
+                <button type="submit" disabled={isSavingAddress} className="flex-1 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-xl text-sm font-semibold transition-colors">
+                  {isSavingAddress ? "Saving..." : "Save Address"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
