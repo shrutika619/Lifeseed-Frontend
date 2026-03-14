@@ -21,6 +21,7 @@ import {
   CheckCircle,
   Settings,
   ArrowLeft,
+  Stethoscope,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────
@@ -107,6 +108,10 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule }) => {
     {
       icon: X, label: "Cancel", color: "text-red-600", bg: "hover:bg-red-50",
       onClick: () => { onCancel && onCancel(); onClose(); },
+    },
+    {
+      icon: Stethoscope, label: "Doctor Panel", color: "text-violet-600", bg: "hover:bg-violet-50",
+      href: "/super-admin/teleconsultation/doctorpanal",
     },
     {
       icon: PhoneCall, label: "Call Clinic", color: "text-slate-600", bg: "hover:bg-slate-50",
