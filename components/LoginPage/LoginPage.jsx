@@ -102,7 +102,7 @@ const LoginPage = () => {
           console.log(`Patient Profile found -> Redirecting to ${redirectPath}`);
           router.push(redirectPath);
         } else {
-          // Profile Missing -> Setup
+          // Profile Missing -> Setup (This perfectly catches the new `isNotFound` response!)
           console.log("Patient Profile missing -> Profile Setup");
           setStep("success");
         }

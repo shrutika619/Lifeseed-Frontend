@@ -39,6 +39,9 @@ export class Constants {
     SUBMIT_CUSTOMER_PROFILE: `${this.API_BASE_URL}/customer/submit`,
     CUSTOMER_ACTIVITY: `${this.API_BASE_URL}/customer/activity`,
     MANUAL_CUSTOMER_CREATE: `${this.API_BASE_URL}/customer/manual`,
+
+    // --- ADMIN ADDRESS --- 
+    ADMIN_ADDRESS_BASE: `${this.API_BASE_URL}/address/admin`,
     
     // Dynamic endpoints (Functions)
     ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE
@@ -89,6 +92,10 @@ export class Constants {
 
     // -- APPOINTMENT BOOKING --
     BOOK_TELECONSULTATION: `${this.API_BASE_URL}/appoinntmentBooking/teleconsultation`,
+
+    // --- ADDRESS ---
+    ADDRESS: `${this.API_BASE_URL}/address`,
+    ADDRESS_SINGLE: `${this.API_BASE_URL}/address/single`,
     
     GET_CLINICS: `${this.API_BASE_URL}/public/clinics`,
     GET_CLINICS_city: `${this.API_BASE_URL}/cities`,
