@@ -1,15 +1,13 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, MapPin, X, Loader2 } from 'lucide-react';
 import { getAllCities } from '@/app/services/patient/clinic.service';
 import { bookTeleconsultation, getPatientTeleSlots } from '@/app/services/patient/appointment.service';
+import { adminTeleconsultationService } from '@/app/services/admin/adminTeleconsultation.service'; 
 import Link from "next/link";
-import { useRouter } from 'next/navigation'; 
+import { useRouter, useSearchParams } from 'next/navigation'; 
 import { toast } from 'sonner'; 
-import api from "@/lib/axios"; 
-import { Constants } from "@/app/utils/constants"; 
 
-// ✅ Imported Redux Hooks & Actions
 import { useSelector, useDispatch } from "react-redux";
 import { 
   selectUser, 
@@ -25,23 +23,17 @@ const generateUpcomingDates = (numDays = 3) => {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     dates.push({
-      fullDate: d.toISOString().split('T')[0], // YYYY-MM-DD for backend
-      label: d.toLocaleDateString('en-US', { weekday: 'short' }), // "Mon"
-      date: d.getDate().toString() // "15"
+      fullDate: d.toISOString().split('T')[0], 
+      label: d.toLocaleDateString('en-US', { weekday: 'short' }), 
+      date: d.getDate().toString() 
     });
   }
   return dates;
 };
 
-// Sort periods chronologically starting at midnight
+// Sort periods chronologically
 const sortPeriodsChronologically = (groups) => {
-  const orderMap = {
-    night: 1,      
-    morning: 2,    
-    afternoon: 3,  
-    evening: 4     
-  };
-
+  const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
   return [...groups].sort((a, b) => {
     return (orderMap[a.period] || 99) - (orderMap[b.period] || 99);
   });
@@ -50,10 +42,18 @@ const sortPeriodsChronologically = (groups) => {
 const FreeConsultationPage = () => {
   const router = useRouter(); 
   const dispatch = useDispatch();
+  const searchParams = useSearchParams();
 
-  // ✅ Read Auth State from Redux
+  // Read Auth State from Redux
   const user = useSelector(selectUser);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+
+  // Determine if the logged-in user is an Admin/SuperAdmin
+  const userRole = user?.role?.toLowerCase() || '';
+  const isAdminOrSuperAdmin = ['admin', 'super_admin', 'superadmin', 'clinic_admin'].includes(userRole);
+  const adminDashboardPath = (userRole === 'super_admin' || userRole === 'superadmin') 
+      ? '/super-admin/teleconsultation' 
+      : '/admin/teleconsultation';
 
   // Dynamic Date & Slot States
   const [availableDates, setAvailableDates] = useState(generateUpcomingDates());
@@ -63,18 +63,25 @@ const FreeConsultationPage = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null); 
   const [activeGroupId, setActiveGroupId] = useState(null); 
-  const [topLevelAvailabilityId, setTopLevelAvailabilityId] = useState(null); // ✅ Added state to hold the root ID
+  const [topLevelAvailabilityId, setTopLevelAvailabilityId] = useState(null);
 
   // Auth & Profile States
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [fetchingProfile, setFetchingProfile] = useState(true);
-  const [profileLoaded, setProfileLoaded] = useState(false); // Prevents overwriting user inputs
+  const [profileLoaded, setProfileLoaded] = useState(false); 
+  const [prefillLoaded, setPrefillLoaded] = useState(false);
 
   // Form States
-  const [gender, setGender] = useState('');
-  const [concern, setConcern] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [age, setAge] = useState('');
+  const [patientContact, setPatientContact] = useState(searchParams.get('contact') || ''); 
+  const [fullName, setFullName] = useState(searchParams.get('name') || '');
+  const [age, setAge] = useState(searchParams.get('age') || '');
+  const [gender, setGender] = useState(searchParams.get('gender') || '');
+  
+  const initialConcern = searchParams.get('concern');
+  const [concern, setConcern] = useState(initialConcern ? [initialConcern] : []);
+  
+  const isAdminBooking = searchParams.get('admin_booking') === 'true'; 
+  const rescheduleRecordId = searchParams.get('rescheduleRecordId'); 
   
   // UI States
   const [showCityPopup, setShowCityPopup] = useState(false);
@@ -93,10 +100,9 @@ const FreeConsultationPage = () => {
     'Other'
   ];
 
-  // ✅ SYNC PROFILE FROM REDUX
+  // SYNC DATA
   useEffect(() => {
-    const loadProfile = async () => {
-      // 1. If completely logged out
+    const loadData = async () => {
       if (!isAuthenticated) {
         setIsLoggedIn(false);
         setFetchingProfile(false);
@@ -104,27 +110,60 @@ const FreeConsultationPage = () => {
       }
 
       setIsLoggedIn(true);
+      
+      // ADMIN FLOW: Prefill API
+      if (isAdminOrSuperAdmin) {
+        setProfileLoaded(true); 
+        
+        const pUserId = searchParams.get('userId');
+        
+        if (isAdminBooking && pUserId && !prefillLoaded) {
+          setFetchingProfile(true);
+          try {
+            const res = await adminTeleconsultationService.getAppointmentPrefill(pUserId);
+            if (res.success && res.data) {
+              if (!patientContact && (res.data.bookingContactNumber || res.data.mobileNo)) {
+                setPatientContact(res.data.bookingContactNumber || res.data.mobileNo); 
+              }
+              if (!fullName && res.data.fullName) setFullName(res.data.fullName);
+              if (!age && res.data.age) setAge(res.data.age.toString());
+              if (!gender && res.data.gender) setGender(res.data.gender.toLowerCase());
+            }
+          } catch (error) {
+            console.error("Failed to load prefill data", error);
+            toast.error("Could not fetch patient prefill data.");
+          } finally {
+            setPrefillLoaded(true);
+            setFetchingProfile(false);
+          }
+        } else {
+          setFetchingProfile(false);
+        }
+        return; 
+      }
 
-      // 2. If logged in but Redux hasn't fetched the profile data yet
+      // PATIENT FLOW: Redux profile
       if (!user?.fullName && !profileLoaded) {
         setFetchingProfile(true);
         await dispatch(fetchProfileDetails());
         setFetchingProfile(false);
       } 
       
-      // 3. If Redux has the data, auto-fill the form (only once)
-      if (user && !profileLoaded) {
-        if (user.fullName) setFullName(user.fullName);
-        if (user.age) setAge(user.age.toString());
-        if (user.gender) setGender(user.gender.toLowerCase());
+      if (user && !profileLoaded && !isAdminOrSuperAdmin) {
+        if (!patientContact && (user.mobileNo || user.contactNumber || user.phone)) {
+           setPatientContact(user.mobileNo || user.contactNumber || user.phone);
+        }
+        if (!fullName && user.fullName) setFullName(user.fullName);
+        if (!age && user.age) setAge(user.age.toString());
+        if (!gender && user.gender) setGender(user.gender.toLowerCase());
         
-        setProfileLoaded(true); // Mark loaded so we don't wipe out user edits later
+        setProfileLoaded(true); 
         setFetchingProfile(false);
       }
     };
 
-    loadProfile();
-  }, [isAuthenticated, user, dispatch, profileLoaded]);
+    loadData();
+  }, [isAuthenticated, user, dispatch, profileLoaded, prefillLoaded, fullName, age, gender, patientContact, isAdminBooking, searchParams, isAdminOrSuperAdmin]);
 
   // Fetch Cities 
   useEffect(() => {
@@ -132,12 +171,9 @@ const FreeConsultationPage = () => {
       try {
         const response = await getAllCities();
         const data = response?.data || response; 
-        
         if (Array.isArray(data)) {
           const formattedLinks = data.reduce((acc, city) => {
-            if (city?.name) {
-                acc[city.name] = city.name.toLowerCase();
-            }
+            if (city?.name) acc[city.name] = city.name.toLowerCase();
             return acc;
           }, {});
           setClinicLinks(formattedLinks);
@@ -149,105 +185,186 @@ const FreeConsultationPage = () => {
     fetchCityData();
   }, []);
 
-// Fetch Slots when Date changes
-  useEffect(() => {
-    const fetchSlots = async () => {
-      if (!selectedDate) return;
-      
-      setLoadingSlots(true);
-      setSelectedSlot(null); 
-      setActiveGroupId(null);
-      setTopLevelAvailabilityId(null); // Reset on date change
+  // ✅ Extracted fetchSlots so it can be called on error to refresh slots
+  const fetchSlots = useCallback(async () => {
+    if (!selectedDate) return;
+    
+    setLoadingSlots(true);
+    setSelectedSlot(null); 
+    setActiveGroupId(null);
+    setTopLevelAvailabilityId(null); 
 
-      // ✅ Use the new service function here
+    try {
       const res = await getPatientTeleSlots(selectedDate);
+      const responseData = res?.data?.slotGroups ? res.data : res;
       
-      if (res.success && res.slotGroups) {
-        setTopLevelAvailabilityId(res.availabilityId); 
-        const sortedGroups = sortPeriodsChronologically(res.slotGroups);
+      if (responseData && responseData.slotGroups) {
+        setTopLevelAvailabilityId(responseData.availabilityId); 
+        const sortedGroups = sortPeriodsChronologically(responseData.slotGroups);
         setSlotGroups(sortedGroups);
-        setPatientLimit(res.patientLimit || 1);
+        setPatientLimit(responseData.patientLimit || 1);
       } else {
         setSlotGroups([]);
       }
-      
-      setLoadingSlots(false);
-    };
-
-    fetchSlots();
+    } catch (error) {
+      console.error("Slot fetch error", error);
+      setSlotGroups([]);
+    }
+    
+    setLoadingSlots(false);
   }, [selectedDate]);
 
-  // ✅ BOOKING HANDLER
+  useEffect(() => {
+    fetchSlots();
+  }, [fetchSlots]);
+
+  // Toggle Multiple Concerns
+  const toggleConcern = (item) => {
+    if (concern.includes(item)) {
+      setConcern(concern.filter(c => c !== item));
+    } else {
+      setConcern([...concern, item]);
+    }
+  };
+
+  // BOOKING / RESCHEDULING HANDLER
   const handleBooking = async () => {
-    // 1. Redirect if not logged in
     if (!isLoggedIn) {
       router.push('/login?from=/free-consultation'); 
       return;
     }
 
-    // 2. Validate details
-    if (!selectedSlot || !activeGroupId || !fullName || !age || !gender || !concern) {
-      toast.error("Please fill all details and select a time slot."); 
+    if (!selectedSlot || !activeGroupId || !topLevelAvailabilityId) {
+      toast.error("Please select a valid time slot."); 
       return;
+    }
+
+    if (!rescheduleRecordId) {
+      if (isAdminOrSuperAdmin && !patientContact) {
+        toast.error("Please enter the Patient Username/Contact.");
+        return;
+      }
+
+      const missingFields = [];
+      if (!fullName) missingFields.push("Full Name");
+      if (!age) missingFields.push("Age");
+      if (!gender) missingFields.push("Gender");
+      if (!concern || concern.length === 0) missingFields.push("Concern");
+
+      if (missingFields.length > 0) {
+        toast.error(`Missing required details: ${missingFields.join(", ")}`); 
+        return;
+      }
     }
 
     setIsBooking(true);
 
-    // ✅ Fixed Payload mapping
-    const payload = {
-      availabilityId: topLevelAvailabilityId, // Taken from the root of API response
-      slotGroupId: activeGroupId,             // Set when clicking a slot
-      slotId: selectedSlot._id                // The ID of the slot itself
-    };
+    try {
+      let res;
+      let orderIdToDisplay = "";
 
-    const res = await bookTeleconsultation(payload);
+      if (rescheduleRecordId) {
+        const reschedulePayload = {
+          availabilityId: topLevelAvailabilityId,
+          slotGroupId: activeGroupId,             
+          slotId: selectedSlot._id || selectedSlot.id,
+        };
 
-    console.log(res)
+        res = await adminTeleconsultationService.rescheduleBooking(rescheduleRecordId, reschedulePayload);
+        
+        if (res.success) {
+           orderIdToDisplay = res.data.requestId || res.data.bookingId || "RESCHEDULED";
+        }
+      } 
+      else {
+        const bookingPayload = {
+          availabilityId: topLevelAvailabilityId,
+          slotGroupId: activeGroupId,             
+          slotId: selectedSlot._id || selectedSlot.id,
+          fullName: fullName,
+          age: Number(age), 
+          gender: gender,
+          concernedAbout: concern,
+          bookingContactNumber: patientContact || searchParams.get('contact') || ''
+        };
 
-    // Fallback if session expired mid-booking
-    if (res.message?.toLowerCase().includes("unauthorized") || res.statusCode === 401) {
-       router.push('/login?from=/free-consultation');
-       return;
+        if (isAdminOrSuperAdmin && isAdminBooking && searchParams.get('userId')) {
+           bookingPayload.patientUserId = searchParams.get('userId'); 
+        }
+
+        res = await bookTeleconsultation(bookingPayload);
+        
+        if (res.success) {
+          orderIdToDisplay = res.data.appointmentId || res.data.requestId;
+        }
+      }
+
+      if (res.message?.toLowerCase().includes("unauthorized") || res.statusCode === 401) {
+         router.push('/login?from=/free-consultation');
+         return;
+      }
+
+      if (res.success || res.message?.includes("successfully")) {
+        const responseData = res.data;
+        const displayDate = new Date(responseData.date).toLocaleDateString('en-US', { 
+          month: 'long', day: 'numeric', year: 'numeric' 
+        });
+
+        setBookingData({
+          orderId: orderIdToDisplay, 
+          date: displayDate,
+          time: responseData.timeSlot,
+          name: fullName || "Existing Patient",
+          contact: patientContact || "On File", 
+          age: age || "--",
+          gender: gender || "--",
+          concern: concern.length > 0 ? concern.join(", ") : "Follow-Up" 
+        });
+        
+        setIsBooked(true);
+
+        if (rescheduleRecordId) {
+            toast.success("Booking successfully rescheduled!");
+        } else if (isAdminBooking) {
+            toast.success(`Booking successfully created for ${fullName}`);
+        }
+      } else {
+        // ✅ CATCH MONGOOSE VERSION ERROR (Concurrency)
+        const errorMsg = res.message || "";
+        if (errorMsg.includes("VersionError") || errorMsg.includes("No matching document")) {
+          toast.error("Slot already full. Please select another time slot.");
+          fetchSlots(); // Refresh slots so the UI shows it's full
+        } else {
+          toast.error(errorMsg || "Something went wrong. Please try again.");
+        }
+      }
+
+    } catch (error) {
+      console.error(error);
+      // ✅ CATCH THROWN VERSION ERROR 
+      const errorStr = String(error?.message || error?.error || error);
+      if (errorStr.includes("VersionError") || errorStr.includes("No matching document")) {
+        toast.error("Slot already full. Please select another time slot.");
+        fetchSlots(); // Refresh slots so the UI shows it's full
+      } else {
+        toast.error(error?.message || "Failed to communicate with server.");
+      }
+    } finally {
+      setIsBooking(false);
     }
-
-    if (res.success || res.message === "Teleconsultation slot booked successfully") {
-      const responseData = res.data;
-      
-      const displayDate = new Date(responseData.date).toLocaleDateString('en-US', { 
-        month: 'long', day: 'numeric', year: 'numeric' 
-      });
-
-      setBookingData({
-        orderId: responseData.appointmentId, 
-        date: displayDate,
-        time: responseData.timeSlot,
-        name: fullName,
-        age: age,
-        gender: gender,
-        concern: concern
-      });
-      
-      setIsBooked(true);
-    } else {
-      toast.error(res.message || "Something went wrong while booking. Please try again.");
-    }
-    
-    setIsBooking(false);
   };
 
   const handleCancelAppointment = () => {
     setIsBooked(false);
     setBookingData(null);
-    setConcern(''); // Keep name, age, and gender populated in case they re-book
+    setConcern([]); 
     setSelectedDate(availableDates[0].fullDate);
     setSelectedSlot(null);
     setActiveGroupId(null);
   };
 
   const handleTabClick = (tab) => {
-    if (tab === 'clinic') {
-      setShowCityPopup(true);
-    }
+    if (tab === 'clinic') setShowCityPopup(true);
     setActiveTab(tab);
   };
 
@@ -263,7 +380,9 @@ const FreeConsultationPage = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">Consultation Booked!</h1>
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                 {rescheduleRecordId ? "Consultation Rescheduled!" : "Consultation Booked!"}
+              </h1>
               <p className="text-sm text-gray-600">Your appointment details are confirmed below.</p>
             </div>
 
@@ -322,6 +441,12 @@ const FreeConsultationPage = () => {
                   <h2 className="font-semibold text-gray-800">Patient Details</h2>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  {isAdminOrSuperAdmin && bookingData.contact && (
+                    <div className="flex justify-between">
+                      <p className="text-sm text-gray-600">Contact / Username:</p>
+                      <p className="text-sm font-semibold text-gray-800">{bookingData.contact}</p>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <p className="text-sm text-gray-600">Full Name:</p>
                     <p className="text-sm font-semibold text-gray-800">{bookingData.name}</p>
@@ -334,18 +459,27 @@ const FreeConsultationPage = () => {
                     <p className="text-sm text-gray-600">Gender:</p>
                     <p className="text-sm font-semibold text-gray-800 capitalize">{bookingData.gender}</p>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col gap-1">
                     <p className="text-sm text-gray-600">Concern:</p>
                     <p className="text-sm font-semibold text-gray-800">{bookingData.concern}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4">
-                <p className="text-center text-sm text-gray-600 mb-3">Need to make a change?</p>
+              <div className="pt-4 flex flex-col gap-3">
+                {isAdminBooking ? (
+                  <button 
+                    onClick={() => router.push(adminDashboardPath)}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
+                  >
+                    Back to Admin Dashboard
+                  </button>
+                ) : (
+                  <p className="text-center text-sm text-gray-600 mb-3">Need to make a change?</p>
+                )}
                 <button 
                   onClick={handleCancelAppointment}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition"
+                  className={`w-full font-semibold py-3 rounded-lg transition ${isAdminBooking ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-red-500 hover:bg-red-600 text-white'}`}
                 >
                   Book Another Slot
                 </button>
@@ -362,25 +496,26 @@ const FreeConsultationPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
+        
+        {/* Admin Warning Banner */}
+        {isAdminBooking && (
+            <div className={`border px-4 py-3 rounded-lg mb-6 font-semibold flex items-center justify-between ${rescheduleRecordId ? 'bg-indigo-100 border-indigo-300 text-indigo-800' : 'bg-orange-100 border-orange-300 text-orange-800'}`}>
+                <span>⚠️ Admin Mode: {rescheduleRecordId ? "Rescheduling an existing appointment." : "Booking an appointment on behalf of a patient."}</span>
+                <button onClick={() => router.push(adminDashboardPath)} className={`text-sm bg-white px-3 py-1 rounded shadow-sm hover:bg-gray-50 ${rescheduleRecordId ? 'text-indigo-700' : 'text-orange-700'}`}>Back to Dashboard</button>
+            </div>
+        )}
+
         {/* Header Tabs */}
         <div className="flex justify-center gap-4 mb-8">
           <button 
             onClick={() => handleTabClick('online')}
-            className={`pb-2 font-medium ${
-              activeTab === 'online'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500'
-            }`}
+            className={`pb-2 font-medium ${activeTab === 'online' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
           >
             Online Consultation
           </button>
           <button 
             onClick={() => handleTabClick('clinic')}
-            className={`pb-2 ${
-              activeTab === 'clinic'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500'
-            }`}
+            className={`pb-2 ${activeTab === 'clinic' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
           >
             Book In-Clinic Visit
           </button>
@@ -389,16 +524,24 @@ const FreeConsultationPage = () => {
         {/* Main Heading */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Book Your <span className="text-blue-600">FREE</span> Online Consultation
+            {rescheduleRecordId 
+               ? "Reschedule Appointment" 
+               : <>Book {isAdminBooking ? 'Patient' : 'Your'} <span className="text-blue-600">FREE</span> Online Consultation</>
+            }
           </h1>
           <p className="text-gray-600 text-sm">
-            Speak privately with our expert. Your first consultation is on us.
+            {rescheduleRecordId 
+               ? "Please select a new date and time for the patient's consultation." 
+               : "Speak privately with our expert. Your first consultation is on us."}
           </p>
-          <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
-            <span className="line-through text-gray-400">₹400</span>
-            <span className="text-green-600 font-bold text-xl">₹0</span>
-            <span className="text-gray-600 text-sm">Limited Time Offer!</span>
-          </div>
+          
+          {!rescheduleRecordId && (
+            <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+              <span className="line-through text-gray-400">₹400</span>
+              <span className="text-green-600 font-bold text-xl">₹0</span>
+              <span className="text-gray-600 text-sm">Limited Time Offer!</span>
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -427,16 +570,31 @@ const FreeConsultationPage = () => {
               </div>
             </div>
 
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Details</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">{isAdminBooking ? "Patient Details" : "Your Details"}</h2>
             
+            {isAdminOrSuperAdmin && (
+              <div className="mb-4">
+                <label className="block text-sm text-gray-600 mb-2">Patient Username / Contact <span className="text-red-500">*</span></label>
+                <input 
+                  type="text"
+                  value={patientContact}
+                  disabled={rescheduleRecordId} // Disabled if just rescheduling
+                  onChange={(e) => setPatientContact(e.target.value)}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-blue-200 focus:border-blue-500 bg-blue-50/30'}`}
+                  placeholder="e.g. 8908999995"
+                />
+              </div>
+            )}
+
             <div className="mb-4">
               <label className="block text-sm text-gray-600 mb-2">Full Name</label>
               <input 
                 type="text"
                 value={fullName}
+                disabled={rescheduleRecordId}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                placeholder="Enter your name"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500'}`}
+                placeholder="Enter patient name"
               />
             </div>
 
@@ -446,8 +604,9 @@ const FreeConsultationPage = () => {
                 <input 
                   type="number"
                   value={age}
+                  disabled={rescheduleRecordId}
                   onChange={(e) => setAge(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500'}`}
                   placeholder="Age"
                 />
               </div>
@@ -455,8 +614,9 @@ const FreeConsultationPage = () => {
                 <label className="block text-sm text-gray-600 mb-2">Gender</label>
                 <select 
                   value={gender}
+                  disabled={rescheduleRecordId}
                   onChange={(e) => setGender(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 bg-pink-50"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500 bg-pink-50'}`}
                 >
                   <option value="">Gender</option>
                   <option value="male">Male</option>
@@ -469,19 +629,26 @@ const FreeConsultationPage = () => {
             <div className="mb-4">
               <label className="block text-sm text-gray-600 mb-2">What are you concerned about?</label>
               <div className="grid grid-cols-2 gap-2">
-                {concerns.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => setConcern(item)}
-                    className={`px-3 py-2 rounded-lg text-sm border transition ${
-                      concern === item
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
+                {concerns.map((item) => {
+                  const isSelected = concern.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      disabled={rescheduleRecordId}
+                      onClick={() => toggleConcern(item)}
+                      className={`px-3 py-2 rounded-lg text-sm border transition ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : rescheduleRecordId
+                            ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -544,7 +711,7 @@ const FreeConsultationPage = () => {
                               disabled={!isBookable}
                               onClick={() => {
                                 setSelectedSlot(slot);
-                                setActiveGroupId(group._id); // ✅ Save Group ID
+                                setActiveGroupId(group._id); 
                               }}
                               className={`
                                 py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
@@ -582,11 +749,11 @@ const FreeConsultationPage = () => {
             }`}
           >
             {isBooking ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Booking...</>
+              <><Loader2 className="w-5 h-5 animate-spin" /> {rescheduleRecordId ? 'Rescheduling...' : 'Booking...'}</>
             ) : selectedSlot ? (
-              'Confirm & Book Free Consultation'
+              rescheduleRecordId ? 'Confirm Reschedule' : 'Confirm & Book Free Consultation'
             ) : (
-              'Select a Slot to Book'
+              'Select a Slot'
             )}
           </button>
         </div>

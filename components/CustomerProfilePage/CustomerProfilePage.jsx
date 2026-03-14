@@ -14,6 +14,7 @@ import {
   getAdminDropdownData   
 } from '@/app/services/admin/leads.service'; 
 import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
+import { getAllCities } from "@/app/services/patient/clinic.service"; // ✅ Imported city service
 import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
@@ -21,7 +22,6 @@ import {
   Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil
 } from 'lucide-react';
 import { customerProfileSchema } from '@/app/utils/validation/customerProfileSchema';
-
 
 /* ─────────────────────────────────────────────
    ORDER HISTORY — SAMPLE DATA
@@ -40,8 +40,8 @@ const SAMPLE_ORDER_HISTORY = [
     status: 'Upcoming',
     statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
     details: [
-      { label: 'Order ID',     value: '#TC-98765' },
-      { label: 'Booking ID',   value: '#BK-54321' },
+      { label: 'Order ID',      value: '#TC-98765' },
+      { label: 'Booking ID',    value: '#BK-54321' },
       { label: 'Booking Time', value: 'Nov 20, 2024, 8:15 PM' },
       { label: 'Amount Paid',  value: '$50.00' },
       { label: 'Agent',        value: 'Pranjal' },
@@ -61,7 +61,7 @@ const SAMPLE_ORDER_HISTORY = [
     status: 'Upcoming',
     statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
     details: [
-      { label: 'Order ID',     value: '#IC-67890' },
+      { label: 'Order ID',      value: '#IC-67890' },
       { label: 'Patient Age',  value: '34' },
       { label: 'Booking Time', value: 'Nov 21, 2024, 10:05 AM' },
       { label: 'Amount Paid',  value: '$80.00' },
@@ -325,22 +325,36 @@ const TicketTab = () => (
 )
 
 /* ─────────────────────────────────────────────
-   CITY SELECT MODAL
+   CITY SELECT MODAL (✅ Now Dynamic)
 ───────────────────────────────────────────── */
-const cities = [
-  { name: "NAGPUR",   sub: "Maharashtra, India", slug: "nagpur"   },
-  { name: "MUMBAI",   sub: "Maharashtra",        slug: "mumbai"   },
-  { name: "PUNE",     sub: "Maharashtra",        slug: "pune"     },
-  { name: "NASHIK",   sub: "Maharashtra",        slug: "nashik"   },
-  { name: "AMRAVATI", sub: "Maharashtra",        slug: "amravati" },
-  { name: "KOLHAPUR", sub: "Maharashtra",        slug: "kolhapur" },
-  { name: "DELHI",    sub: "Delhi",              slug: "delhi"    },
-];
-
 const CitySelectModal = ({ onClose }) => {
+  const [cities, setCities] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCityData = async () => {
+      try {
+        const response = await getAllCities();
+        const data = response?.data || response; 
+        if (Array.isArray(data)) {
+          setCities(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch cities", error);
+        toast.error("Failed to load cities");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCityData();
+  }, []);
+
   const handleCitySelect = (slug) => {
-    window.location.href = `/clinic/${slug}/`;
+    // Use the actual slug from backend or convert name to lowercase
+    const finalSlug = slug || "nagpur"; 
+    window.location.href = `/clinic/${finalSlug}/`;
   };
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -350,20 +364,33 @@ const CitySelectModal = ({ onClose }) => {
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
-        <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100">
-          {cities.map((city) => (
-            <button
-              key={city.slug} type="button" onClick={() => handleCitySelect(city.slug)}
-              className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
-            >
-              <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
-              <div>
-                <p className="font-bold text-slate-800 text-sm">{city.name}</p>
-                <p className="text-xs text-slate-500">{city.sub}</p>
-              </div>
-            </button>
-          ))}
+        
+        <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100 min-h-[200px] relative">
+          {loading ? (
+             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+               <p className="text-sm font-medium">Loading cities...</p>
+             </div>
+          ) : cities.length > 0 ? (
+            cities.map((city, idx) => (
+              <button
+                key={city._id || idx} type="button" onClick={() => handleCitySelect(city.name?.toLowerCase())}
+                className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+              >
+                <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-800 text-sm uppercase">{city.name}</p>
+                  <p className="text-xs text-slate-500">{city.state || "India"}</p>
+                </div>
+              </button>
+            ))
+          ) : (
+             <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                <p className="text-sm">No clinics found.</p>
+             </div>
+          )}
         </div>
+        
         <div className="px-6 py-3 border-t border-slate-100">
           <p className="text-xs text-slate-400 text-center">Can't find your city? Contact Customer Support</p>
         </div>
@@ -375,9 +402,22 @@ const CitySelectModal = ({ onClose }) => {
 /* ─────────────────────────────────────────────
    BOOK CONSULTATION MODAL
 ───────────────────────────────────────────── */
-const BookConsultationModal = ({ onClose }) => {
+const BookConsultationModal = ({ onClose, userId }) => {
+  const router = useRouter();
   const [showCityModal, setShowCityModal] = useState(false);
+
   if (showCityModal) return <CitySelectModal onClose={onClose} />;
+
+  const handleTeleconsultationClick = () => {
+    // ✅ If Admin is booking from Profile page, attach User ID to the URL
+    if (userId) {
+      router.push(`/free-consultation?admin_booking=true&userId=${userId}`);
+    } else {
+      router.push('/free-consultation');
+    }
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
@@ -400,8 +440,9 @@ const BookConsultationModal = ({ onClose }) => {
               <p className="text-xs text-slate-500">Physical visit at clinic</p>
             </div>
           </button>
+          
           <button
-            type="button" onClick={() => { window.location.href = '/free-consultation'; }}
+            type="button" onClick={handleTeleconsultationClick} // ✅ Fixed Teleconsultation Link
             className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group"
           >
             <div className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-all">
@@ -689,7 +730,9 @@ const CustomerProfilePage = () => {
     }
   };
 
-  /* ADDRESS CRUD */
+  /* ─────────────────────────────────────────────
+     ADDRESS CRUD HANDLERS
+  ───────────────────────────────────────────── */
   const handleAddressInputChange = (e) => {
     const { name, value } = e.target;
     setAddressForm(prev => ({ ...prev, [name]: value }));
@@ -716,16 +759,26 @@ const CustomerProfilePage = () => {
     if (!addressForm.flatNo || !addressForm.streetArea || !addressForm.pinCode) {
       return toast.error("Flat No, Street, and PIN Code are required.");
     }
+    
+    const safeAddressForm = {
+        label: addressForm.label || "Home",
+        flatNo: addressForm.flatNo || "",
+        streetArea: addressForm.streetArea || "",
+        landmark: addressForm.landmark || "",
+        pinCode: addressForm.pinCode || "",
+        contactNumber: addressForm.contactNumber || ""
+    };
+
     setIsSavingAddress(true);
     try {
       if (editAddressId) {
-        const res = await adminAddressService.updateUserAddress(userId, editAddressId, addressForm);
+        const res = await adminAddressService.updateUserAddress(userId, editAddressId, safeAddressForm);
         if (res.success) {
           toast.success("Address updated!");
-          setAddresses(prev => prev.map(addr => addr._id === editAddressId ? { ...addr, ...addressForm } : addr));
+          setAddresses(prev => prev.map(addr => addr._id === editAddressId ? { ...addr, ...safeAddressForm } : addr));
         } else toast.error(res.message);
       } else {
-        const res = await adminAddressService.createUserAddress(userId, addressForm);
+        const res = await adminAddressService.createUserAddress(userId, safeAddressForm);
         if (res.success) {
           toast.success("Address added!");
           setAddresses(prev => [...prev, res.data]); 
@@ -767,27 +820,27 @@ const CustomerProfilePage = () => {
     }
 
     const payload = {
-      name: data.name,
+      name: data.name || "",
       age: data.age ? Number(data.age) : null,
-      contactNumber: data.contact,
-      whatsappNumber: data.whatsapp,
-      email: data.email,
-      mailId: data.email,
-      city: data.city,
-      leadSource: data.leadSource,
-      leadStage: data.leadStage,
-      notes: data.notes,
+      contactNumber: data.contact || "",
+      whatsappNumber: data.whatsapp || "",
+      email: data.email || "",
+      mailId: data.email || "",
+      city: data.city || "",
+      leadSource: data.leadSource || "",
+      leadStage: data.leadStage || "",
+      notes: data.notes || "",
       sendWhatsAppNotification: !!data.sendWhatsApp,
     };
 
     if (isNewUser) {
       payload.deliveryAddress = {
         label: data.addressLabel || "Home",
-        flatNo: data.flatNo,
-        streetArea: data.street,
-        landmark: data.landmark,
-        pinCode: data.pincode,
-        contactNumber: data.contact 
+        flatNo: data.flatNo || "",
+        streetArea: data.street || "",
+        landmark: data.landmark || "",
+        pinCode: data.pincode || "",
+        contactNumber: data.contact || "" 
       };
     }
 
@@ -857,7 +910,8 @@ const CustomerProfilePage = () => {
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
 
-      {showBookModal && <BookConsultationModal onClose={() => setShowBookModal(false)} />}
+      {/* ✅ Passed userId dynamically to BookConsultationModal */}
+      {showBookModal && <BookConsultationModal onClose={() => setShowBookModal(false)} userId={userId} />}
 
       <form onSubmit={handleSubmit(onFinalSubmit)} className="max-w-5xl mx-auto space-y-6">
         

@@ -42,6 +42,10 @@ export class Constants {
 
     // --- ADMIN ADDRESS --- 
     ADMIN_ADDRESS_BASE: `${this.API_BASE_URL}/address/admin`,
+
+    // --- ADMIN TELECONSULTATION BOOKINGS --- 
+    ADMIN_TELECONSULTATION_BOOKINGS: `${this.API_BASE_URL}/admin/teleconsultationBooking/bookings`,
+    APPOINTMENT_PREFILL: `${this.API_BASE_URL}/appoinntmentBooking/appointment/prefill`,
     
     // Dynamic endpoints (Functions)
     ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE
