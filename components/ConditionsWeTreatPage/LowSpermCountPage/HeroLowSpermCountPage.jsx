@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import CountUp from "react-countup";
+import Link from "next/link";
 
 const HeroLowSpermCountPage = () => {
   return (
@@ -26,12 +27,18 @@ const HeroLowSpermCountPage = () => {
 
         {/* Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold shadow-md hover:bg-blue-700 transition">
+          <Link
+            href="/free-consultation"
+            className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold shadow-md hover:bg-blue-700 transition text-center"
+          >
             Book a Consultation
-          </button>
-          <button className="px-6 py-3 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition">
+          </Link>
+          <Link
+            href="/#assessment"
+            className="px-6 py-3 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition text-center"
+          >
             Take Free Fertility Assessment
-          </button>
+          </Link>
         </div>
 
         {/* Stats with Counter */}
@@ -49,7 +56,7 @@ const HeroLowSpermCountPage = () => {
               <CountUp end={40} duration={4} redraw={true} />+ million
             </p>
             <p className="text-gray-600 mt-2 text-sm sm:text-base">
-              Patient Recoveries We’ve Seen
+              Patient Recoveries We've Seen
             </p>
           </div>
           <div className="text-center">

@@ -1,9 +1,12 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Plus, Star, Clock, User, Calendar, Droplet, X, Check } from 'lucide-react';
-import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service"; // ✅ IMPORT SERVICE
+import { Plus, Star, Clock, User, Calendar, Droplet, X, Check, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service";
 
 const HospitalDashboard = () => {
+  const router = useRouter(); // ✅ ROUTER
+
   const [activeTab, setActiveTab] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -13,7 +16,7 @@ const HospitalDashboard = () => {
   const [followUpStatus, setFollowUpStatus] = useState('');
   const [paymentReceived, setPaymentReceived] = useState(false);
   const [notes, setNotes] = useState('');
-  
+
   // ✅ STATE FOR CLINIC HEADER
   const [clinicHeader, setClinicHeader] = useState({
     name: "Loading...",
@@ -81,13 +84,11 @@ const HospitalDashboard = () => {
       try {
         const response = await getMeClinicProfile();
         if (response.success && response.data) {
-          console.log(response.data)
+          console.log(response.data);
           const clinic = response.data.clinic;
-          
           const area = clinic.areaName || "";
           const city = response.data.cityName || "";
           const formattedLocation = [area, city].filter(Boolean).join(", ");
-
           setClinicHeader({
             name: clinic.clinicName || "MEN10 Clinic",
             location: formattedLocation || "Location Unavailable",
@@ -101,10 +102,8 @@ const HospitalDashboard = () => {
         setClinicHeader({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
       }
     };
-
     fetchHeaderData();
   }, []);
-
 
   const tabs = [
     { id: 'all', label: 'All', count: requests.length },
@@ -117,9 +116,7 @@ const HospitalDashboard = () => {
   ];
 
   const handleAccept = (id) => {
-    setRequests(requests.map(req => 
-      req.id === id ? { ...req, status: 'accepted' } : req
-    ));
+    setRequests(requests.map(req => req.id === id ? { ...req, status: 'accepted' } : req));
     setShowRejectCard(false);
   };
 
@@ -149,9 +146,7 @@ const HospitalDashboard = () => {
   };
 
   const handleCancel = (id) => {
-    setRequests(requests.map(req => 
-      req.id === id ? { ...req, status: 'cancelled' } : req
-    ));
+    setRequests(requests.map(req => req.id === id ? { ...req, status: 'cancelled' } : req));
   };
 
   const handleMarkCompletePaid = () => {
@@ -160,38 +155,27 @@ const HospitalDashboard = () => {
 
   const handleFinalizeAppointment = () => {
     let finalStatus = 'completed';
-    
-    if (followUpStatus === 'interested') {
-      finalStatus = 'follow-up';
-    } else if (followUpStatus === 'sell') {
-      finalStatus = 'sold';
-    }
-    
-    setRequests(requests.map(req => 
-      req.id === selectedRequest.id ? { ...req, status: finalStatus } : req
-    ));
+    if (followUpStatus === 'interested') finalStatus = 'follow-up';
+    else if (followUpStatus === 'sell') finalStatus = 'sold';
+    setRequests(requests.map(req => req.id === selectedRequest.id ? { ...req, status: finalStatus } : req));
     setShowCompleteModal(false);
     setSelectedRequest(null);
   };
 
   const handleCloseRejectAppointment = () => {
-    setRequests(requests.map(req => 
-      req.id === selectedRequest.id ? { ...req, status: 'rejected' } : req
-    ));
+    setRequests(requests.map(req => req.id === selectedRequest.id ? { ...req, status: 'rejected' } : req));
     setShowRejectModal(false);
     setSelectedRequest(null);
   };
 
   const handleCloseAbsentAppointment = () => {
-    setRequests(requests.map(req => 
-      req.id === selectedRequest.id ? { ...req, status: 'absent' } : req
-    ));
+    setRequests(requests.map(req => req.id === selectedRequest.id ? { ...req, status: 'absent' } : req));
     setShowAbsentModal(false);
     setSelectedRequest(null);
   };
 
-  const filteredRequests = activeTab === 'all' 
-    ? requests 
+  const filteredRequests = activeTab === 'all'
+    ? requests
     : requests.filter(req => {
         if (activeTab === 'booked') return req.status === 'accepted';
         return req.status === activeTab;
@@ -200,10 +184,21 @@ const HospitalDashboard = () => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
 
+      {/* ✅ HEADER WITH BACK BUTTON */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+
+              {/* ✅ BACK BUTTON */}
+              <button
+                onClick={() => router.back()}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Go back"
+              >
+                <ArrowLeft size={22} className="text-gray-600" />
+              </button>
+
               {/* ✅ DYNAMIC INITIAL */}
               <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center font-bold text-white text-lg">
                 {clinicHeader.initial}
@@ -234,19 +229,13 @@ const HospitalDashboard = () => {
               >
                 {tab.label}
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  activeTab === tab.id
-                    ? 'bg-white text-blue-600'
-                    : 'bg-gray-100 text-gray-600'
+                  activeTab === tab.id ? 'bg-white text-blue-600' : 'bg-gray-100 text-gray-600'
                 }`}>
                   {tab.count}
                 </span>
               </button>
             ))}
           </div>
-          <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
-            <Plus size={20} />
-            <span>Add Request</span>
-          </button>
         </div>
 
         <div className="space-y-4">
@@ -257,12 +246,9 @@ const HospitalDashboard = () => {
                   <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600">
                     <span className="font-medium">• Order ID: {request.id}</span>
                     <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={14} />
-                      {request.time}
-                    </span>
+                    <span className="flex items-center gap-1"><Clock size={14} />{request.time}</span>
                     <span>•</span>
-                    <span>{request.type}</span>
+                    <span>{request.type === 'Collet CASH ED' ? 'Prepaid' : request.type}</span>
                   </div>
                   {request.orderType && (
                     <p className="text-sm text-gray-700 mt-1 font-medium">{request.orderType}</p>
@@ -331,11 +317,7 @@ const HospitalDashboard = () => {
                           </p>
                           <div className="flex items-center gap-1 mt-2">
                             {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                size={16}
-                                className={i < request.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-                              />
+                              <Star key={i} size={16} className={i < request.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
                             ))}
                           </div>
                         </div>
@@ -349,7 +331,6 @@ const HospitalDashboard = () => {
                       <button onClick={() => handleRejectClick(request)} className="text-red-500 hover:text-red-600 font-semibold text-base transition-colors">Reject</button>
                     </div>
                   )}
-
                   {request.status === 'accepted' && (
                     <div className="flex items-center gap-3 mt-6 pt-4 border-t border-gray-200">
                       <button onClick={() => handleCompleteClick(request)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-base transition-colors">Complete</button>
@@ -357,7 +338,6 @@ const HospitalDashboard = () => {
                       <button onClick={() => handleCancel(request.id)} className="text-yellow-600 hover:text-yellow-700 font-semibold text-base transition-colors">Cancel</button>
                     </div>
                   )}
-
                   {request.status === 'completed' && (
                     <div className="mt-6 pt-4 border-t border-gray-200">
                       <div className="bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg font-medium text-center">✓ Appointment Finalized</div>
@@ -407,7 +387,7 @@ const HospitalDashboard = () => {
             </div>
             <div className="p-6 space-y-6">
               <div className="border-b border-gray-200 pb-4">
-                <p className="text-sm text-blue-600 font-medium mb-2">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</p>
+                <p className="text-sm text-blue-600 font-medium mb-2">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type === 'Collet CASH ED' ? 'Prepaid' : selectedRequest.type}</p>
                 <div className="flex items-center gap-3 mt-4">
                   {selectedRequest.patient.image ? (
                     <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-12 h-12 rounded-full object-cover" />
@@ -440,42 +420,46 @@ const HospitalDashboard = () => {
                     <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
                     <div className="flex items-center gap-1 mt-1">
                       {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={12}
-                          className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-                        />
+                        <Star key={i} size={12} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
                       ))}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {!paymentReceived && (
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Follow Up</h4>
-                  <div className="space-y-2">
-                    {['not-interested', 'sell', 'interested'].map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => setFollowUpStatus(status)}
-                        className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all capitalize ${
-                          followUpStatus === status ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        {status.replace('-', ' ')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Follow Up dropdown — always shown below Booking for */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Follow Up</h4>
+                <select
+                  value={followUpStatus}
+                  onChange={(e) => setFollowUpStatus(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-700"
+                >
+                  <option value="">Select Follow Up</option>
+                  <option value="not-interested">Not Interested</option>
+                  <option value="sell">Sell</option>
+                  <option value="interested">Interested</option>
+                </select>
+              </div>
 
-              {!paymentReceived ? (
+              {/* Payment Box — 3 states */}
+              {selectedRequest.type === 'Collet CASH ED' ? (
+                // State 3: Prepaid — blue box shown directly
+                <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <Check size={20} className="bg-blue-600 text-white rounded-full p-0.5" />
+                    <p className="font-semibold">Prepaid</p>
+                  </div>
+                  <p className="text-3xl font-bold text-blue-600">₹{selectedRequest.amount}</p>
+                </div>
+              ) : !paymentReceived ? (
+                // State 1: Collect Cash — green dashed box
                 <div className="bg-emerald-50 rounded-lg p-4 border-2 border-dashed border-emerald-200">
                   <p className="text-sm text-emerald-700 font-medium mb-1">Please Collect Cash</p>
                   <p className="text-3xl font-bold text-emerald-700">₹{selectedRequest.amount}</p>
                 </div>
               ) : (
+                // State 2: Online Payment Received
                 <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
                   <div className="flex items-center gap-2 text-blue-600 mb-2">
                     <Check size={20} className="bg-blue-600 text-white rounded-full p-0.5" />
@@ -497,11 +481,11 @@ const HospitalDashboard = () => {
               </div>
 
               <button
-                onClick={!paymentReceived ? handleMarkCompletePaid : handleFinalizeAppointment}
+                onClick={selectedRequest.type === 'Collet CASH ED' || paymentReceived ? handleFinalizeAppointment : handleMarkCompletePaid}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg flex items-center justify-center gap-2"
               >
                 <Check size={20} />
-                {!paymentReceived ? 'Mark as Completed & Paid' : 'Finalize Appointment'}
+                {selectedRequest.type === 'Collet CASH ED' || paymentReceived ? 'Finalize Appointment' : 'Mark as Completed & Paid'}
               </button>
             </div>
           </div>
@@ -516,7 +500,6 @@ const HospitalDashboard = () => {
               <div className="text-sm text-gray-600">
                 <span className="font-medium">• Order ID {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</span>
               </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
                   <div className="flex items-start gap-3">
@@ -541,7 +524,6 @@ const HospitalDashboard = () => {
                     </div>
                   </div>
                 </div>
-
                 <div className="border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-6">
                   <p className="text-sm text-gray-600 mb-2">Booking for</p>
                   <div className="flex items-start gap-3">
@@ -559,28 +541,19 @@ const HospitalDashboard = () => {
                           <p className="text-sm text-gray-600">{selectedRequest.doctor.qualification}</p>
                         </div>
                         {selectedRequest.doctor.available && (
-                          <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full whitespace-nowrap flex-shrink-0">
-                            Available
-                          </span>
+                          <span className="bg-emerald-500 text-white text-xs px-3 py-1 rounded-full whitespace-nowrap flex-shrink-0">Available</span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-700 mt-1">
-                        {selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}
-                      </p>
+                      <p className="text-sm text-gray-700 mt-1">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
                       <div className="flex items-center gap-1 mt-2">
                         {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            size={16}
-                            className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-                          />
+                          <Star key={i} size={16} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
                         ))}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-
               <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
                 <button onClick={() => handleAccept(selectedRequest.id)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-base transition-colors">Complete</button>
                 <button onClick={handleRejectFromCard} className="text-red-500 hover:text-red-600 font-semibold text-base transition-colors">Absent</button>
@@ -621,7 +594,6 @@ const HospitalDashboard = () => {
                 </div>
                 <p className="text-sm text-gray-600 mt-3">Slot: {selectedRequest.slot}</p>
               </div>
-
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-2">Booking for</p>
                 <div className="flex items-center gap-3">
@@ -638,17 +610,12 @@ const HospitalDashboard = () => {
                     <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
                     <div className="flex items-center gap-1 mt-1">
                       {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={12}
-                          className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-                        />
+                        <Star key={i} size={12} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
                       ))}
                     </div>
                   </div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
                 <textarea
@@ -676,7 +643,7 @@ const HospitalDashboard = () => {
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Reject</h2>
+                <h2 className="text-xl font-bold text-gray-900">Absent</h2>
                 <button onClick={() => setShowAbsentModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                   <X size={24} className="text-gray-500" />
                 </button>
@@ -700,7 +667,6 @@ const HospitalDashboard = () => {
                 </div>
                 <p className="text-sm text-gray-600 mt-3">Slot: {selectedRequest.slot}</p>
               </div>
-
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-2">Booking for</p>
                 <div className="flex items-center gap-3">
@@ -717,17 +683,12 @@ const HospitalDashboard = () => {
                     <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
                     <div className="flex items-center gap-1 mt-1">
                       {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={12}
-                          className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-                        />
+                        <Star key={i} size={12} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
                       ))}
                     </div>
                   </div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
                 <textarea

@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 const HeroSectionPrematureEjaculationPage = () => {
   return (
@@ -22,12 +23,18 @@ const HeroSectionPrematureEjaculationPage = () => {
 
           {/* Buttons */}
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-            <button className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition w-full sm:w-auto shadow-sm">
+            <Link
+              href="/free-consultation"
+              className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition w-full sm:w-auto shadow-sm text-center"
+            >
               Free Consultation
-            </button>
-            <button className="px-6 py-3 border border-blue-600 text-blue-600 rounded-md font-medium hover:bg-blue-50 transition w-full sm:w-auto">
+            </Link>
+            <Link
+              href="/#assessment"
+              className="px-6 py-3 border border-blue-600 text-blue-600 rounded-md font-medium hover:bg-blue-50 transition w-full sm:w-auto text-center"
+            >
               Take Self-Assessment
-            </button>
+            </Link>
           </div>
         </div>
 
