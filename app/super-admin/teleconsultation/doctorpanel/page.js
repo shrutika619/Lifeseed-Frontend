@@ -1,5 +1,5 @@
 import React from 'react'
-import AdminDoctorPanalPage from '@/components/AdminDoctorPanalPage/AdminDoctorPanalPage'
+import AdminDoctorPanalPage from '@/components/AdminDoctorPanelPage/AdminDoctorPanelPage'
 
 const page = () => {
   return (

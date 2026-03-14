@@ -42,7 +42,7 @@ export default function RootLayout({ children }) {
     ,"/super-admin/teleconsultation/customerprofile","/super-admin/in-clinic-consultation/customerprofile","/timeslotmanagement"
     ,"/super-admin/teleconsultation/configureslot","/admin/teleconsultation/configureslot","/super-admin/first-time-user/customerprofile",
     "/admin/first-time-user/customerprofile","/super-admin/log-in-user/customerprofile", "/admin/log-in-user/customerprofile","/super-admin/newuser","/admin/newuser",
-    "/super-admin/teleconsultation/doctorpanal","/admin/teleconsultation/doctorpanal"
+    "/super-admin/teleconsultation/doctorpanel","/admin/teleconsultation/doctorpanel"
   ];
 
   // Logic to handle exact matches or sub-paths if necessary

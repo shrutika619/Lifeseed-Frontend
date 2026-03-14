@@ -111,7 +111,7 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule }) => {
     },
     {
       icon: Stethoscope, label: "Doctor Panel", color: "text-violet-600", bg: "hover:bg-violet-50",
-      href: "/super-admin/teleconsultation/doctorpanal",
+      href: "/super-admin/teleconsultation/doctorpanel",
     },
     {
       icon: PhoneCall, label: "Call Clinic", color: "text-slate-600", bg: "hover:bg-slate-50",
