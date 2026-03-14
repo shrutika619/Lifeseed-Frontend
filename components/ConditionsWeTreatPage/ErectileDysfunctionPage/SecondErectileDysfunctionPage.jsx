@@ -1,8 +1,11 @@
 "use client"
 import React from "react";
 import { Users, TrendingUp, BarChart3 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const SecondErectileDysfunctionPage = () => {
+  const router = useRouter();
+
   return (
     <>
       {/* Main Content Section */}
@@ -65,7 +68,10 @@ const SecondErectileDysfunctionPage = () => {
           Our 2-minute assessment helps you understand your symptoms and
           provides a confidential starting point for your recovery journey.
         </p>
-        <button className="px-6 py-3 bg-white text-blue-600 font-medium rounded-md hover:bg-gray-100 transition">
+        <button
+          onClick={() => router.push("/#assessment")}
+          className="px-6 py-3 bg-white text-blue-600 font-medium rounded-md hover:bg-gray-100 transition"
+        >
           Take Free Self-Assessment
         </button>
       </div>

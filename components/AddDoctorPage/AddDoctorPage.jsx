@@ -3,9 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useDoctorOptions } from '@/app/hooks/useDoctorOptions';
-import { AlertCircle, Lock } from 'lucide-react'; 
+import { AlertCircle, Lock, ArrowLeft } from 'lucide-react'; 
 
-// ✅ ALL API CALLS NOW IMPORTED FROM SERVICE ONLY (No direct Axios calls)
 import { 
   getDoctorById, 
   createDoctor, 
@@ -104,7 +103,6 @@ const AddDoctorPage = () => {
 
       try {
         if (doctorId) {
-          // EDIT MODE
           const [docRes, configRes] = await Promise.all([
             getDoctorById(doctorId),
             getDoctorSlotConfig(doctorId)
@@ -166,7 +164,6 @@ const AddDoctorPage = () => {
           }
 
         } else {
-          // ✅ CREATE MODE: Using Service Call
           const response = await getClinicSlots();
           
           if (response.success) {
@@ -338,7 +335,6 @@ const AddDoctorPage = () => {
   const hasSlotsForDay = clinicSlots && !clinicSlots[selectedDayObj.full]?.isClosed && 
       ['morning', 'afternoon', 'evening', 'night'].some(s => clinicSlots[selectedDayObj.full]?.[s]?.length > 0);
 
-  // Read-Only renderer for "Current Schedule"
   const renderOriginalAvailability = (dayString) => {
     if (!originalAvailability) return <p className="text-sm text-gray-500 py-4">No previous schedule found.</p>;
     const dayData = originalAvailability[dayString];
@@ -371,14 +367,12 @@ const AddDoctorPage = () => {
     });
   };
 
-  // Editable renderer switches styling based on 'isCompact' flag
   const renderEditableSlots = (isCompact = false) => {
     if (!clinicSlots) return <p className="text-sm text-gray-500 py-4">Loading clinic timings...</p>;
     if (clinicSlots[selectedDayObj.full]?.isClosed) return <p className="text-sm text-red-500 py-4 font-medium">Clinic is closed on this day.</p>;
 
     return (
       <>
-        {/* DAY-SPECIFIC TOGGLE */}
         {hasSlotsForDay && (
           <div className={isCompact ? "flex items-center justify-between mb-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm" : "flex items-center justify-end mb-4"}>
             <span className={isCompact ? "text-sm font-medium text-gray-800" : "text-sm font-medium text-gray-700 mr-3"}>Select All for {selectedDayObj.short}</span>
@@ -390,7 +384,6 @@ const AddDoctorPage = () => {
           </div>
         )}
 
-        {/* Session Slots Loop */}
         {['morning', 'afternoon', 'evening', 'night'].map(session => {
           const sessionSlots = clinicSlots[selectedDayObj.full]?.[session] || [];
           if (sessionSlots.length === 0) return null;
@@ -415,7 +408,6 @@ const AddDoctorPage = () => {
           );
         })}
 
-        {/* Fallback if no slots generated */}
         {!hasSlotsForDay && (
           <p className="text-sm text-gray-500 italic py-2">No time slots configured in the clinic profile for this day.</p>
         )}
@@ -425,6 +417,19 @@ const AddDoctorPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-inter">
+
+      {/* === Back Button === */}
+      <div className="max-w-4xl mx-auto mb-4">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
 
         {/* === Photo Upload Section === */}
@@ -502,7 +507,6 @@ const AddDoctorPage = () => {
         <div className="p-6">
           <h2 className="text-xl font-semibold mb-4">Weekly Availability</h2>
 
-          {/* WARNING BANNER */}
           {needsReconfig && (
             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 shadow-sm">
               <AlertCircle className="text-amber-600 mt-0.5 shrink-0" size={20} />
@@ -541,10 +545,8 @@ const AddDoctorPage = () => {
             </div>
           </div>
 
-          {/* SIDE-BY-SIDE GRID VIEW OR STANDARD VIEW */}
           {needsReconfig ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-              {/* Left Side: Current Locked Schedule */}
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
                   <Lock size={18} className="text-gray-500" />
@@ -556,7 +558,6 @@ const AddDoctorPage = () => {
                 {renderOriginalAvailability(selectedDayObj.full)}
               </div>
 
-              {/* Right Side: New Editable Schedule */}
               <div className="bg-blue-50/30 border border-blue-100 rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4 pb-3 border-b border-blue-100">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -569,7 +570,6 @@ const AddDoctorPage = () => {
               </div>
             </div>
           ) : (
-            // Standard View if no conflict (Uses original layout)
             <div>
               {renderEditableSlots(false)}
             </div>
