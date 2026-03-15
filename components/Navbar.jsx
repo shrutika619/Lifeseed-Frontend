@@ -3,11 +3,9 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAllCities } from "@/app/services/patient/clinic.service";
-import { toast } from "sonner"; // ✅ Imported toast
-// Icons
+import { toast } from "sonner";
 import { User, LogOut, ChevronDown } from "lucide-react";
 
-// Redux
 import { useSelector, useDispatch } from "react-redux";
 import { 
   selectUser, 
@@ -45,23 +43,32 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  // ✅ UPDATED: Catch 404 Error and show toast ONLY once per session
+  // ✅ Get Role and Determine Display Name
+  const userRole = user?.role?.toLowerCase();
+  
+  let displayName = "Complete Profile";
+  if (user?.fullName) {
+    displayName = user.fullName;
+  } else if (userRole === "admin") {
+    displayName = "Admin Mode";
+  } else if (userRole === "super_admin" || userRole === "superadmin") {
+    displayName = "Superadmin Mode";
+  }
+
+  // ✅ UPDATED: Catch 404 Error and show toast ONLY for patients
   useEffect(() => {
     const checkProfile = async () => {
-      if (isAuthenticated && !user?.fullName) {
-        // Dispatch the thunk and wait for the result
+      // Only run this logic if they are authenticated, missing a name, AND are a patient
+      if (isAuthenticated && !user?.fullName && (!userRole || userRole === "patient")) {
         const resultAction = await dispatch(fetchProfileDetails());
         
-        // If the action has an error (like a 404 from your API)
         if (resultAction.error || resultAction.payload?.error) {
-          // Check session storage so we don't spam the user on every page load
           const hasShownToast = sessionStorage.getItem("missing_profile_toast");
           
           if (!hasShownToast) {
             toast.warning("Please complete your profile setup to continue.", {
-               duration: 6000, // Show it a bit longer so they can read it
+               duration: 6000, 
             });
-            // Mark as shown for this session
             sessionStorage.setItem("missing_profile_toast", "true");
           }
         }
@@ -69,7 +76,7 @@ const Navbar = () => {
     };
 
     checkProfile();
-  }, [dispatch, isAuthenticated, user?.fullName]); 
+  }, [dispatch, isAuthenticated, user?.fullName, userRole]); 
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -125,7 +132,6 @@ const Navbar = () => {
       console.error("Logout API call failed", error);
     } finally {
       dispatch(logoutSuccess());
-      // ✅ Clear the session storage flag on logout so it triggers again if they log back in
       sessionStorage.removeItem("missing_profile_toast");
       closeDropdown();
       router.push("/");
@@ -245,9 +251,9 @@ const Navbar = () => {
                 </div>
 
                 <div className="flex flex-col items-start">
-                   {/* ✅ Changed fallback to Complete Profile */}
+                   {/* ✅ Used dynamic displayName */}
                    <span className="text-sm font-semibold text-gray-700 max-w-[120px] truncate leading-tight">
-                     {user?.fullName || "Complete Profile"} 
+                     {displayName} 
                    </span>
                 </div>
                 
@@ -257,9 +263,9 @@ const Navbar = () => {
               {openDropdown === "profile" && (
                 <ul className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 border border-gray-100">
                   <li className="px-4 py-2 border-b border-gray-100">
-                    {/* ✅ Changed fallback to Complete Profile */}
+                    {/* ✅ Used dynamic displayName */}
                     <p className="text-sm font-semibold text-gray-800 truncate">
-                      {user?.fullName || "Complete Profile"}
+                      {displayName}
                     </p>
                     <p className="text-xs text-gray-500 truncate">{user?.mobileNo || user?.email}</p>
                   </li>
@@ -408,9 +414,9 @@ const Navbar = () => {
                       )}
                     </div>
                     <div>
-                      {/* ✅ Changed fallback to Complete Profile */}
+                      {/* ✅ Used dynamic displayName */}
                       <p className="text-sm font-semibold text-gray-800 truncate max-w-[180px]">
-                        {user?.fullName || "Complete Profile"}
+                        {displayName}
                       </p>
                       <p className="text-xs text-gray-500 truncate max-w-[180px]">
                         {user?.mobileNo || user?.email}
