@@ -35,7 +35,7 @@ export const adminTicketService = {
    */
   addTicketComment: async (userId, activityId, commentData) => {
     try {
-      const response = await api.post(`/customer/activity/${userId}/${activityId}/comment`, commentData);
+      const response = await api.post(`${Constants.urlEndPoints.CUSTOMER_ACTIVITY}/${userId}/${activityId}/comment`, commentData);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -48,23 +48,10 @@ export const adminTicketService = {
    */
   getTicketDetail: async (userId, activityId) => {
     try {
-      const response = await api.get(`/customer/activity/${userId}/${activityId}`);
+      const response = await api.get(`${Constants.urlEndPoints.CUSTOMER_ACTIVITY}/${userId}/${activityId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
-
-  /**
-   * Add a comment to a specific ticket.
-   * POST /api/v1/customer/activity/:userId/:activityId/comment
-   */
-  addTicketComment: async (userId, activityId, commentData) => {
-    try {
-      const response = await api.post(`/customer/activity/${userId}/${activityId}/comment`, commentData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error.message;
-    }
-  }
 };

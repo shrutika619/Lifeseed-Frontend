@@ -39,6 +39,8 @@ export class Constants {
     SUBMIT_CUSTOMER_PROFILE: `${this.API_BASE_URL}/customer/submit`,
     CUSTOMER_ACTIVITY: `${this.API_BASE_URL}/customer/activity`,
     MANUAL_CUSTOMER_CREATE: `${this.API_BASE_URL}/customer/manual`,
+    CUSTOMER_ORDER_HISTORY: `${this.API_BASE_URL}/customer/order-history`,
+    
 
     // Add these inside your URL endpoints object
     CUSTOMER_ACTIVITY: "/customer/activity", // Used for fetching tickets
