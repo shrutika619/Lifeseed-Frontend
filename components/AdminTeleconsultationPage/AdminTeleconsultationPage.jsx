@@ -153,10 +153,10 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
       icon: Stethoscope, label: "Doctor Panel", color: "text-violet-600", bg: "hover:bg-violet-50",
       href: `${basePath}/teleconsultation/doctorpanel?recordId=${item.recordId}`,
     },
-    // ✅ 3rd position — Place Order
+    // ✅ PASSING RECORD ID HERE
     {
       icon: ShoppingCart, label: "Place Order", color: "text-blue-600", bg: "hover:bg-blue-50",
-      href: `${basePath}/teleconsultation/placeorder`,
+      href: `${basePath}/teleconsultation/placeorder?recordId=${item.recordId}`,
     },
     {
       icon: PhoneCall, label: "Call Clinic", color: "text-slate-600", bg: "hover:bg-slate-50",

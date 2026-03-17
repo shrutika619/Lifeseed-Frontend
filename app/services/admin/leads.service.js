@@ -94,7 +94,6 @@ export const updateCustomerActivity = async (userId, activityId, payload) => {
 };
 
 
-// ✅ Create New Customer (Manual Entry)
 export const createCustomerProfile = async (payload) => {
   try {
     const response = await api.post(`/customer/manual`, payload); 
@@ -108,7 +107,7 @@ export const createCustomerProfile = async (payload) => {
   }
 };
 
-// ✅ Option 1 Dummy Data: Tells the UI to auto-assign the owner
+
 export const getAdminDropdownData = async () => {
   return { 
     success: true, 
@@ -117,4 +116,14 @@ export const getAdminDropdownData = async () => {
       assignToDropdown: [] 
     } 
   };
+};
+
+
+export const getCustomerOrderHistory = async (userId) => {
+  try {
+    const response = await api.get(`/customer/order-history/${userId}`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
 };

@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { adminTeleconsultationService } from '@/app/services/admin/adminTeleconsultation.service'
 import { toast } from 'sonner'
 import { Loader2, X } from 'lucide-react'
@@ -65,7 +65,11 @@ const chipStyles = {
 const AdminDoctorPanalPage = () => {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const recordId = searchParams.get('recordId')
+
+  // To dynamically handle `/admin` vs `/super-admin`
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
   // --- Data States ---
   const [loading, setLoading] = useState(true)
@@ -90,7 +94,7 @@ const AdminDoctorPanalPage = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  // ✅ Computed Logic for Blocked Status
+  // Computed Logic for Blocked Status
   const isRescheduleBlocked = consultationStatus === 'Cancelled' || consultationStatus === 'Complete';
 
   // Fetch Data on Load
@@ -202,12 +206,16 @@ const AdminDoctorPanalPage = () => {
     }
   }
 
+  // ✅ UPDATED TO REDIRECT TO PLACE ORDER PAGE
   const handlePlaceOrder = () => {
-    alert('Order placed for patient: ' + patientDetails?.name)
+    if (!recordId) {
+      toast.error("No record found to place order");
+      return;
+    }
+    router.push(`${basePath}/teleconsultation/placeorder?recordId=${recordId}`);
   }
 
   const handleReschedule = () => {
-    // Block action if status is Cancelled or Complete
     if (isRescheduleBlocked) {
       toast.error(`${consultationStatus} appointments cannot be rescheduled.`);
       return;
@@ -401,7 +409,6 @@ const AdminDoctorPanalPage = () => {
         <div style={styles.actionRow}>
           <button style={styles.btnCancel} onClick={handleCancel}>Cancel</button>
           
-          {/* ✅ UPDATED RESCHEDULE BUTTON WITH BLOCK LOGIC */}
           <button 
             style={{
               ...styles.btnReschedule,
@@ -473,7 +480,6 @@ const styles = {
   actionRow: { display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid #eef0f5' },
   btnCancel: { background: '#fff', color: '#555', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '9px 18px', fontSize: '13.5px', fontWeight: '600', cursor: 'pointer' },
   
-  // Reschedule styles
   btnReschedule: { background: '#fff', color: '#3b5bdb', border: '1.5px solid #3b5bdb', borderRadius: '8px', padding: '9px 18px', fontSize: '13.5px', fontWeight: '600', cursor: 'pointer', transition: '0.2s' },
   btnDisabled: { background: '#f5f5f5', color: '#999', border: '1.5px solid #d0d5dd', cursor: 'not-allowed', opacity: 0.6 },
   

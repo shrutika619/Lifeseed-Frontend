@@ -40,12 +40,23 @@ export class Constants {
     CUSTOMER_ACTIVITY: `${this.API_BASE_URL}/customer/activity`,
     MANUAL_CUSTOMER_CREATE: `${this.API_BASE_URL}/customer/manual`,
 
+    // Add these inside your URL endpoints object
+    CUSTOMER_ACTIVITY: "/customer/activity", // Used for fetching tickets
+    TICKET_UPDATE: "/customer/activity", // Adjust if you have a specific /ticket route
+    TICKET_COMMENT: "/customer/activity/comment", // Adjust to your actual comment POST route
+
     // --- ADMIN ADDRESS --- 
     ADMIN_ADDRESS_BASE: `${this.API_BASE_URL}/address/admin`,
 
     // --- ADMIN TELECONSULTATION BOOKINGS --- 
     ADMIN_TELECONSULTATION_BOOKINGS: `${this.API_BASE_URL}/admin/teleconsultationBooking/bookings`,
     APPOINTMENT_PREFILL: `${this.API_BASE_URL}/appoinntmentBooking/appointment/prefill`,
+    
+    
+    // --- ADMIN PLACE ORDER --- 
+    ADMIN_ORDER_PREFETCH: `${this.API_BASE_URL}/admin/orders/prefetch`,
+    ADMIN_ORDER_PLACE: `${this.API_BASE_URL}/admin/orders/place`,
+    ADMIN_ORDER_HISTORY: `${this.API_BASE_URL}/admin/orders/history`,
     
     // Dynamic endpoints (Functions)
     ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE

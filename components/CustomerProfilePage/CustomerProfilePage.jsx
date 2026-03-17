@@ -11,9 +11,11 @@ import {
   addCustomerActivity, 
   updateCustomerActivity,
   createCustomerProfile, 
-  getAdminDropdownData   
+  getAdminDropdownData,
+  getCustomerOrderHistory,
 } from '@/app/services/admin/leads.service'; 
 import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
+import { adminTicketService } from '@/app/services/admin/adminTicket.service'; // ✅ IMPORTED TICKET SERVICE
 import { getAllCities } from "@/app/services/patient/clinic.service";
 import { toast } from 'sonner';
 import { 
@@ -47,99 +49,6 @@ const activitySchema = yup.object({
 });
 
 /* ─────────────────────────────────────────────
-   ORDER HISTORY — SAMPLE DATA
-───────────────────────────────────────────── */
-const SAMPLE_ORDER_HISTORY = [
-  {
-    id: 'order-1',
-    type: 'Teleconsultation',
-    icon: '🔮',
-    iconBg: '#f3e8ff',
-    doctor: 'Dr. Aisha Sharma',
-    specialization: 'Cardiologist',
-    location: null,
-    date: 'Nov 25, 2024',
-    timeSlot: '11:30 AM - 12:00 PM',
-    status: 'Upcoming',
-    statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-    details: [
-      { label: 'Order ID',      value: '#TC-98765' },
-      { label: 'Booking ID',    value: '#BK-54321' },
-      { label: 'Booking Time', value: 'Nov 20, 2024, 8:15 PM' },
-      { label: 'Amount Paid',  value: '$50.00' },
-      { label: 'Agent',        value: 'Pranjal' },
-    ],
-    actions: ['View Details', 'Edit', 'Cancel'],
-  },
-  {
-    id: 'order-2',
-    type: 'In-Clinic Consultation',
-    icon: '📋',
-    iconBg: '#fef9c3',
-    doctor: 'Dr. Rohan Gupta',
-    specialization: 'General Physician',
-    location: 'Apollo Clinic, Koregaon Park',
-    date: 'Nov 28, 2024',
-    timeSlot: '5:00 PM - 5:30 PM',
-    status: 'Upcoming',
-    statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-    details: [
-      { label: 'Order ID',      value: '#IC-67890' },
-      { label: 'Patient Age',  value: '34' },
-      { label: 'Booking Time', value: 'Nov 21, 2024, 10:05 AM' },
-      { label: 'Amount Paid',  value: '$80.00' },
-      { label: 'Agent',        value: 'Pranjal' },
-    ],
-    actions: ['View Details', 'Get Directions', 'Edit', 'Cancel'],
-  },
-  {
-    id: 'order-3',
-    type: 'Medicine Order',
-    icon: '🧴',
-    iconBg: '#e0f2fe',
-    doctor: null,
-    specialization: null,
-    location: null,
-    date: 'Nov 1, 2024',
-    timeSlot: null,
-    status: 'Delivered',
-    statusColor: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
-    orderId: '#MED-12908',
-    items: 'Paracetamol (1 strip), Atorvastatin (1 strip), Vitamin D Sachet...',
-    actions: ['View Order', 'Reorder'],
-  },
-]
-
-/* ─────────────────────────────────────────────
-   TICKET — SAMPLE DATA
-───────────────────────────────────────────── */
-const SAMPLE_TICKETS = [
-  {
-    id: 'ticket-1',
-    category: 'Tc Related',
-    title: 'Users are reporting that the login page is not loading properly on mobile devices.',
-    meta: 'Wed, Mar 11, 2026, 09:30 AM • Agent: Pranjal',
-    statuses: ['Open', 'Unresolved', 'Resolved', 'Closed'],
-    activeStatus: 'Open',
-    comments: [
-      { author: 'Sarah Johnson', time: 'Wed, Mar 11, 2026, 09:35 AM', text: 'Checked the server logs, no errors found.' },
-    ],
-  },
-  {
-    id: 'ticket-2',
-    category: null,
-    title: 'Login page not loading',
-    body: 'Users are reporting that the login page is not loading properly on mobile devices.',
-    meta: 'Technical • Wed, Mar 11, 2026, 09:30 AM • Agent: Sarah Johnson',
-    statuses: ['Open', 'Unresolved', 'Resolved', 'Fake'],
-    activeStatus: 'Open',
-    comments: [
-      { author: 'Sarah Johnson', time: 'Wed, Mar 11, 2026, 09:35 AM', text: 'Checked the server logs, no errors found.' },
-    ],
-  },
-]
-
-/* ─────────────────────────────────────────────
    TICKET STATUS HELPERS
 ───────────────────────────────────────────── */
 const ticketStatusStyle = (s) => {
@@ -166,181 +75,437 @@ const ticketStatusIcon = (s) => {
 /* ─────────────────────────────────────────────
    ORDER HISTORY TAB COMPONENT
 ───────────────────────────────────────────── */
-const OrderHistoryTab = () => (
-  <div className="space-y-4">
-    {SAMPLE_ORDER_HISTORY.map((order) => (
-      <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0"
-              style={{ background: order.iconBg }}
-            >
-              {order.icon}
-            </div>
-            <div>
-              <p className="font-bold text-slate-800 text-sm">{order.type}</p>
-              {order.doctor && (
-                <p className="text-xs text-slate-500 mt-0.5">
-                  with <span className="font-semibold text-slate-700">{order.doctor}</span>
-                  {order.specialization && <span className="text-slate-400"> ({order.specialization})</span>}
-                </p>
-              )}
-              {order.location && (
-                <p className="text-xs text-slate-400 mt-0.5">{order.location}</p>
-              )}
-              {order.date && (
-                <p className="text-xs font-semibold text-slate-600 mt-1">
-                  {order.timeSlot
-                    ? <>Time Slot: <span className="text-slate-800">{order.date}</span>&nbsp;•&nbsp;{order.timeSlot}</>
-                    : order.date
-                  }
-                </p>
-              )}
-            </div>
-          </div>
-          <span
-            className="text-[11px] font-bold px-3 py-1 rounded-full border ml-2 shrink-0"
-            style={{ background: order.statusColor.bg, color: order.statusColor.text, borderColor: order.statusColor.border }}
-          >
-            {order.status}
-          </span>
-        </div>
+const OrderHistoryTab = ({ userId }) => {
+  const [historyData, setHistoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
-        {order.orderId && (
-          <div className="text-xs text-slate-600 mt-2 mb-1">
-            <span className="font-medium">Order ID: </span>{order.orderId}
-          </div>
-        )}
-        {order.items && (
-          <div className="text-xs text-slate-500 mb-1">
-            <span className="font-medium">Items: </span>{order.items}
-          </div>
-        )}
+  useEffect(() => {
+    if (!userId) return;
 
-        {order.details && (
-          <div className="mt-3 border-t border-slate-50 pt-3 space-y-1.5">
-            {order.details.map((d) => (
-              <div key={d.label} className="flex justify-between text-xs">
-                <span className="text-slate-400">{d.label}:</span>
-                <span className="font-semibold text-slate-700">{d.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
+    const fetchAllHistory = async () => {
+      setLoading(true);
+      try {
+        const res = await getCustomerOrderHistory(userId);
+        if (res.success && res.data) {
+          const combined = [];
 
-        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50">
-          {order.actions.map((action) => {
-            const isDanger  = action === 'Cancel'
-            const isPrimary = action === 'Reorder'
-            const isLink    = ['View Details', 'View Order', 'Get Directions', 'Edit'].includes(action)
-            return (
-              <button
-                key={action}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all
-                  ${isDanger  ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : ''}
-                  ${isPrimary ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : ''}
-                  ${isLink    ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : ''}
-                `}
-              >
-                {action}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    ))}
-  </div>
-)
+          // Map Teleconsultations
+          if (res.data.teleBookings && Array.isArray(res.data.teleBookings)) {
+            res.data.teleBookings.forEach(booking => {
+              combined.push({
+                id: booking.requestId,
+                type: 'Teleconsultation',
+                icon: '🔮',
+                iconBg: '#f3e8ff',
+                doctor: booking.doctorName || 'Not Assigned',
+                date: booking.appointmentDate ? new Date(booking.appointmentDate).toLocaleDateString() : '--',
+                timeSlot: booking.timeSlot,
+                status: booking.consultationStatus || 'New',
+                statusColor: booking.consultationStatus === 'Complete'
+                  ? { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }
+                  : booking.consultationStatus === 'Cancelled'
+                  ? { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
+                  : { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+                orderId: booking.requestId,
+                details: [
+                  { label: 'Agent', value: booking.agentName || '--' },
+                  ...(booking.cancelledBy ? [{ label: 'Cancelled By', value: booking.cancelledBy }] : [])
+                ],
+                actions: ['View Details', 'Place Order'],
+                recordId: booking.recordId,
+                rawCreatedAt: booking.bookingDate
+              });
+            });
+          }
 
-/* ─────────────────────────────────────────────
-   TICKET TAB COMPONENT
-───────────────────────────────────────────── */
-const TicketCard = ({ ticket }) => {
-  const [activeStatus, setActiveStatus] = useState(ticket.activeStatus)
-  const [comments, setComments]         = useState(ticket.comments)
-  const [commentInput, setCommentInput] = useState('')
+          // Map Medicine Orders
+          if (res.data.medicineOrders && Array.isArray(res.data.medicineOrders)) {
+            res.data.medicineOrders.forEach(order => {
+              const balanceDue = order.finalPrice - order.amountPaid;
+              
+              combined.push({
+                id: order.orderId,
+                type: 'Medicine Order',
+                icon: '🧴',
+                iconBg: '#e0f2fe',
+                doctor: null,
+                date: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '--',
+                timeSlot: null,
+                status: order.deliveryStatus || 'Pending',
+                statusColor: order.deliveryStatus === 'Delivered' 
+                  ? { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }
+                  : { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5' },
+                orderId: order.orderNumber,
+                items: order.productName,
+                details: [
+                  { label: 'Amount Paid', value: `₹${order.amountPaid}` },
+                  { label: 'Balance Due', value: `₹${balanceDue}` },
+                  { label: 'Payment Status', value: order.paymentStatus },
+                ],
+                actions: ['View Order', 'Reorder'],
+                rawCreatedAt: order.createdAt
+              });
+            });
+          }
 
-  const handleAddComment = () => {
-    if (!commentInput.trim()) return
-    setComments([...comments, { author: 'You', time: 'Just now', text: commentInput.trim() }])
-    setCommentInput('')
+          // Dummy In-Clinic
+          combined.push({
+            id: 'dummy-ic-1',
+            type: 'In-Clinic Consultation',
+            icon: '📋',
+            iconBg: '#fef9c3',
+            doctor: 'Dr. Rohan Gupta',
+            specialization: 'General Physician',
+            location: 'Apollo Clinic, Koregaon Park',
+            date: 'Nov 28, 2024',
+            timeSlot: '5:00 PM - 5:30 PM',
+            status: 'Upcoming',
+            statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+            details: [
+              { label: 'Order ID',      value: '#IC-67890' },
+              { label: 'Patient Age',  value: '34' },
+              { label: 'Amount Paid',  value: '$80.00' },
+            ],
+            actions: ['View Details', 'Get Directions'],
+            rawCreatedAt: '2024-11-21T10:00:00Z'
+          });
+
+          combined.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
+          setHistoryData(combined);
+        } else {
+          toast.error(res.message || "Failed to load history");
+        }
+      } catch (error) {
+        console.error("Error loading history", error);
+        toast.error("Error fetching order history.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllHistory();
+  }, [userId]);
+
+  if (loading) {
+    return <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>;
+  }
+
+  if (historyData.length === 0) {
+    return <div className="text-center py-10 text-slate-500 text-sm">No history found for this patient.</div>;
   }
 
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow space-y-3">
+    <div className="space-y-4">
+      {historyData.map((order) => (
+        <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0" style={{ background: order.iconBg }}>
+                {order.icon}
+              </div>
+              <div>
+                <p className="font-bold text-slate-800 text-sm">{order.type}</p>
+                {order.doctor && (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    with <span className="font-semibold text-slate-700">{order.doctor}</span>
+                    {order.specialization && <span className="text-slate-400"> ({order.specialization})</span>}
+                  </p>
+                )}
+                {order.location && <p className="text-xs text-slate-400 mt-0.5">{order.location}</p>}
+                {order.date && (
+                  <p className="text-xs font-semibold text-slate-600 mt-1">
+                    {order.timeSlot ? <>Time Slot: <span className="text-slate-800">{order.date}</span>&nbsp;•&nbsp;{order.timeSlot}</> : order.date}
+                  </p>
+                )}
+              </div>
+            </div>
+            <span
+              className="text-[11px] font-bold px-3 py-1 rounded-full border ml-2 shrink-0"
+              style={{ background: order.statusColor?.bg, color: order.statusColor?.text, borderColor: order.statusColor?.border }}
+            >
+              {order.status}
+            </span>
+          </div>
+
+          {order.orderId && <div className="text-xs text-slate-600 mt-2 mb-1"><span className="font-medium">ID: </span>{order.orderId}</div>}
+          {order.items && <div className="text-xs text-slate-500 mb-1"><span className="font-medium">Items: </span>{order.items}</div>}
+
+          {order.details && order.details.length > 0 && (
+            <div className="mt-3 border-t border-slate-50 pt-3 space-y-1.5">
+              {order.details.map((d) => (
+                <div key={d.label} className="flex justify-between text-xs">
+                  <span className="text-slate-400">{d.label}:</span>
+                  <span className="font-semibold text-slate-700">{d.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50">
+            {order.actions.map((action) => {
+              const isDanger  = action === 'Cancel';
+              const isPrimary = action === 'Reorder' || action === 'Place Order';
+              const isLink    = ['View Details', 'View Order', 'Get Directions', 'Edit'].includes(action);
+              
+              if (action === 'Place Order' && order.status === 'Cancelled') return null;
+
+              return (
+                <button
+                  key={action}
+                  onClick={() => {
+                    if (action === 'Place Order' && order.recordId) {
+                      router.push(`${basePath}/teleconsultation/placeorder?recordId=${order.recordId}`);
+                    }
+                    if (action === 'View Details' && order.recordId) {
+                      router.push(`${basePath}/teleconsultation/doctorpanel?recordId=${order.recordId}`);
+                    }
+                  }}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all
+                    ${isDanger  ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : ''}
+                    ${isPrimary ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : ''}
+                    ${isLink    ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : ''}
+                  `}
+                >
+                  {action}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   TICKET TAB COMPONENT (Wired to Real API)
+───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────
+   TICKET TAB COMPONENT (Wired to Real API)
+───────────────────────────────────────────── */
+const TicketCard = ({ ticket, userId }) => {
+  const [activeStatus, setActiveStatus] = useState(ticket.ticketStatus || ticket.status || 'Open');
+  const [comments, setComments] = useState([]); 
+  const [commentInput, setCommentInput] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [isFetchingComments, setIsFetchingComments] = useState(false); // ✅ Added loading state
+
+  const statuses = ['Open', 'Unresolved', 'Resolved', 'Closed', 'Fake'];
+
+  const createdDate = new Date(ticket.createdAt || new Date()).toLocaleDateString("en-IN", { 
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+  });
+  const metaString = `${createdDate} • Assigned to: ${ticket.assignedName || ticket.assignedTo || 'Unassigned'}`;
+
+  // Update Status API
+  const handleStatusChange = async (newStatus) => {
+    if (newStatus === activeStatus) return;
+    
+    setIsUpdating(true);
+    try {
+      const payload = { status: newStatus, ticketStatus: newStatus };
+      const res = await adminTicketService.updateTicketStatus(userId, ticket.activityId, payload);
+      
+      if (res.success) {
+        setActiveStatus(newStatus);
+        toast.success(`Ticket marked as ${newStatus}`);
+      } else {
+        toast.error(res.message || "Failed to update ticket");
+      }
+    } catch (error) {
+      toast.error(error.message || "Error communicating with server");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Add Comment API
+  const handleAddComment = async () => {
+    if (!commentInput.trim()) return;
+    
+    const payload = { text: commentInput.trim() };
+
+    try {
+      const res = await adminTicketService.addTicketComment(userId, ticket.activityId, payload);
+      
+      if (res.success) {
+        toast.success("Comment added");
+        
+        // Optimistically add the new comment to the UI
+        const newCommentObj = { 
+          id: Date.now(), // Temporary ID
+          author: 'You', 
+          time: 'Just now', 
+          text: payload.text 
+        };
+        
+        setComments(prev => [newCommentObj, ...prev]); // Add to top of the list
+        setCommentInput(''); 
+      } else {
+        toast.error(res.message || "Failed to add comment");
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to post comment");
+    }
+  };
+
+  // ✅ Fetch Comments API
+  const loadComments = async () => {
+    if (!showComments) {
+      // We are opening the comments section, let's fetch the latest data
+      setIsFetchingComments(true);
+      setShowComments(true); // Open immediately to show the loader
+      
+      try {
+        const res = await adminTicketService.getTicketDetail(userId, ticket.activityId);
+        if (res.success && res.data) {
+          // Map backend comments to our UI structure
+          const mappedComments = (res.data.comments || []).map(c => ({
+            id: c.commentId,
+            author: c.agentName || 'Admin',
+            time: new Date(c.createdAt).toLocaleDateString("en-IN", { 
+              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            }),
+            text: c.text
+          }));
+          
+          setComments(mappedComments);
+        } else {
+          toast.error("Failed to load comments");
+        }
+      } catch (error) {
+        console.error("Error fetching ticket details:", error);
+        toast.error("Error fetching comments");
+      } finally {
+        setIsFetchingComments(false);
+      }
+    } else {
+      // Just close it
+      setShowComments(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow space-y-4">
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-slate-400 text-sm font-bold">D</span>
+        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+          <span className="text-slate-400 text-sm font-bold">
+            {(ticket.assignedName || ticket.createdBy || 'T').charAt(0).toUpperCase()}
+          </span>
         </div>
         <div className="flex-1">
-          {ticket.category && (
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">{ticket.category}</p>
-          )}
-          <p className="text-sm font-bold text-slate-800">{ticket.title}</p>
-          {ticket.body && <p className="text-sm text-slate-600 mt-1">{ticket.body}</p>}
-          <p className="text-xs text-slate-400 mt-1">{ticket.meta}</p>
+          <div className="flex justify-between items-start">
+             <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1 bg-blue-50 inline-block px-2 py-0.5 rounded">
+               {ticket.type}
+             </p>
+             <span className="text-[10px] text-slate-400">ID: {ticket.activityId ? ticket.activityId.slice(-6).toUpperCase() : ''}</span>
+          </div>
+          <p className="text-sm font-bold text-slate-800 leading-relaxed">{ticket.notes}</p>
+          <p className="text-xs text-slate-400 mt-2">{metaString}</p>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {ticket.statuses.map((s) => (
+      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
+        {statuses.map((s) => (
           <button
             key={s}
-            onClick={() => setActiveStatus(s)}
+            type="button"
+            onClick={() => handleStatusChange(s)}
+            disabled={isUpdating}
             className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full transition-all
               ${activeStatus === s
                 ? ticketStatusStyle(s) + ' shadow-sm'
                 : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
-              }`}
+              } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <span>{ticketStatusIcon(s)}</span> {s}
           </button>
         ))}
       </div>
 
-      <div>
-        <p className="text-xs font-bold text-slate-500 mb-2">Comments ({comments.length})</p>
-        <div className="space-y-2 mb-3">
-          {comments.map((c, i) => (
-            <div key={i} className="bg-slate-50 rounded-xl p-3">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-xs font-bold text-blue-600">{c.author}</span>
-                <span className="text-[10px] text-slate-400">{c.time}</span>
-              </div>
-              <p className="text-xs text-slate-600">{c.text}</p>
+      <div className="pt-2">
+        <button 
+          type="button" 
+          onClick={loadComments}
+          disabled={isFetchingComments && !showComments}
+          className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 mb-2 disabled:opacity-50"
+        >
+          <MessageSquare size={14} />
+          {showComments ? 'Hide Comments' : `Comments (${ticket.commentCount || 0})`}
+        </button>
+
+        {showComments && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                {isFetchingComments ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2 mb-3 max-h-[200px] overflow-y-auto pr-2">
+                      {comments.length === 0 && (
+                          <p className="text-[11px] text-slate-400 italic">No comments yet.</p>
+                      )}
+                      {comments.map((c, i) => (
+                        <div key={c.id || i} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-bold text-blue-600">{c.author}</span>
+                            <span className="text-[10px] text-slate-400">{c.time}</span>
+                          </div>
+                          <p className="text-xs text-slate-600">{c.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={commentInput}
+                        onChange={(e) => setCommentInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                        placeholder="Type an internal note or update..."
+                        className="flex-1 text-xs p-2.5 border border-slate-200 rounded-xl outline-none focus:border-blue-400 bg-slate-50"
+                      />
+                      <button
+                        type="button" 
+                        onClick={handleAddComment}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
+                      >
+                        Post
+                      </button>
+                    </div>
+                  </>
+                )}
             </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={commentInput}
-            onChange={(e) => setCommentInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-            placeholder="Add a comment..."
-            className="flex-1 text-xs p-2.5 border border-slate-200 rounded-xl outline-none focus:border-blue-400 bg-slate-50"
-          />
-          <button
-            onClick={handleAddComment}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors"
-          >
-            Comment
-          </button>
-        </div>
+        )}
       </div>
     </div>
   )
 }
 
-const TicketTab = () => (
-  <div className="space-y-4">
-    {SAMPLE_TICKETS.map((ticket) => (
-      <TicketCard key={ticket.id} ticket={ticket} />
-    ))}
-  </div>
-)
+const TicketTab = ({ activities, userId }) => {
+  // Filter activities to only render categories mapped as 'Ticket'
+  const tickets = activities.filter(a => a.category === 'Ticket');
+
+  if (tickets.length === 0) {
+      return (
+        <div className="text-center py-10 text-slate-400 text-sm border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+          No tickets found for this patient.
+        </div>
+      );
+  }
+
+  return (
+    <div className="space-y-4">
+      {tickets.map((ticket) => (
+        <TicketCard key={ticket.activityId} ticket={ticket} userId={userId} />
+      ))}
+    </div>
+  );
+}
 
 /* ─────────────────────────────────────────────
    CITY SELECT MODAL
@@ -576,7 +741,6 @@ const CustomerProfilePage = () => {
   const [addressForm, setAddressForm] = useState({
     label: "Home", flatNo: "", streetArea: "", landmark: "", pinCode: "", contactNumber: ""
   });
-  // ── Address form validation errors ──
   const [addressErrors, setAddressErrors] = useState({});
 
   const { register, handleSubmit, watch, setValue, resetField, reset, formState: { errors } } = useForm({
@@ -589,7 +753,6 @@ const CustomerProfilePage = () => {
     }
   });
 
-  // ── Separate activity form state for validation ──
   const [activityErrors, setActivityErrors] = useState({});
 
   const watchedLeadOwner = watch("leadOwner");
@@ -665,7 +828,7 @@ const CustomerProfilePage = () => {
   // 2. Fetch Activities
   const fetchActivities = useCallback(async () => {
     if (isNewUser || !userId) return;
-    if (activeTab === 'Order History' || activeTab === 'Ticket') return;
+    if (activeTab === 'Order History') return; 
     setLoadingActivities(true);
     const res = await getCustomerActivities(userId, activeTab);
     if (res.success && res.data) {
@@ -688,7 +851,6 @@ const CustomerProfilePage = () => {
     const date       = watch('activityDate');
     const time       = watch('activityTime');
 
-    // ── Validate activity fields via yup ──
     try {
       await activitySchema.validate(
         { activityType: type, activityAssignTo: assignToName, activityNotes: notes, activityDate: date, activityTime: time },
@@ -699,7 +861,7 @@ const CustomerProfilePage = () => {
       const errs = {};
       validationError.inner.forEach(e => { errs[e.path] = e.message; });
       setActivityErrors(errs);
-      return; // stop — don't proceed
+      return; 
     }
 
     const category = ACTIVITY_CATEGORIES[type] || "Follow-Up";
@@ -766,7 +928,6 @@ const CustomerProfilePage = () => {
   const handleAddressInputChange = (e) => {
     const { name, value } = e.target;
     setAddressForm(prev => ({ ...prev, [name]: value }));
-    // Clear error for this field on change
     if (addressErrors[name]) {
       setAddressErrors(prev => ({ ...prev, [name]: undefined }));
     }
@@ -793,7 +954,6 @@ const CustomerProfilePage = () => {
   const handleSaveAddress = async (e) => {
     e.preventDefault();
 
-    // ── Validate address form via yup ──
     try {
       await addressFormSchema.validate(addressForm, { abortEarly: false });
       setAddressErrors({});
@@ -801,7 +961,7 @@ const CustomerProfilePage = () => {
       const errs = {};
       validationError.inner.forEach(err => { errs[err.path] = err.message; });
       setAddressErrors(errs);
-      return; // stop — don't call API
+      return; 
     }
 
     const safeAddressForm = {
@@ -1257,9 +1417,9 @@ const CustomerProfilePage = () => {
 
           <div className="min-h-[150px]">
             {activeTab === 'Order History' ? (
-              <OrderHistoryTab />
+              <OrderHistoryTab userId={userId} />
             ) : activeTab === 'Ticket' ? (
-              <TicketTab />
+              <TicketTab activities={activities} userId={userId} />
             ) : loadingActivities ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
