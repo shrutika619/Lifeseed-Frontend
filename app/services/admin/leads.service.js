@@ -121,7 +121,7 @@ export const getAdminDropdownData = async () => {
 
 export const getCustomerOrderHistory = async (userId) => {
   try {
-    const response = await api.get(`/customer/order-history/${userId}`);
+    const response = await api.get(`${Constants.urlEndPoints.CUSTOMER_ORDER_HISTORY}/${userId}`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
