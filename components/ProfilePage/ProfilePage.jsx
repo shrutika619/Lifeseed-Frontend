@@ -11,18 +11,16 @@ import { toast } from "sonner";
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectIsAuthenticated, logoutSuccess } from "@/redux/slices/authSlice";
 import { getPatientProfile, savePatientProfile } from "@/app/services/patient/patient.service"; 
-import { addressService } from "@/app/services/patient/address.service"; // ✅ Imported Address Service
+import { addressService } from "@/app/services/patient/address.service";
 import api from "@/lib/axios";
 
 const ProfilePage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  // Redux State
   const authUser = useSelector(selectUser);
   const isAuthenticated = useSelector(selectIsAuthenticated);
 
-  // UI State
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,7 +28,6 @@ const ProfilePage = () => {
   const [saveStatus, setSaveStatus] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
 
-  // Profile Form State
   const [formData, setFormData] = useState({
     name: "",
     gender: "Male",
@@ -40,7 +37,6 @@ const ProfilePage = () => {
     profileImageUrl: "",
   });
 
-  // ✅ Address State
   const [addresses, setAddresses] = useState([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -54,31 +50,26 @@ const ProfilePage = () => {
     contactNumber: ""
   });
 
-  /* =========================================================
-      1. AUTH & DATA FETCHING
-     ========================================================= */
   useEffect(() => {
     if (!isAuthenticated) return; 
 
     const fetchDetails = async () => {
       try {
         setLoading(true);
-        // Fetch Profile & Addresses in parallel
         const [profileRes, addressRes] = await Promise.all([
           getPatientProfile().catch(err => err),
           addressService.getAllAddresses().catch(err => err)
         ]);
         
-        // Handle Profile
         if (profileRes?.success && profileRes?.data) {
           const data = profileRes.data;
           setFormData({
-              name: data.fullName || "",
-              gender: data.gender ? (data.gender.charAt(0).toUpperCase() + data.gender.slice(1)) : "Male",
-              age: data.age || "",
-              email: data.email || "",
-              phone: data.user_id?.mobileNo || authUser?.mobileNo || "Not Provided",
-              profileImageUrl: data.profileImageUrl || "",
+            name: data.fullName || "",
+            gender: data.gender ? (data.gender.charAt(0).toUpperCase() + data.gender.slice(1)) : "Male",
+            age: data.age || "",
+            email: data.email || "",
+            phone: data.user_id?.mobileNo || authUser?.mobileNo || "Not Provided",
+            profileImageUrl: data.profileImageUrl || "",
           });
           setIsEditing(false); 
           setIsNewProfile(false);
@@ -86,16 +77,15 @@ const ProfilePage = () => {
           handleMissingProfile();
         }
 
-        // Handle Addresses
         if (addressRes?.success && addressRes?.data?.addresses) {
           setAddresses(addressRes.data.addresses);
         }
 
       } catch (err) {
-          console.error("Data fetch error:", err);
-          toast.error("Failed to load some profile data");
+        console.error("Data fetch error:", err);
+        toast.error("Failed to load some profile data");
       } finally {
-          setLoading(false);
+        setLoading(false);
       }
     };
 
@@ -108,16 +98,13 @@ const ProfilePage = () => {
     setFormData(prev => ({ ...prev, phone: authUser?.mobileNo || "Not Provided" }));
   };
 
-  /* =========================================================
-      2. PROFILE HANDLERS
-     ========================================================= */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleGenderChange = (genderValue) => {
-     setFormData(prev => ({ ...prev, gender: genderValue }));
+    setFormData(prev => ({ ...prev, gender: genderValue }));
   };
 
   const handleSaveProfile = async () => {
@@ -129,7 +116,6 @@ const ProfilePage = () => {
       email: formData.email,
       age: formData.age ? parseInt(formData.age) : 0,
       gender: formData.gender.toLowerCase(),
-      // Removed homeAddress & workAddress strings as they are now handled by the Address API
     };
 
     try {
@@ -163,9 +149,6 @@ const ProfilePage = () => {
     }
   };
 
-  /* =========================================================
-      3. ADDRESS HANDLERS
-     ========================================================= */
   const handleAddressInputChange = (e) => {
     const { name, value } = e.target;
     setAddressForm(prev => ({ ...prev, [name]: value }));
@@ -199,18 +182,15 @@ const ProfilePage = () => {
     setIsSavingAddress(true);
     try {
       if (editAddressId) {
-        // Update
         const res = await addressService.updateAddress(editAddressId, addressForm);
         if (res.success) {
           toast.success("Address updated!");
           setAddresses(prev => prev.map(addr => addr._id === editAddressId ? { ...addr, ...addressForm } : addr));
         }
       } else {
-        // Create
         const res = await addressService.createAddress(addressForm);
         if (res.success) {
           toast.success("Address added!");
-          // Append new address (using backend returned data to get the new _id)
           setAddresses(prev => [...prev, res.data]); 
         }
       }
@@ -236,9 +216,6 @@ const ProfilePage = () => {
     }
   };
 
-  /* =========================================================
-      4. UI RENDERING
-     ========================================================= */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -250,7 +227,6 @@ const ProfilePage = () => {
     );
   }
 
-  // ✅ IF NEW PROFILE (Show Basic Setup Form)
   if (isNewProfile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#1e1e1e] p-4 font-sans">
@@ -290,7 +266,6 @@ const ProfilePage = () => {
     );
   }
 
-  // ✅ IF EXISTING PROFILE (Show Full Dashboard)
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans p-4 md:p-8">
       
@@ -302,15 +277,15 @@ const ProfilePage = () => {
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* ---------------- SIDEBAR ---------------- */}
+        {/* ── SIDEBAR ── */}
         <aside className="hidden lg:block lg:col-span-3">
           <div className="bg-white border-white border rounded-2xl p-6 shadow-sm sticky top-8">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md overflow-hidden bg-blue-600">
                 {formData.profileImageUrl ? (
-                   <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                   <User size={24} />
+                  <User size={24} />
                 )}
               </div>
               <div className="overflow-hidden">
@@ -321,7 +296,12 @@ const ProfilePage = () => {
 
             <div className="space-y-1">
               <SidebarItem icon={<Settings size={16}/>} label="Settings" active />
-              <SidebarItem icon={<ShoppingBag size={16}/>} label="My Orders" />
+              {/* ✅ My Orders — redirects to /profile/myorders */}
+              <SidebarItem
+                icon={<ShoppingBag size={16}/>}
+                label="My Orders"
+                onClick={() => router.push("/profile/myorders")}
+              />
               <SidebarItem icon={<HelpCircle size={16}/>} label="Help" />
               <SidebarItem icon={<ShieldCheck size={16}/>} label="Privacy Policy" />
               <SidebarItem icon={<FileText size={16}/>} label="Terms & Conditions" />
@@ -336,7 +316,7 @@ const ProfilePage = () => {
           </div>
         </aside>
 
-        {/* ---------------- MAIN CONTENT ---------------- */}
+        {/* ── MAIN CONTENT ── */}
         <main className="lg:col-span-9 space-y-6">
           
           {saveStatus && (
@@ -350,9 +330,9 @@ const ProfilePage = () => {
             <div className="flex items-center gap-6 w-full">
               <div className="hidden sm:flex w-16 h-16 bg-blue-50 rounded-full items-center justify-center text-blue-600 border border-blue-50 overflow-hidden shrink-0">
                 {formData.profileImageUrl ? (
-                   <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                   <User size={32} />
+                  <User size={32} />
                 )}
               </div>
               
@@ -360,23 +340,21 @@ const ProfilePage = () => {
                 {isEditing ? (
                   <div className="max-w-lg space-y-5 animate-in fade-in duration-300">
                     <div>
-                       <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Full Name *</label>
-                       <input name="name" value={formData.name} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" placeholder="Enter Full Name" />
+                      <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Full Name *</label>
+                      <input name="name" value={formData.name} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" placeholder="Enter Full Name" />
                     </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <div>
-                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Age</label>
-                         <input name="age" type="number" value={formData.age} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" placeholder="Enter Age" />
-                       </div>
-
-                       <div>
-                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Gender</label>
-                         <div className="flex bg-[#F7FAFC] rounded-xl overflow-hidden border border-[#EDF2F7] p-1 h-[48px]">
-                           <button type="button" onClick={() => handleGenderChange('Male')} className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Male' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}>Male</button>
-                           <button type="button" onClick={() => handleGenderChange('Female')} className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Female' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}>Female</button>
-                         </div>
-                       </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Age</label>
+                        <input name="age" type="number" value={formData.age} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" placeholder="Enter Age" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Gender</label>
+                        <div className="flex bg-[#F7FAFC] rounded-xl overflow-hidden border border-[#EDF2F7] p-1 h-[48px]">
+                          <button type="button" onClick={() => handleGenderChange('Male')} className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Male' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}>Male</button>
+                          <button type="button" onClick={() => handleGenderChange('Female')} className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Female' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}>Female</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -397,10 +375,10 @@ const ProfilePage = () => {
                 </button>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all border border-gray-200 w-full sm:w-auto">Cancel</button>
-                    <button onClick={handleSaveProfile} disabled={isSaving} className="flex items-center justify-center gap-2 bg-[#4285F4] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all shadow-md w-full sm:w-auto">
-                        <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
-                    </button>
+                  <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all border border-gray-200 w-full sm:w-auto">Cancel</button>
+                  <button onClick={handleSaveProfile} disabled={isSaving} className="flex items-center justify-center gap-2 bg-[#4285F4] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all shadow-md w-full sm:w-auto">
+                    <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
+                  </button>
                 </div>
               )}
             </div>
@@ -426,13 +404,13 @@ const ProfilePage = () => {
               <div className="space-y-1">
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Phone Number <span className="text-[9px] normal-case text-gray-400 font-medium">(Read-only)</span></label>
                 <div className="w-full p-3.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed">
-                    {formData.phone}
+                  {formData.phone}
                 </div>
               </div>
             </div>
           </section>
 
-          {/* ✅ ADDRESS SECTION */}
+          {/* ADDRESS SECTION */}
           <section className="bg-white border-white border rounded-2xl p-6 md:p-8 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
@@ -456,7 +434,6 @@ const ProfilePage = () => {
                 addresses.map((addr) => (
                   <div key={addr._id} className="border border-gray-100 rounded-xl p-5 bg-[#FAFBFC] hover:shadow-sm transition-all relative overflow-hidden group">
                     <div className={`absolute top-0 left-0 w-1.5 h-full ${addr.label === 'Home' ? 'bg-blue-500' : addr.label === 'Work' ? 'bg-orange-400' : 'bg-purple-500'}`} />
-                    
                     <div className="flex justify-between items-start mb-3">
                       <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">{addr.label}</span>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -464,7 +441,6 @@ const ProfilePage = () => {
                         <button onClick={() => handleDeleteAddress(addr._id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={14}/></button>
                       </div>
                     </div>
-                    
                     <div className="text-sm text-gray-700 leading-relaxed font-medium">
                       <p>{addr.flatNo}, {addr.streetArea}</p>
                       {addr.landmark && <p className="text-gray-500 font-normal">Landmark: {addr.landmark}</p>}
@@ -479,7 +455,7 @@ const ProfilePage = () => {
         </main>
       </div>
 
-      {/* ---------------- ADDRESS MODAL ---------------- */}
+      {/* ── ADDRESS MODAL ── */}
       {showAddressModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl animate-in zoom-in-95 duration-200">
@@ -519,7 +495,6 @@ const ProfilePage = () => {
                   <input name="contactNumber" value={addressForm.contactNumber} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
                 </div>
               </div>
-              
               <div className="flex gap-3 mt-6">
                 <button type="button" onClick={() => setShowAddressModal(false)} className="flex-1 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold transition-colors">Cancel</button>
                 <button type="submit" disabled={isSavingAddress} className="flex-1 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-xl text-sm font-semibold transition-colors">
@@ -531,7 +506,7 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* ---------------- MOBILE DRAWER ---------------- */}
+      {/* ── MOBILE DRAWER ── */}
       {menuOpen && (
         <div className="fixed inset-0 z-[100] flex items-end lg:hidden">
           <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
@@ -543,7 +518,12 @@ const ProfilePage = () => {
             </div>
             <div className="space-y-3">
               <MobileLink icon={<Settings size={18}/>} label="Account Settings" />
-              <MobileLink icon={<ShoppingBag size={18}/>} label="Order History" />
+              {/* ✅ My Orders mobile — redirects to /profile/myorders */}
+              <MobileLink
+                icon={<ShoppingBag size={18}/>}
+                label="Order History"
+                onClick={() => { setMenuOpen(false); router.push("/profile/myorders"); }}
+              />
               <MobileLink icon={<HelpCircle size={18}/>} label="Help & Support" />
               <div className="h-px bg-gray-100 my-5" />
               <button onClick={handleLogout} className="w-full py-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm flex items-center justify-center gap-2 transition-colors">
@@ -557,10 +537,14 @@ const ProfilePage = () => {
   );
 };
 
-// --- HELPER COMPONENTS ---
+// ── HELPER COMPONENTS ──
 
-const SidebarItem = ({ icon, label, active = false }) => (
-  <button className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-medium transition-all ${active ? "bg-blue-50 text-blue-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}>
+// ✅ onClick prop added
+const SidebarItem = ({ icon, label, active = false, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-medium transition-all ${active ? "bg-blue-50 text-blue-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+  >
     <div className="flex items-center gap-3">
       <span className={active ? "text-blue-600" : "text-gray-400"}>{icon}</span>
       <span>{label}</span>
@@ -568,8 +552,12 @@ const SidebarItem = ({ icon, label, active = false }) => (
   </button>
 );
 
-const MobileLink = ({ icon, label }) => (
-  <button className="w-full p-4 bg-gray-50 rounded-xl flex items-center gap-4 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+// ✅ onClick prop added
+const MobileLink = ({ icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full p-4 bg-gray-50 rounded-xl flex items-center gap-4 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+  >
     <span className="text-blue-600">{icon}</span>
     <span>{label}</span>
   </button>

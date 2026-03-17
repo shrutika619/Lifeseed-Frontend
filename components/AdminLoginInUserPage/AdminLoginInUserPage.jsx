@@ -66,7 +66,7 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              router.push(`${basePath}/teleconsultation/placeorder`);
+              router.push(`/super-admin/log-in-user/placeorder`);  // ✅ ONLY THIS LINE CHANGED
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
