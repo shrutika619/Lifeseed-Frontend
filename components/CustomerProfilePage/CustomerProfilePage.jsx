@@ -78,116 +78,166 @@ const ticketStatusIcon = (s) => {
 const OrderHistoryTab = ({ userId }) => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false); // State to toggle "Show More"
+  
   const router = useRouter();
   const pathname = usePathname();
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
+  const fetchAllHistory = async () => {
+    setLoading(true);
+    try {
+      const res = await getCustomerOrderHistory(userId);
+      if (res.success && res.data) {
+        const combined = [];
+
+        // 1. Map Teleconsultations
+        if (res.data.teleBookings && Array.isArray(res.data.teleBookings)) {
+          res.data.teleBookings.forEach(booking => {
+            const isCancellable = booking.consultationStatus !== 'Cancelled' && booking.consultationStatus !== 'Complete';
+            const isReschedulable = booking.consultationStatus !== 'Cancelled' && booking.consultationStatus !== 'Complete';
+
+            combined.push({
+              id: booking.requestId || booking.recordId,
+              type: 'Teleconsultation',
+              categoryName: 'Teleconsultation', // Used for filtering
+              icon: '🔮',
+              iconBg: '#f3e8ff',
+              doctor: booking.doctorName || 'Not Assigned',
+              date: booking.appointmentDate ? new Date(booking.appointmentDate).toLocaleDateString() : '--',
+              timeSlot: booking.timeSlot,
+              status: booking.consultationStatus || 'New',
+              statusColor: booking.consultationStatus === 'Complete'
+                ? { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }
+                : booking.consultationStatus === 'Cancelled'
+                ? { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
+                : { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+              orderId: booking.requestId,
+              details: [
+                { label: 'Agent', value: booking.agentName || '--' },
+                ...(booking.cancelledBy ? [{ label: 'Cancelled By', value: booking.cancelledBy }] : [])
+              ],
+              // Add conditional actions
+              actions: [
+                'View Details', 
+                'Place Order',
+                ...(isCancellable ? ['Cancel'] : []),
+                ...(isReschedulable ? ['Reschedule'] : [])
+              ],
+              recordId: booking.recordId,
+              rawCreatedAt: booking.bookingDate
+            });
+          });
+        }
+
+        // 2. Map Medicine Orders
+        if (res.data.medicineOrders && Array.isArray(res.data.medicineOrders)) {
+          res.data.medicineOrders.forEach(order => {
+            const balanceDue = order.finalPrice - order.amountPaid;
+            
+            combined.push({
+              id: order.orderId,
+              type: 'Medicine Order',
+              categoryName: 'Medicine Order', // Used for filtering
+              icon: '🧴',
+              iconBg: '#e0f2fe',
+              doctor: null,
+              date: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '--',
+              timeSlot: null,
+              status: order.deliveryStatus || 'Pending',
+              statusColor: order.deliveryStatus === 'Delivered' 
+                ? { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }
+                : { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5' },
+              orderId: order.orderNumber,
+              items: order.productName,
+              details: [
+                { label: 'Amount Paid', value: `₹${order.amountPaid}` },
+                { label: 'Balance Due', value: `₹${balanceDue}` },
+                { label: 'Payment Status', value: order.paymentStatus },
+              ],
+              actions: ['View Order', 'Reorder'],
+              rawCreatedAt: order.createdAt
+            });
+          });
+        }
+
+        // 3. Dummy In-Clinic
+        combined.push({
+          id: 'dummy-ic-1',
+          type: 'In-Clinic Consultation',
+          categoryName: 'In-Clinic Consultation', // Used for filtering
+          icon: '📋',
+          iconBg: '#fef9c3',
+          doctor: 'Dr. Rohan Gupta',
+          specialization: 'General Physician',
+          location: 'Apollo Clinic, Koregaon Park',
+          date: 'Nov 28, 2024',
+          timeSlot: '5:00 PM - 5:30 PM',
+          status: 'Upcoming',
+          statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+          details: [
+            { label: 'Order ID',      value: '#IC-67890' },
+            { label: 'Patient Age',  value: '34' },
+            { label: 'Amount Paid',  value: '$80.00' },
+          ],
+          actions: ['View Details', 'Get Directions'],
+          rawCreatedAt: '2024-11-21T10:00:00Z'
+        });
+
+        // Sort combined by date descending
+        combined.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
+        setHistoryData(combined);
+      } else {
+        toast.error(res.message || "Failed to load history");
+      }
+    } catch (error) {
+      console.error("Error loading history", error);
+      toast.error("Error fetching order history.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!userId) return;
-
-    const fetchAllHistory = async () => {
-      setLoading(true);
-      try {
-        const res = await getCustomerOrderHistory(userId);
-        if (res.success && res.data) {
-          const combined = [];
-
-          // Map Teleconsultations
-          if (res.data.teleBookings && Array.isArray(res.data.teleBookings)) {
-            res.data.teleBookings.forEach(booking => {
-              combined.push({
-                id: booking.requestId,
-                type: 'Teleconsultation',
-                icon: '🔮',
-                iconBg: '#f3e8ff',
-                doctor: booking.doctorName || 'Not Assigned',
-                date: booking.appointmentDate ? new Date(booking.appointmentDate).toLocaleDateString() : '--',
-                timeSlot: booking.timeSlot,
-                status: booking.consultationStatus || 'New',
-                statusColor: booking.consultationStatus === 'Complete'
-                  ? { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }
-                  : booking.consultationStatus === 'Cancelled'
-                  ? { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
-                  : { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-                orderId: booking.requestId,
-                details: [
-                  { label: 'Agent', value: booking.agentName || '--' },
-                  ...(booking.cancelledBy ? [{ label: 'Cancelled By', value: booking.cancelledBy }] : [])
-                ],
-                actions: ['View Details', 'Place Order'],
-                recordId: booking.recordId,
-                rawCreatedAt: booking.bookingDate
-              });
-            });
-          }
-
-          // Map Medicine Orders
-          if (res.data.medicineOrders && Array.isArray(res.data.medicineOrders)) {
-            res.data.medicineOrders.forEach(order => {
-              const balanceDue = order.finalPrice - order.amountPaid;
-              
-              combined.push({
-                id: order.orderId,
-                type: 'Medicine Order',
-                icon: '🧴',
-                iconBg: '#e0f2fe',
-                doctor: null,
-                date: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '--',
-                timeSlot: null,
-                status: order.deliveryStatus || 'Pending',
-                statusColor: order.deliveryStatus === 'Delivered' 
-                  ? { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }
-                  : { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5' },
-                orderId: order.orderNumber,
-                items: order.productName,
-                details: [
-                  { label: 'Amount Paid', value: `₹${order.amountPaid}` },
-                  { label: 'Balance Due', value: `₹${balanceDue}` },
-                  { label: 'Payment Status', value: order.paymentStatus },
-                ],
-                actions: ['View Order', 'Reorder'],
-                rawCreatedAt: order.createdAt
-              });
-            });
-          }
-
-          // Dummy In-Clinic
-          combined.push({
-            id: 'dummy-ic-1',
-            type: 'In-Clinic Consultation',
-            icon: '📋',
-            iconBg: '#fef9c3',
-            doctor: 'Dr. Rohan Gupta',
-            specialization: 'General Physician',
-            location: 'Apollo Clinic, Koregaon Park',
-            date: 'Nov 28, 2024',
-            timeSlot: '5:00 PM - 5:30 PM',
-            status: 'Upcoming',
-            statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-            details: [
-              { label: 'Order ID',      value: '#IC-67890' },
-              { label: 'Patient Age',  value: '34' },
-              { label: 'Amount Paid',  value: '$80.00' },
-            ],
-            actions: ['View Details', 'Get Directions'],
-            rawCreatedAt: '2024-11-21T10:00:00Z'
-          });
-
-          combined.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
-          setHistoryData(combined);
-        } else {
-          toast.error(res.message || "Failed to load history");
-        }
-      } catch (error) {
-        console.error("Error loading history", error);
-        toast.error("Error fetching order history.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAllHistory();
   }, [userId]);
+
+  const handleCancelTeleconsultation = async (recordId) => {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    
+    const toastId = toast.loading("Cancelling booking...");
+    try {
+      // Assuming you imported this service at the top of your file
+      const res = await adminTeleconsultationService.cancelBooking(recordId);
+      if (res.success) {
+        toast.success("Booking Cancelled Successfully", { id: toastId });
+        fetchAllHistory(); // Re-fetch to update UI
+      } else {
+        toast.error(res.message || "Failed to cancel booking", { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Error cancelling booking", { id: toastId });
+    }
+  };
+
+  // --- Filter Logic for "Show More" ---
+  const getVisibleData = () => {
+    if (showAll) return historyData;
+
+    // Only take top 2 from each category
+    const categoryCounts = {};
+    return historyData.filter((item) => {
+      const cat = item.categoryName;
+      if (!categoryCounts[cat]) categoryCounts[cat] = 0;
+      
+      if (categoryCounts[cat] < 2) {
+        categoryCounts[cat]++;
+        return true;
+      }
+      return false;
+    });
+  };
 
   if (loading) {
     return <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-blue-500" /></div>;
@@ -197,9 +247,11 @@ const OrderHistoryTab = ({ userId }) => {
     return <div className="text-center py-10 text-slate-500 text-sm">No history found for this patient.</div>;
   }
 
+  const visibleData = getVisibleData();
+
   return (
     <div className="space-y-4">
-      {historyData.map((order) => (
+      {visibleData.map((order) => (
         <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -248,13 +300,14 @@ const OrderHistoryTab = ({ userId }) => {
             {order.actions.map((action) => {
               const isDanger  = action === 'Cancel';
               const isPrimary = action === 'Reorder' || action === 'Place Order';
-              const isLink    = ['View Details', 'View Order', 'Get Directions', 'Edit'].includes(action);
+              const isLink    = ['View Details', 'View Order', 'Get Directions', 'Edit', 'Reschedule'].includes(action);
               
               if (action === 'Place Order' && order.status === 'Cancelled') return null;
 
               return (
                 <button
                   key={action}
+                  type="button"
                   onClick={() => {
                     if (action === 'Place Order' && order.recordId) {
                       router.push(`${basePath}/teleconsultation/placeorder?recordId=${order.recordId}`);
@@ -262,11 +315,17 @@ const OrderHistoryTab = ({ userId }) => {
                     if (action === 'View Details' && order.recordId) {
                       router.push(`${basePath}/teleconsultation/doctorpanel?recordId=${order.recordId}`);
                     }
+                    if (action === 'Cancel' && order.recordId) {
+                      handleCancelTeleconsultation(order.recordId);
+                    }
+                    if (action === 'Reschedule' && order.recordId) {
+                      router.push(`/free-consultation?admin_booking=true&rescheduleRecordId=${order.recordId}&userId=${userId}`);
+                    }
                   }}
                   className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all
-                    ${isDanger  ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : ''}
+                    ${isDanger  ? 'text-red-500 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200' : ''}
                     ${isPrimary ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : ''}
-                    ${isLink    ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : ''}
+                    ${isLink    ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-200' : ''}
                   `}
                 >
                   {action}
@@ -276,10 +335,21 @@ const OrderHistoryTab = ({ userId }) => {
           </div>
         </div>
       ))}
+
+      {/* Show More / Show Less Button */}
+      {historyData.length > visibleData.length || showAll ? (
+        <button
+          type="button"
+          onClick={() => setShowAll(!showAll)}
+          className="w-full py-3 mt-2 rounded-xl border border-slate-200 border-dashed text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+        >
+          {showAll ? "Show Less" : `View All History (${historyData.length})`}
+        </button>
+      ) : null}
+
     </div>
   );
 };
-
 /* ─────────────────────────────────────────────
    TICKET TAB COMPONENT (Wired to Real API)
 ───────────────────────────────────────────── */
