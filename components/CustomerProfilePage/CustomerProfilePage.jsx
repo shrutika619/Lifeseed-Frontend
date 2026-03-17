@@ -14,7 +14,7 @@ import {
   getAdminDropdownData   
 } from '@/app/services/admin/leads.service'; 
 import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
-import { getAllCities } from "@/app/services/patient/clinic.service"; // ✅ Imported city service
+import { getAllCities } from "@/app/services/patient/clinic.service";
 import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
@@ -22,6 +22,29 @@ import {
   Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil
 } from 'lucide-react';
 import { customerProfileSchema } from '@/app/utils/validation/customerProfileSchema';
+
+/* ─────────────────────────────────────────────
+   ADDRESS FORM VALIDATION SCHEMA
+───────────────────────────────────────────── */
+const addressFormSchema = yup.object({
+  label:         yup.string().required("Label is required"),
+  flatNo:        yup.string().trim().required("Flat / House No. is required"),
+  streetArea:    yup.string().trim().required("Street / Area is required"),
+  landmark:      yup.string().trim(),
+  pinCode:       yup.string().trim().required("PIN Code is required").matches(/^\d{6}$/, "PIN Code must be 6 digits"),
+  contactNumber: yup.string().trim().matches(/^(\d{10})?$/, "Contact must be 10 digits").optional(),
+});
+
+/* ─────────────────────────────────────────────
+   ACTIVITY FORM VALIDATION SCHEMA
+───────────────────────────────────────────── */
+const activitySchema = yup.object({
+  activityType:     yup.string().required("Activity type is required"),
+  activityAssignTo: yup.string().required("Please assign this activity to a user"),
+  activityNotes:    yup.string().trim().required("Activity note is required"),
+  activityDate:     yup.string().optional(),
+  activityTime:     yup.string().optional(),
+});
 
 /* ─────────────────────────────────────────────
    ORDER HISTORY — SAMPLE DATA
@@ -185,7 +208,6 @@ const OrderHistoryTab = () => (
           </span>
         </div>
 
-        {/* Medicine-specific */}
         {order.orderId && (
           <div className="text-xs text-slate-600 mt-2 mb-1">
             <span className="font-medium">Order ID: </span>{order.orderId}
@@ -197,7 +219,6 @@ const OrderHistoryTab = () => (
           </div>
         )}
 
-        {/* Detail rows */}
         {order.details && (
           <div className="mt-3 border-t border-slate-50 pt-3 space-y-1.5">
             {order.details.map((d) => (
@@ -209,7 +230,6 @@ const OrderHistoryTab = () => (
           </div>
         )}
 
-        {/* Action buttons */}
         <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50">
           {order.actions.map((action) => {
             const isDanger  = action === 'Cancel'
@@ -264,7 +284,6 @@ const TicketCard = ({ ticket }) => {
         </div>
       </div>
 
-      {/* Status chips */}
       <div className="flex flex-wrap gap-2">
         {ticket.statuses.map((s) => (
           <button
@@ -281,7 +300,6 @@ const TicketCard = ({ ticket }) => {
         ))}
       </div>
 
-      {/* Comments */}
       <div>
         <p className="text-xs font-bold text-slate-500 mb-2">Comments ({comments.length})</p>
         <div className="space-y-2 mb-3">
@@ -325,7 +343,7 @@ const TicketTab = () => (
 )
 
 /* ─────────────────────────────────────────────
-   CITY SELECT MODAL (✅ Now Dynamic)
+   CITY SELECT MODAL
 ───────────────────────────────────────────── */
 const CitySelectModal = ({ onClose }) => {
   const [cities, setCities] = useState([]);
@@ -350,7 +368,6 @@ const CitySelectModal = ({ onClose }) => {
   }, []);
 
   const handleCitySelect = (slug) => {
-    // Use the actual slug from backend or convert name to lowercase
     const finalSlug = slug || "nagpur"; 
     window.location.href = `/clinic/${finalSlug}/`;
   };
@@ -409,7 +426,6 @@ const BookConsultationModal = ({ onClose, userId }) => {
   if (showCityModal) return <CitySelectModal onClose={onClose} />;
 
   const handleTeleconsultationClick = () => {
-    // ✅ If Admin is booking from Profile page, attach User ID to the URL
     if (userId) {
       router.push(`/free-consultation?admin_booking=true&userId=${userId}`);
     } else {
@@ -442,7 +458,7 @@ const BookConsultationModal = ({ onClose, userId }) => {
           </button>
           
           <button
-            type="button" onClick={handleTeleconsultationClick} // ✅ Fixed Teleconsultation Link
+            type="button" onClick={handleTeleconsultationClick}
             className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group"
           >
             <div className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-all">
@@ -560,6 +576,8 @@ const CustomerProfilePage = () => {
   const [addressForm, setAddressForm] = useState({
     label: "Home", flatNo: "", streetArea: "", landmark: "", pinCode: "", contactNumber: ""
   });
+  // ── Address form validation errors ──
+  const [addressErrors, setAddressErrors] = useState({});
 
   const { register, handleSubmit, watch, setValue, resetField, reset, formState: { errors } } = useForm({
     resolver: yupResolver(customerProfileSchema),
@@ -570,6 +588,9 @@ const CustomerProfilePage = () => {
       pageStatus: 'manual'
     }
   });
+
+  // ── Separate activity form state for validation ──
+  const [activityErrors, setActivityErrors] = useState({});
 
   const watchedLeadOwner = watch("leadOwner");
 
@@ -644,7 +665,6 @@ const CustomerProfilePage = () => {
   // 2. Fetch Activities
   const fetchActivities = useCallback(async () => {
     if (isNewUser || !userId) return;
-    // Skip API call for Order History and Ticket tabs (sample data used)
     if (activeTab === 'Order History' || activeTab === 'Ticket') return;
     setLoadingActivities(true);
     const res = await getCustomerActivities(userId, activeTab);
@@ -660,17 +680,27 @@ const CustomerProfilePage = () => {
     fetchActivities();
   }, [fetchActivities]);
 
-  // 3. ADD NEW ACTIVITY LOG
+  // 3. ADD NEW ACTIVITY LOG — with yup validation
   const addNewActivity = async () => {
-    const type = watch('activityType');
-    const notes = watch('activityNotes');
+    const type       = watch('activityType');
+    const notes      = watch('activityNotes');
     const assignToName = watch('activityAssignTo');
-    const date = watch('activityDate');
-    const time = watch('activityTime');
+    const date       = watch('activityDate');
+    const time       = watch('activityTime');
 
-    if (!type)                        return toast.error("Activity Reason / Type is required.");
-    if (!assignToName)                return toast.error("Please assign this activity to a user.");
-    if (!notes || notes.trim() === "") return toast.error("Activity Note is required.");
+    // ── Validate activity fields via yup ──
+    try {
+      await activitySchema.validate(
+        { activityType: type, activityAssignTo: assignToName, activityNotes: notes, activityDate: date, activityTime: time },
+        { abortEarly: false }
+      );
+      setActivityErrors({});
+    } catch (validationError) {
+      const errs = {};
+      validationError.inner.forEach(e => { errs[e.path] = e.message; });
+      setActivityErrors(errs);
+      return; // stop — don't proceed
+    }
 
     const category = ACTIVITY_CATEGORIES[type] || "Follow-Up";
     const payload = { type, category, notes: notes.trim() };
@@ -736,10 +766,15 @@ const CustomerProfilePage = () => {
   const handleAddressInputChange = (e) => {
     const { name, value } = e.target;
     setAddressForm(prev => ({ ...prev, [name]: value }));
+    // Clear error for this field on change
+    if (addressErrors[name]) {
+      setAddressErrors(prev => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const openAddAddressModal = () => {
     setAddressForm({ label: "Home", flatNo: "", streetArea: "", landmark: "", pinCode: "", contactNumber: "" });
+    setAddressErrors({});
     setEditAddressId(null);
     setShowAddressModal(true);
   };
@@ -750,16 +785,25 @@ const CustomerProfilePage = () => {
       streetArea: address.streetArea || "", landmark: address.landmark || "",
       pinCode: address.pinCode || "", contactNumber: address.contactNumber || ""
     });
+    setAddressErrors({});
     setEditAddressId(address._id);
     setShowAddressModal(true);
   };
 
   const handleSaveAddress = async (e) => {
     e.preventDefault();
-    if (!addressForm.flatNo || !addressForm.streetArea || !addressForm.pinCode) {
-      return toast.error("Flat No, Street, and PIN Code are required.");
+
+    // ── Validate address form via yup ──
+    try {
+      await addressFormSchema.validate(addressForm, { abortEarly: false });
+      setAddressErrors({});
+    } catch (validationError) {
+      const errs = {};
+      validationError.inner.forEach(err => { errs[err.path] = err.message; });
+      setAddressErrors(errs);
+      return; // stop — don't call API
     }
-    
+
     const safeAddressForm = {
         label: addressForm.label || "Home",
         flatNo: addressForm.flatNo || "",
@@ -910,7 +954,6 @@ const CustomerProfilePage = () => {
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
 
-      {/* ✅ Passed userId dynamically to BookConsultationModal */}
       {showBookModal && <BookConsultationModal onClose={() => setShowBookModal(false)} userId={userId} />}
 
       <form onSubmit={handleSubmit(onFinalSubmit)} className="max-w-5xl mx-auto space-y-6">
@@ -1001,10 +1044,37 @@ const CustomerProfilePage = () => {
               ))}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input {...register("flatNo")} placeholder="Flat No / House No *" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-              <input {...register("street")} placeholder="Street / Area *" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-              <input {...register("landmark")} placeholder="Landmark" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
-              <input {...register("pincode")} placeholder="Pin Code *" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+              <div>
+                <input
+                  {...register("flatNo")}
+                  placeholder="Flat No / House No *"
+                  className={`w-full p-2.5 border ${errors.flatNo ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400`}
+                />
+                {errors.flatNo && <p className="text-red-500 text-[10px] mt-1">{errors.flatNo.message}</p>}
+              </div>
+              <div>
+                <input
+                  {...register("street")}
+                  placeholder="Street / Area *"
+                  className={`w-full p-2.5 border ${errors.street ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400`}
+                />
+                {errors.street && <p className="text-red-500 text-[10px] mt-1">{errors.street.message}</p>}
+              </div>
+              <div>
+                <input
+                  {...register("landmark")}
+                  placeholder="Landmark"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <input
+                  {...register("pincode")}
+                  placeholder="Pin Code *"
+                  className={`w-full p-2.5 border ${errors.pincode ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400`}
+                />
+                {errors.pincode && <p className="text-red-500 text-[10px] mt-1">{errors.pincode.message}</p>}
+              </div>
             </div>
             <p className="text-[10px] text-slate-400 italic">Flat No, Street, and Pin Code are required for new profiles.</p>
           </div>
@@ -1076,10 +1146,16 @@ const CustomerProfilePage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Activity Type */}
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Activity Reason / Type <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
+                Activity Reason / Type <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
-                <select {...register("activityType")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 font-medium">
+                <select
+                  {...register("activityType")}
+                  className={`w-full appearance-none p-2.5 bg-slate-50 border ${activityErrors.activityType ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-500 font-medium`}
+                >
                   <optgroup label="Follow-Up">
                     <option value="Next Medicine Order">💊 Next Medicine Order</option>
                     <option value="Follow-Up">📞 Follow-Up</option>
@@ -1101,14 +1177,21 @@ const CustomerProfilePage = () => {
                 </select>
                 <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
               </div>
+              {activityErrors.activityType && (
+                <p className="text-red-500 text-[10px] mt-1">{activityErrors.activityType}</p>
+              )}
             </div>
+
+            {/* Assign To */}
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Assign to (User) <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
+                Assign to (User) <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <select 
                   {...register("activityAssignTo")} 
                   disabled={!isSuperAdmin}
-                  className={`w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none ${!isSuperAdmin ? 'opacity-60 cursor-not-allowed text-slate-500 bg-gray-100' : 'focus:border-blue-500'}`}
+                  className={`w-full appearance-none p-2.5 bg-slate-50 border ${activityErrors.activityAssignTo ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none ${!isSuperAdmin ? 'opacity-60 cursor-not-allowed text-slate-500 bg-gray-100' : 'focus:border-blue-500'}`}
                 >
                   <option value="" disabled>Unassigned</option>
                   {adminList.map(admin => (
@@ -1117,12 +1200,25 @@ const CustomerProfilePage = () => {
                 </select>
                 <ChevronDown className={`absolute right-3 top-3 ${!isSuperAdmin ? 'text-gray-300' : 'text-slate-400'} pointer-events-none`} size={16} />
               </div>
+              {activityErrors.activityAssignTo && (
+                <p className="text-red-500 text-[10px] mt-1">{activityErrors.activityAssignTo}</p>
+              )}
             </div>
           </div>
 
+          {/* Activity Notes */}
           <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Activity Note <span className="text-red-500">*</span></label>
-            <textarea {...register("activityNotes")} className="w-full p-2.5 border border-slate-200 rounded-xl text-sm h-20 outline-none focus:border-blue-400 resize-none" placeholder="Enter reason or notes for this specific task (Required)"></textarea>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
+              Activity Note <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              {...register("activityNotes")}
+              className={`w-full p-2.5 border ${activityErrors.activityNotes ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm h-20 outline-none focus:border-blue-400 resize-none`}
+              placeholder="Enter reason or notes for this specific task (Required)"
+            />
+            {activityErrors.activityNotes && (
+              <p className="text-red-500 text-[10px] mt-1">{activityErrors.activityNotes}</p>
+            )}
           </div>
           
           <div className="flex flex-wrap items-end gap-4">
@@ -1159,7 +1255,6 @@ const CustomerProfilePage = () => {
             ))}
           </div>
 
-          {/* ── ACTIVITY LIST — now with Order History & Ticket sample UI ── */}
           <div className="min-h-[150px]">
             {activeTab === 'Order History' ? (
               <OrderHistoryTab />
@@ -1256,33 +1351,73 @@ const CustomerProfilePage = () => {
             <form onSubmit={handleSaveAddress} className="space-y-4">
               <div>
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Label</label>
-                <select name="label" value={addressForm.label} onChange={handleAddressInputChange} className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50">
+                <select
+                  name="label"
+                  value={addressForm.label}
+                  onChange={handleAddressInputChange}
+                  className={`w-full p-3 border ${addressErrors.label ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50`}
+                >
                   <option value="Home">Home</option>
                   <option value="Work">Work</option>
                   <option value="Office">Office</option>
                   <option value="Other">Other</option>
                 </select>
+                {addressErrors.label && <p className="text-red-500 text-[10px] mt-1">{addressErrors.label}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Flat / House No. *</label>
-                  <input required name="flatNo" value={addressForm.flatNo} onChange={handleAddressInputChange} placeholder="e.g. B-202" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                  <input
+                    name="flatNo"
+                    value={addressForm.flatNo}
+                    onChange={handleAddressInputChange}
+                    placeholder="e.g. B-202"
+                    className={`w-full p-3 border ${addressErrors.flatNo ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50`}
+                  />
+                  {addressErrors.flatNo && <p className="text-red-500 text-[10px] mt-1">{addressErrors.flatNo}</p>}
                 </div>
                 <div className="col-span-2">
                   <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Street / Area *</label>
-                  <input required name="streetArea" value={addressForm.streetArea} onChange={handleAddressInputChange} placeholder="e.g. Koregaon Park" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                  <input
+                    name="streetArea"
+                    value={addressForm.streetArea}
+                    onChange={handleAddressInputChange}
+                    placeholder="e.g. Koregaon Park"
+                    className={`w-full p-3 border ${addressErrors.streetArea ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50`}
+                  />
+                  {addressErrors.streetArea && <p className="text-red-500 text-[10px] mt-1">{addressErrors.streetArea}</p>}
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Landmark</label>
-                  <input name="landmark" value={addressForm.landmark} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                  <input
+                    name="landmark"
+                    value={addressForm.landmark}
+                    onChange={handleAddressInputChange}
+                    placeholder="Optional"
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50"
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">PIN Code *</label>
-                  <input required name="pinCode" value={addressForm.pinCode} onChange={handleAddressInputChange} placeholder="e.g. 411001" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                  <input
+                    name="pinCode"
+                    value={addressForm.pinCode}
+                    onChange={handleAddressInputChange}
+                    placeholder="e.g. 411001"
+                    className={`w-full p-3 border ${addressErrors.pinCode ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50`}
+                  />
+                  {addressErrors.pinCode && <p className="text-red-500 text-[10px] mt-1">{addressErrors.pinCode}</p>}
                 </div>
                 <div className="col-span-2">
                   <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Contact Number</label>
-                  <input name="contactNumber" value={addressForm.contactNumber} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                  <input
+                    name="contactNumber"
+                    value={addressForm.contactNumber}
+                    onChange={handleAddressInputChange}
+                    placeholder="Optional"
+                    className={`w-full p-3 border ${addressErrors.contactNumber ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50`}
+                  />
+                  {addressErrors.contactNumber && <p className="text-red-500 text-[10px] mt-1">{addressErrors.contactNumber}</p>}
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
