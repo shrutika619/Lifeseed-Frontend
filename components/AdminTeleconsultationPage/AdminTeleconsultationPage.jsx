@@ -27,7 +27,8 @@ import {
   ChevronRight,
   AlertCircle,
   CalendarClock,
-  Monitor 
+  Monitor,
+  ShoppingCart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminTeleconsultationService } from "@/app/services/admin/adminTeleconsultation.service";
@@ -150,7 +151,12 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
     },
     {
       icon: Stethoscope, label: "Doctor Panel", color: "text-violet-600", bg: "hover:bg-violet-50",
-      href: `${basePath}/teleconsultation/doctorpanel?recordId=${item.recordId}`, 
+      href: `${basePath}/teleconsultation/doctorpanel?recordId=${item.recordId}`,
+    },
+    // ✅ 3rd position — Place Order
+    {
+      icon: ShoppingCart, label: "Place Order", color: "text-blue-600", bg: "hover:bg-blue-50",
+      href: `${basePath}/teleconsultation/placeorder`,
     },
     {
       icon: PhoneCall, label: "Call Clinic", color: "text-slate-600", bg: "hover:bg-slate-50",
@@ -158,11 +164,11 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
     },
     {
       icon: FileText, label: "Profile & CRM", color: "text-indigo-600", bg: "hover:bg-indigo-50",
-      href: `${basePath}/teleconsultation/customerprofile?userId=${item.requestBy?.userId || item.requestBy?.userid}`, 
+      href: `${basePath}/teleconsultation/customerprofile?userId=${item.requestBy?.userId || item.requestBy?.userid}`,
     },
     {
       icon: Calendar, label: "Reschedule", color: "text-orange-600", bg: "hover:bg-orange-50",
-      href: `/free-consultation?admin_booking=true&rescheduleRecordId=${item.recordId}&userId=${item.requestBy?.userId || item.requestBy?.userid}`, 
+      href: `/free-consultation?admin_booking=true&rescheduleRecordId=${item.recordId}&userId=${item.requestBy?.userId || item.requestBy?.userid}`,
       hide: item.consultationStatus === 'Cancelled' || item.consultationStatus === 'Complete'
     },
     {
@@ -175,7 +181,7 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
     },
     {
       icon: MapPin, label: "Tracking", color: "text-purple-600", bg: "hover:bg-purple-50",
-      onClick: () => { window.open(`https://maps.google.com/?q=$$${item.requestBy.city}`, "_blank"); onClose(); },
+      onClick: () => { window.open(`https://maps.google.com/?q=${item.requestBy.city}`, "_blank"); onClose(); },
     },
   ];
 
@@ -224,9 +230,9 @@ const ActionCell = ({ item, onCancel, onReschedule, dropUp }) => {
           <Phone className="w-4 h-4" />
         </button>
 
-        <a 
-          href={`${basePath}/log-in-user/customerprofile?userId=${item.requestBy?.userId || item.requestBy?.userid}`} 
-          title="View Profile" 
+        <a
+          href={`${basePath}/log-in-user/customerprofile?userId=${item.requestBy?.userId || item.requestBy?.userid}`}
+          title="View Profile"
           className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white flex items-center justify-center transition-all hover:scale-110 border border-indigo-200 shadow-sm"
         >
           <User className="w-4 h-4" />
@@ -306,7 +312,7 @@ const AdminTeleconsultationPage = () => {
     const delay = setTimeout(() => {
       fetchBookings();
       setCurrentPage(1);
-    }, 400); 
+    }, 400);
     return () => clearTimeout(delay);
   }, [selectedTime, activeConsultFilter, activeSellFilter, searchTerm]);
 
@@ -327,7 +333,7 @@ const AdminTeleconsultationPage = () => {
       const res = await adminTeleconsultationService.cancelBooking(cancelModal.recordId);
       if (res.success) {
         toast.success("Booking Cancelled Successfully");
-        fetchBookings(); 
+        fetchBookings();
         setCancelModal({ isOpen: false, recordId: null });
       } else {
         toast.error(res.message);
@@ -346,7 +352,7 @@ const AdminTeleconsultationPage = () => {
 
   const toggleSellFilter = (status) => {
     setActiveSellFilter(prev => prev === status ? "All" : status);
-    setActiveConsultFilter("All"); 
+    setActiveConsultFilter("All");
   };
 
   const formatDate = (isoDate) => {
@@ -500,7 +506,6 @@ const AdminTeleconsultationPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {/* ── UPDATED AGENT COLUMN WITH HOVER ── */}
                         <div className="relative group cursor-help inline-block">
                           <span className="text-sm text-slate-600 font-medium">
                             {item.agentName}
@@ -634,7 +639,6 @@ const AdminTeleconsultationPage = () => {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Agent</span>
-                    {/* ── AGENT HOVER FOR MOBILE ── */}
                     <div className="relative group cursor-help">
                       <p className="text-sm text-slate-700 font-medium">{item.agentName}</p>
                       {item.originalAgent && item.originalAgent !== item.agentName && (
@@ -701,9 +705,9 @@ const StatusPill = ({ count, label, color, onClick, active }) => (
 const getConsultStyle = (status) => {
   switch (status) {
     case "Complete":         return "bg-emerald-50 text-emerald-600 border-emerald-100";
-    case "New":               return "bg-blue-50 text-blue-600 border-blue-100";
+    case "New":              return "bg-blue-50 text-blue-600 border-blue-100";
     case "Pending/Upcoming": return "bg-orange-50 text-orange-600 border-orange-100";
-    case "Cancelled":         return "bg-red-50 text-red-600 border-red-100";
+    case "Cancelled":        return "bg-red-50 text-red-600 border-red-100";
     case "Reschedule":       return "bg-purple-50 text-purple-600 border-purple-100";
     default:                 return "bg-slate-50 text-slate-500 border-slate-100";
   }

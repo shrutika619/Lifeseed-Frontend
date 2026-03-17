@@ -12,7 +12,8 @@ import {
   Loader2,
   X,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  ShoppingCart
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getLoginUsersLeads } from "@/app/services/admin/leads.service"; 
@@ -34,6 +35,8 @@ const ActionMenu = ({ userId }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -45,6 +48,7 @@ const ActionMenu = ({ userId }) => {
 
       {open && (
         <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+          {/* 1st — CRM Profile */}
           <button
             onClick={() => {
               setOpen(false);
@@ -56,6 +60,20 @@ const ActionMenu = ({ userId }) => {
               <User className="w-4 h-4 text-blue-500" />
             </div>
             <span className="font-medium">CRM Profile</span>
+          </button>
+
+          {/* ✅ 2nd — Place Order */}
+          <button
+            onClick={() => {
+              setOpen(false);
+              router.push(`${basePath}/teleconsultation/placeorder`);
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <ShoppingCart className="w-4 h-4 text-blue-500" />
+            </div>
+            <span className="font-medium">Place Order</span>
           </button>
         </div>
       )}
@@ -320,10 +338,9 @@ const AdminLoginInUserPage = () => {
             />
           </div>
         </div>
-{/* ── ONLY CHANGE: onClick updated to target base path ── */}
+
         <button
           onClick={() => {
-            // Check if user is super-admin or admin, and route to the correct base path
             const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
             router.push(`${basePath}/newuser`);
           }}
