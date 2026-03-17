@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-// Inject responsive CSS once
 const RESPONSIVE_CSS = `
   .apo-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
   @media (max-width: 480px) {
@@ -51,25 +50,12 @@ const s = {
     background: "#fff",
     zIndex: 10,
   },
-  headerLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-  },
+  headerLeft: { display: "flex", alignItems: "center", gap: 10 },
   backBtn: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "none",
-    border: "1px solid #e0e0e0",
-    borderRadius: 8,
-    padding: "6px 10px",
-    cursor: "pointer",
-    color: "#555",
-    gap: 4,
-    fontSize: 13,
-    fontWeight: 500,
-    transition: "all 0.15s",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    background: "none", border: "1px solid #e0e0e0", borderRadius: 8,
+    padding: "6px 10px", cursor: "pointer", color: "#555",
+    gap: 4, fontSize: 13, fontWeight: 500, transition: "all 0.15s",
   },
   headerTitle: { fontSize: 18, fontWeight: 600, color: "#1a1a2e", margin: 0 },
   headerSub: { fontSize: 13, color: "#888", marginTop: 2 },
@@ -132,10 +118,8 @@ const s = {
     padding: "16px 20px 28px", background: "#fff",
   },
   placeBtn: {
-    background: "#4a6cf7", color: "#fff",
-    border: "none", padding: "10px 40px",
-    fontSize: 14, fontWeight: 600,
-    cursor: "pointer", letterSpacing: 0.3,
+    background: "#4a6cf7", color: "#fff", border: "none", padding: "10px 40px",
+    fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: 0.3,
     borderRadius: 8, minWidth: 160,
   },
   suggBox: {
@@ -152,19 +136,18 @@ const s = {
   modalOverlay: {
     position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
     background: "rgba(0,0,0,0.5)", zIndex: 100,
-    display: "flex", alignItems: "flex-end", justifyContent: "center",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "20px",
   },
   modalInner: {
-    background: "#fff", width: "100%", maxWidth: 520,
-    borderRadius: "16px 16px 0 0", padding: 20,
-    maxHeight: "60vh", overflowY: "auto",
+    background: "#fff", width: "100%", maxWidth: 500,
+    borderRadius: "16px", padding: "20px 24px",
+    maxHeight: "80vh", overflowY: "auto",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
   },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   modalTitle: { fontSize: 16, fontWeight: 600, color: "#1a1a2e" },
   closeBtn: { background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" },
-  historyItem: { padding: "10px 0", borderBottom: "1px solid #f0f0f0" },
-  historyName: { fontSize: 14, fontWeight: 600, color: "#1a1a2e", marginBottom: 2 },
-  historyMeta: { fontSize: 12, color: "#888" },
   emptyText: { fontSize: 13, color: "#aaa", textAlign: "center", padding: "20px 0" },
 };
 
@@ -183,25 +166,361 @@ const CONTACTS = [
   { number: "8765432109", name: "Suresh Nair" },
 ];
 
+const HISTORY_ITEMS = [
+  {
+    id: 1, icon: "👤", iconBg: "#e8f5e9",
+    title: "Just Contact",
+    desc: "Initial call with customer. Discussed needs. Seems interested.",
+    agent: "Pranjal", time: "Nov 11, 2:15 PM", date: null,
+    tag: "Follow-Up", tagColor: "#fff3e0", tagText: "#f57c00",
+  },
+  {
+    id: 2, icon: "✏️", iconBg: "#e3f2fd",
+    title: "Next Medicine Order",
+    desc: "Reminder for monthly prescription refill.",
+    agent: "Support", time: "Nov 13, 10:30 AM", date: "Wed Nov 20 2024",
+    tag: "Sell Done", tagColor: "#e8f5e9", tagText: "#2e7d32",
+  },
+  {
+    id: 3, icon: "🔄", iconBg: "#fce4ec",
+    title: "Follow-Up",
+    desc: "Check in on how the new medication is working.",
+    agent: "Pranjal", time: "Nov 13, 7:00 PM", date: "Fri Nov 15 2024 15:00",
+    tag: "Closed", tagColor: "#fce4ec", tagText: "#c62828",
+  },
+];
+
+const DEMO_ORDER_HISTORY = [
+  {
+    id: "demo-1",
+    type: "teleconsultation",
+    iconBg: "#f3e8ff",
+    icon: "📞",
+    title: "Teleconsultation",
+    badge: "Upcoming",
+    badgeBg: "#e8f0fe",
+    badgeColor: "#4a6cf7",
+    doctor: "Dr. Aisha Sharma",
+    specialty: "Cardiologist",
+    timeSlot: "Nov 25, 2024  •  11:30 AM - 12:00 PM",
+    details: [
+      { label: "Order ID:", value: "#TC-98765" },
+      { label: "Booking ID:", value: "#BK-54321" },
+      { label: "Booking Time:", value: "Nov 20, 2024, 8:15 PM" },
+      { label: "Amount Paid:", value: "$50.00" },
+      { label: "Agent:", value: "Pranjal" },
+    ],
+    // no View Details, no Edit — only Cancel
+    cancelable: true,
+    directionsLink: null,
+  },
+  {
+    id: "demo-2",
+    type: "inclinic",
+    iconBg: "#e8f5e9",
+    icon: "🏥",
+    title: "In-Clinic Consultation",
+    badge: "Upcoming",
+    badgeBg: "#e8f0fe",
+    badgeColor: "#4a6cf7",
+    doctor: "Dr. Rohan Gupta",
+    specialty: "General Physician",
+    clinic: "Apollo Clinic, Koregaon Park",
+    timeSlot: "Nov 28, 2024  •  5:00 PM - 5:30 PM",
+    details: [
+      { label: "Order ID:", value: "#IC-67890" },
+      { label: "Patient Age:", value: "34" },
+      { label: "Booking Time:", value: "Nov 21, 2024, 10:05 AM" },
+      { label: "Amount Paid:", value: "$80.00" },
+      { label: "Agent:", value: "Pranjal" },
+    ],
+    cancelable: true,
+    // Google Maps link for Apollo Clinic, Koregaon Park, Pune
+    directionsLink: "https://www.google.com/maps/search/Apollo+Clinic+Koregaon+Park+Pune",
+  },
+  {
+    id: "demo-3",
+    type: "medicine",
+    iconBg: "#e3f2fd",
+    icon: "💊",
+    title: "Medicine Order",
+    badge: "Delivered",
+    badgeBg: "#e8f5e9",
+    badgeColor: "#2e7d32",
+    date: "Nov 1, 2024",
+    orderId: "#MED-12908",
+    items: "Paracetamol (1 strip), Atorvastatin (1 strip), Vitamin D Sachet...",
+    cancelable: false,
+    directionsLink: null,
+  },
+];
+
+function OrderHistoryCard({ order, onCancel, onReorder }) {
+  const [cancelled, setCancelled] = useState(false);
+  const [reordered, setReordered] = useState(false);
+
+  const handleCancel = () => {
+    if (window.confirm(`Cancel ${order.title}?`)) {
+      setCancelled(true);
+      if (onCancel) onCancel(order.id);
+    }
+  };
+
+  const handleReorder = () => {
+    setReordered(true);
+    if (onReorder) onReorder(order);
+    alert(`✅ Reorder placed for: ${order.title}\nItems: ${order.items}`);
+  };
+
+  const handleDirections = () => {
+    window.open(order.directionsLink, "_blank");
+  };
+
+  return (
+    <div style={{
+      border: "1px solid #eee", borderRadius: 12, padding: "14px 16px",
+      marginBottom: 14, background: cancelled ? "#fafafa" : "#fff",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      opacity: cancelled ? 0.6 : 1,
+    }}>
+      {/* Card Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: "50%",
+            background: order.iconBg, display: "flex",
+            alignItems: "center", justifyContent: "center",
+            fontSize: 18, flexShrink: 0,
+          }}>
+            {order.icon}
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e" }}>{order.title}</div>
+            {order.doctor && (
+              <div style={{ fontSize: 12, color: "#555", marginTop: 1 }}>
+                with <span style={{ fontWeight: 600, color: "#333" }}>{order.doctor}</span>
+                {order.specialty && <span style={{ color: "#888" }}> ({order.specialty})</span>}
+              </div>
+            )}
+            {order.clinic && (
+              <div style={{ fontSize: 11, color: "#888", marginTop: 1 }}>{order.clinic}</div>
+            )}
+            {order.timeSlot && (
+              <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>Time Slot: {order.timeSlot}</div>
+            )}
+            {order.type === "medicine" && (
+              <>
+                <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>Order ID: {order.orderId}</div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 1 }}>Items: {order.items}</div>
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{order.date}</div>
+              </>
+            )}
+          </div>
+        </div>
+        <span style={{
+          fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
+          background: cancelled ? "#f5f5f5" : order.badgeBg,
+          color: cancelled ? "#aaa" : order.badgeColor,
+          whiteSpace: "nowrap", marginLeft: 8,
+        }}>
+          {cancelled ? "Cancelled" : order.badge}
+        </span>
+      </div>
+
+      {/* Details Grid */}
+      {order.details && (
+        <div style={{ margin: "10px 0 8px", borderTop: "1px solid #f5f5f5", paddingTop: 10 }}>
+          {order.details.map((d, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: "#888" }}>{d.label}</span>
+              <span style={{ fontSize: 12, color: "#333", fontWeight: 500 }}>{d.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      {!cancelled && (
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+
+          {/* Get Directions — only for inclinic */}
+          {order.type === "inclinic" && order.directionsLink && (
+            <button
+              onClick={handleDirections}
+              style={{
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                padding: "5px 12px", borderRadius: 6,
+                border: "1px solid #4a6cf7", color: "#4a6cf7", background: "none",
+                display: "flex", alignItems: "center", gap: 4,
+              }}
+            >
+              📍 Get Directions
+            </button>
+          )}
+
+          {/* Cancel — teleconsultation & inclinic */}
+          {order.cancelable && (
+            <button
+              onClick={handleCancel}
+              style={{
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                padding: "5px 12px", borderRadius: 6,
+                border: "1px solid #e53935", color: "#e53935", background: "none",
+              }}
+            >
+              Cancel
+            </button>
+          )}
+
+          {/* View Order — medicine */}
+          {order.type === "medicine" && (
+            <button
+              onClick={() => alert(`Order Details:\nID: ${order.orderId}\nItems: ${order.items}\nDate: ${order.date}`)}
+              style={{
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                padding: "5px 12px", borderRadius: 6,
+                border: "1px solid #4a6cf7", color: "#4a6cf7", background: "none",
+              }}
+            >
+              View Order
+            </button>
+          )}
+
+          {/* Reorder — medicine */}
+          {order.type === "medicine" && (
+            <button
+              onClick={handleReorder}
+              disabled={reordered}
+              style={{
+                fontSize: 12, fontWeight: 600, cursor: reordered ? "default" : "pointer",
+                padding: "5px 14px", borderRadius: 6,
+                border: "none",
+                color: "#fff",
+                background: reordered ? "#aaa" : "#4a6cf7",
+              }}
+            >
+              {reordered ? "Reordered ✓" : "Reorder"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoryModal({ orderHistory, onClose }) {
+  const [activeTab, setActiveTab] = useState("orderHistory");
+  const [cancelledIds, setCancelledIds] = useState([]);
+
+  const tabStyle = (active) => ({
+    padding: "8px 16px", fontSize: 13,
+    fontWeight: active ? 600 : 400,
+    color: active ? "#4a6cf7" : "#888",
+    background: "none", border: "none",
+    borderBottom: active ? "2px solid #4a6cf7" : "2px solid transparent",
+    cursor: "pointer",
+  });
+
+  const allOrders = [
+    ...DEMO_ORDER_HISTORY,
+    ...orderHistory.map((o) => ({
+      id: o.id,
+      type: "medicine",
+      iconBg: "#e3f2fd",
+      icon: "💊",
+      title: "Medicine Order",
+      badge: "Placed",
+      badgeBg: "#fff8e1",
+      badgeColor: "#f9a825",
+      date: o.time,
+      orderId: o.id,
+      items: o.product,
+      cancelable: true,
+      directionsLink: null,
+    })),
+  ];
+
+  return (
+    <div style={s.modalOverlay} onClick={onClose}>
+      <div style={s.modalInner} onClick={(e) => e.stopPropagation()}>
+        <div style={s.modalHeader}>
+          <span style={s.modalTitle}>History</span>
+          <button style={s.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{ display: "flex", borderBottom: "1px solid #eee", marginBottom: 16 }}>
+          <button style={tabStyle(activeTab === "orderHistory")} onClick={() => setActiveTab("orderHistory")}>
+            Order History
+          </button>
+          <button style={tabStyle(activeTab === "history")} onClick={() => setActiveTab("history")}>
+            History
+          </button>
+        </div>
+
+        {activeTab === "orderHistory" && (
+          <div>
+            {allOrders.map((order) => (
+              <OrderHistoryCard
+                key={order.id}
+                order={order}
+                onCancel={(id) => setCancelledIds((p) => [...p, id])}
+              />
+            ))}
+          </div>
+        )}
+
+        {activeTab === "history" && (
+          <div>
+            {HISTORY_ITEMS.map((item) => (
+              <div key={item.id} style={{
+                display: "flex", alignItems: "flex-start", gap: 12,
+                padding: "12px 0", borderBottom: "1px solid #f0f0f0",
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: "50%",
+                  background: item.iconBg, display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  fontSize: 16, flexShrink: 0,
+                }}>
+                  {item.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e" }}>{item.title}</span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, padding: "3px 10px",
+                      borderRadius: 20, background: item.tagColor, color: item.tagText,
+                      whiteSpace: "nowrap",
+                    }}>
+                      {item.tag}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#555", margin: "3px 0 4px" }}>{item.desc}</p>
+                  <div style={{ fontSize: 11, color: "#aaa" }}>
+                    {item.agent} • {item.time}
+                    {item.date && <span style={{ marginLeft: 6, color: "#bbb" }}>{item.date}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ContactTypeahead({ value, onChange, onSelect }) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
-
   const filtered = value
-    ? CONTACTS.filter(
-        (c) =>
-          c.number.includes(value) ||
-          c.name.toLowerCase().includes(value.toLowerCase())
-      )
+    ? CONTACTS.filter((c) => c.number.includes(value) || c.name.toLowerCase().includes(value.toLowerCase()))
     : CONTACTS;
 
   return (
     <div style={{ position: "relative" }}>
       <input
-        style={s.input}
-        type="tel"
-        maxLength={10}
-        value={value}
+        style={s.input} type="tel" maxLength={10} value={value}
         placeholder="Type or select number..."
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
@@ -210,9 +529,7 @@ function ContactTypeahead({ value, onChange, onSelect }) {
       {open && filtered.length > 0 && (
         <div style={s.suggBox}>
           {filtered.map((c) => (
-            <div
-              key={c.number}
-              style={s.suggItem(hovered === c.number)}
+            <div key={c.number} style={s.suggItem(hovered === c.number)}
               onMouseEnter={() => setHovered(c.number)}
               onMouseLeave={() => setHovered(null)}
               onMouseDown={() => { onSelect(c); setOpen(false); }}
@@ -254,8 +571,7 @@ export default function AdminPlaceOrderPage() {
     const id = "apo-responsive-style";
     if (!document.getElementById(id)) {
       const el = document.createElement("style");
-      el.id = id;
-      el.textContent = RESPONSIVE_CSS;
+      el.id = id; el.textContent = RESPONSIVE_CSS;
       document.head.appendChild(el);
     }
   }, []);
@@ -265,16 +581,11 @@ export default function AdminPlaceOrderPage() {
     : "0.00";
 
   const balanceDue =
-    payMode === "cod"
-      ? parseFloat(finalPrice || 0).toFixed(2)
-      : payMode === "partial"
-      ? Math.max(0, parseFloat(finalPrice || 0) - (parseFloat(amountPaid) || 0)).toFixed(2)
-      : "0.00";
+    payMode === "cod" ? parseFloat(finalPrice || 0).toFixed(2)
+    : payMode === "partial" ? Math.max(0, parseFloat(finalPrice || 0) - (parseFloat(amountPaid) || 0)).toFixed(2)
+    : "0.00";
 
-  const handleContactSelect = (c) => {
-    setContactNo(c.number);
-    setPatientName(c.name);
-  };
+  const handleContactSelect = (c) => { setContactNo(c.number); setPatientName(c.name); };
 
   const handleProductChange = (val) => {
     setProductName(val);
@@ -316,43 +627,27 @@ export default function AdminPlaceOrderPage() {
         {/* Header */}
         <div style={s.header} className="apo-header">
           <div style={s.headerLeft}>
-            {/* ✅ Back Button */}
-            <button
-              style={s.backBtn}
-              onClick={() => router.back()}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#f0f4ff";
-                e.currentTarget.style.borderColor = "#4a6cf7";
-                e.currentTarget.style.color = "#4a6cf7";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-                e.currentTarget.style.borderColor = "#e0e0e0";
-                e.currentTarget.style.color = "#555";
-              }}
+            <button style={s.backBtn} onClick={() => router.back()}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#f0f4ff"; e.currentTarget.style.borderColor = "#4a6cf7"; e.currentTarget.style.color = "#4a6cf7"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.borderColor = "#e0e0e0"; e.currentTarget.style.color = "#555"; }}
             >
-              <ArrowLeft size={15} />
-              Back
+              <ArrowLeft size={15} /> Back
             </button>
             <div>
               <h2 style={s.headerTitle}>Medicine Order</h2>
               <p style={s.headerSub}>Patient ID: {patientName ? patientId : "—"}</p>
             </div>
           </div>
-          <button style={s.historyBtn} onClick={() => setShowHistory(true)}>
-            🕐 Show History
-          </button>
+          <button style={s.historyBtn} onClick={() => setShowHistory(true)}>🕐 Show History</button>
         </div>
 
         {/* Patient Details */}
         <div style={s.section} className="apo-section">
           <div style={s.sectionTitle}>Patient Details</div>
-
           <div style={s.field}>
             <label style={s.label}>Patient Name</label>
             <input style={s.input} value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="e.g., John Doe" />
           </div>
-
           <div className="apo-row2">
             <div style={s.field}>
               <label style={s.label}>Agent Name</label>
@@ -365,7 +660,6 @@ export default function AdminPlaceOrderPage() {
               <datalist id="doctorList">{DOCTORS.map((d) => <option key={d} value={d} />)}</datalist>
             </div>
           </div>
-
           <div style={s.divider} />
 
           {/* Address */}
@@ -376,13 +670,11 @@ export default function AdminPlaceOrderPage() {
               <button style={s.saveAddrBtn} onClick={saveAddress}>Save Address</button>
             </div>
           </div>
-
           <div style={s.tagGroup}>
             {["Home", "Office", "Other"].map((tag) => (
               <button key={tag} style={s.tag(addressTag === tag)} onClick={() => setAddressTag(tag)}>{tag}</button>
             ))}
           </div>
-
           <div className="apo-row2">
             <div style={s.field}>
               <label style={s.label}>Flat No / House No</label>
@@ -393,7 +685,6 @@ export default function AdminPlaceOrderPage() {
               <input style={s.input} value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Enter" />
             </div>
           </div>
-
           <div className="apo-row2">
             <div style={s.field}>
               <label style={s.label}>Landmark</label>
@@ -404,7 +695,6 @@ export default function AdminPlaceOrderPage() {
               <input style={s.input} value={pinCode} onChange={(e) => setPinCode(e.target.value)} placeholder="Enter" maxLength={6} />
             </div>
           </div>
-
           <div className="apo-row2" style={{ marginBottom: 0 }}>
             <div style={s.field}>
               <label style={s.label}>Contact Number</label>
@@ -422,26 +712,15 @@ export default function AdminPlaceOrderPage() {
         {/* Order & Payment */}
         <div style={s.section} className="apo-section">
           <div style={s.sectionTitle}>Order & Payment</div>
-
           <div style={s.field}>
             <label style={s.label}>Contact No</label>
-            <ContactTypeahead
-              value={contactNo}
-              onChange={(val) => setContactNo(val)}
-              onSelect={handleContactSelect}
-            />
+            <ContactTypeahead value={contactNo} onChange={(val) => setContactNo(val)} onSelect={handleContactSelect} />
           </div>
-
           <div style={s.field}>
             <label style={s.label}>Product Name</label>
-            <input
-              list="productList" style={s.input} value={productName}
-              onChange={(e) => handleProductChange(e.target.value)}
-              placeholder="Select a product..."
-            />
+            <input list="productList" style={s.input} value={productName} onChange={(e) => handleProductChange(e.target.value)} placeholder="Select a product..." />
             <datalist id="productList">{PRODUCTS.map((p) => <option key={p.label} value={p.label} />)}</datalist>
           </div>
-
           <div style={s.field}>
             <label style={s.label}>Medication Selling Price</label>
             <div style={s.priceInputRow}>
@@ -449,7 +728,6 @@ export default function AdminPlaceOrderPage() {
               <input type="number" style={s.innerInput} value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} placeholder="e.g., 2998" />
             </div>
           </div>
-
           <div style={s.field}>
             <label style={s.label}>Discount</label>
             <div style={s.priceInputRow}>
@@ -457,7 +735,6 @@ export default function AdminPlaceOrderPage() {
               <span style={s.rupee}>%</span>
             </div>
           </div>
-
           <div style={s.field}>
             <label style={s.label}>Final Price</label>
             <div style={s.priceInputRowReadonly}>
@@ -465,7 +742,6 @@ export default function AdminPlaceOrderPage() {
               <input type="number" style={{ ...s.innerInput, background: "#f9f9f9" }} value={finalPrice} readOnly />
             </div>
           </div>
-
           <div style={s.field}>
             <label style={s.label}>Payment Mode</label>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }} className="apo-payment-modes">
@@ -477,7 +753,6 @@ export default function AdminPlaceOrderPage() {
               ))}
             </div>
           </div>
-
           {payMode !== "cod" && (
             <div style={s.field}>
               <label style={s.label}>Amount Paid (Pre-paid)</label>
@@ -497,31 +772,12 @@ export default function AdminPlaceOrderPage() {
 
         {/* Place Order Button */}
         <div style={s.placeBtnWrapper} className="apo-place-btn-wrapper">
-          <button style={s.placeBtn} className="apo-place-btn" onClick={placeOrder}>
-            Place Order
-          </button>
+          <button style={s.placeBtn} className="apo-place-btn" onClick={placeOrder}>Place Order</button>
         </div>
 
         {/* History Modal */}
         {showHistory && (
-          <div style={s.modalOverlay} onClick={() => setShowHistory(false)}>
-            <div style={s.modalInner} onClick={(e) => e.stopPropagation()}>
-              <div style={s.modalHeader}>
-                <span style={s.modalTitle}>Order History</span>
-                <button style={s.closeBtn} onClick={() => setShowHistory(false)}>✕</button>
-              </div>
-              {orderHistory.length === 0 ? (
-                <p style={s.emptyText}>No orders placed yet.</p>
-              ) : (
-                orderHistory.map((o) => (
-                  <div key={o.id} style={s.historyItem}>
-                    <div style={s.historyName}>{o.patient} — {o.product}</div>
-                    <div style={s.historyMeta}>{o.amount} · Balance: {o.balance} · {o.mode.toUpperCase()} · {o.time}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <HistoryModal orderHistory={orderHistory} onClose={() => setShowHistory(false)} />
         )}
 
       </div>
