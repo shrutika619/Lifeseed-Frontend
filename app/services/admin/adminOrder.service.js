@@ -2,25 +2,23 @@ import api from "@/lib/axios";
 import { Constants } from "@/app/utils/constants";
 
 export const adminOrderService = {
-  // Uses query param: ?teleRecordId=
-  prefetchOrderDetails: async (teleRecordId) => {
+  // Pass an object like { teleRecordId: "123" } or { userId: "456" }
+  prefetchOrderDetails: async (queryParams) => {
     try {
-      const response = await api.get(
-        `${Constants.urlEndPoints.ADMIN_ORDER_PREFETCH}?teleRecordId=${teleRecordId}`
-      );
+      const response = await api.get(Constants.urlEndPoints.ADMIN_ORDER_PREFETCH, {
+        params: queryParams // Axios automatically formats this into ?key=value
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
 
-  // Uses query param: ?teleRecordId=
-  placeOrder: async (teleRecordId, orderData) => {
+  placeOrder: async (queryParams, orderData) => {
     try {
-      const response = await api.post(
-        `${Constants.urlEndPoints.ADMIN_ORDER_PLACE}?teleRecordId=${teleRecordId}`, 
-        orderData
-      );
+      const response = await api.post(Constants.urlEndPoints.ADMIN_ORDER_PLACE, orderData, {
+        params: queryParams 
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
