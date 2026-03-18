@@ -4,21 +4,22 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux"; 
 import { Calendar, Clock, MapPin, User, Phone, Mail, Loader2 } from 'lucide-react';
-import { ClinicDoctorService } from "@/app/services/patient/clinicDoctor.service"; 
+import { ClinicDoctorService } from "@/app/services/patient/clinicDoctor.service";
+import { bookingService } from "@/app/services/patient/payment.service"; 
+import { toast } from 'sonner';
 
-// ✅ HELPER: Always generate the next 7 days starting from today
+// ✅ HELPER: Generate the next 7 days starting from today in YYYY-MM-DD format
 const generateNext7Days = () => {
   return Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     
-    // Format to YYYY-MM-DD for accurate comparison
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     
     return {
-      fullDate: `${year}-${month}-${day}`, 
+      fullDate: `${year}-${month}-${day}`, // E.g., "2026-03-23"
       day: d.toLocaleDateString('en-US', { weekday: 'short' }),
       date: d.getDate(),
       obj: d
@@ -42,27 +43,32 @@ const BookAppointmentPage = () => {
   // States for Dynamic Slots & Timings
   const [availabilityData, setAvailabilityData] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [isBooking, setIsBooking] = useState(false); 
   
-  // ✅ Initialize visible dates to the next 7 days
   const [visibleDates] = useState(generateNext7Days());
   const [selectedDate, setSelectedDate] = useState(null); 
-  const [selectedTime, setSelectedTime] = useState(null);
+  
+  // ✅ Stores the full slot object to capture availabilityId, slotGroupId, and slotId
+  const [selectedSlot, setSelectedSlot] = useState(null);
   
   // Form data state
   const [formData, setFormData] = useState({
     fullName: '',
     contact: '',
+    email: '', 
     age: '',
     gender: ''
   });
   
   const [acceptTerms, setAcceptTerms] = useState(false);
 
+  // Populate form with logged-in user data
   useEffect(() => {
     if (user) {
       setFormData({
         fullName: user.fullName || user.name || '',
         contact: user.mobileNo || user.phone || '',
+        email: user.email || user.mailId || '',
         age: user.age || '',
         gender: user.gender ? user.gender.toLowerCase() : ''
       });
@@ -73,18 +79,17 @@ const BookAppointmentPage = () => {
   useEffect(() => {
     const fetchDoctors = async () => {
       if (!clinicId) {
-        console.warn("No clinicId found in URL parameters");
         setLoadingDoctors(false);
         return;
       }
       try {
         setLoadingDoctors(true);
-        const data = await ClinicDoctorService.getDoctorsByClinicId(clinicId);
+        const res = await ClinicDoctorService.getDoctorsByClinicId(clinicId);
 
-        if (data.success) {
-          setClinicName(data.data.clinicName);
+        if (res.success && res.data) {
+          setClinicName(res.data.clinicName);
           
-          const mappedDoctors = data.data.doctors.map(doc => {
+          const mappedDoctors = res.data.doctors.map(doc => {
             const ug = doc.underGraduationDegree?.name || "";
             const pg = doc.postGraduationDegree?.name || "";
             const superSpec = doc.superSpecialization?.name || "";
@@ -97,7 +102,7 @@ const BookAppointmentPage = () => {
               name: doc.name.toLowerCase().startsWith('dr') ? doc.name : `Dr. ${doc.name}`,
               specialization: qualifications || fallbackSpec,
               experience: doc.experience ? `${doc.experience}+ Years` : "Experience not listed",
-              location: data.data.clinicName,
+              location: res.data.clinicName,
               fee: doc.consultationFee,
               image: doc.profileImage || `https://via.placeholder.com/100/6366f1/ffffff?text=${doc.name.charAt(0)}`
             };
@@ -120,13 +125,15 @@ const BookAppointmentPage = () => {
       if (!selectedDoctor) return;
       try {
         setLoadingSlots(true);
-        // Default select "today" from our generated 7-day array
         setSelectedDate(visibleDates[0].fullDate); 
-        setSelectedTime(null); 
+        setSelectedSlot(null); 
 
         const res = await ClinicDoctorService.getDoctorDetailsById(selectedDoctor);
-        if (res.success && res.data?.availability) {
+        
+        if (res.data?.availability) {
           setAvailabilityData(res.data.availability);
+        } else {
+          setAvailabilityData([]);
         }
       } catch (error) {
         console.error("Failed to fetch availability", error);
@@ -137,14 +144,13 @@ const BookAppointmentPage = () => {
     fetchAvailability();
   }, [selectedDoctor, visibleDates]);
 
-  // ✅ HELPER: Match selected local date string with backend ISO date
+  // ✅ SAFELY EXTRACT AVAILABILITY BY SPLITTING ISO STRING
   const getAvailabilityForDate = (targetDateStr) => {
     return availabilityData.find(a => {
-      const aDate = new Date(a.date);
-      const aYear = aDate.getFullYear();
-      const aMonth = String(aDate.getMonth() + 1).padStart(2, '0');
-      const aDay = String(aDate.getDate()).padStart(2, '0');
-      return `${aYear}-${aMonth}-${aDay}` === targetDateStr;
+      if (!a.date) return false;
+      // Converts "2026-03-23T01:00:00.000Z" -> "2026-03-23"
+      const backendDateStr = a.date.split('T')[0]; 
+      return backendDateStr === targetDateStr;
     });
   };
 
@@ -153,7 +159,7 @@ const BookAppointmentPage = () => {
   const currentDayAvailability = getAvailabilityForDate(selectedDate);
   const patientLimit = currentDayAvailability?.patientLimit || 1;
   
-  // ✅ EXTRACT & SORT: Night -> Morning -> Afternoon -> Evening
+  // EXTRACT & SORT: Night -> Morning -> Afternoon -> Evening
   let activeGroups = [];
   if (currentDayAvailability?.slotGroups) {
     activeGroups = [...currentDayAvailability.slotGroups].filter(g => g.slots && g.slots.length > 0);
@@ -165,12 +171,50 @@ const BookAppointmentPage = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleBooking = () => {
-    if (!selectedDoctor || !selectedTime || !formData.fullName || !formData.contact || !acceptTerms) {
-      alert('Please fill all required fields and select a time slot');
+  // ✅ 3. Call Cash Booking API
+  const handleBooking = async () => {
+    if (!selectedDoctor || !selectedSlot || !formData.fullName || !formData.contact || !acceptTerms) {
+      toast.error('Please fill all required fields and select a time slot');
       return;
     }
-    router.push("/confirmbooking");
+
+    const doctor = doctors.find(d => d.id === selectedDoctor);
+    const fee = doctor ? doctor.fee : 0;
+
+    // Construct the exact payload required by your backend
+    const payload = {
+      bookingData: {
+        availabilityId: selectedSlot.availabilityId,
+        slotGroupId: selectedSlot.slotGroupId,
+        slotId: selectedSlot.slotId,
+        doctorId: selectedDoctor,
+        patientName: formData.fullName,
+        patientPhone: String(formData.contact),
+        patientEmail: formData.email || "no-email@provided.com",
+        patientGender: formData.gender || "other",
+        // ✅ CRITICAL: Required if an Admin is booking on behalf of a patient
+        patientUserId: user?._id || user?.id || null 
+      },
+      totalAmount: Number(fee)
+    };
+
+    setIsBooking(true);
+    try {
+      const res = await bookingService.createCashBooking(payload);
+      
+      if (res.success) {
+        toast.success(res.message || "Booking confirmed!");
+        // Navigate to success page, passing the newly generated appointment ID
+        router.push(`/confirmbooking?appointmentId=${res.data.appointmentId}`);
+      } else {
+        toast.error(res.message || "Failed to create booking.");
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      toast.error(error.message || "An error occurred while booking.");
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   return (
@@ -277,6 +321,14 @@ const BookAppointmentPage = () => {
                   className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
                 />
                 <input
+                  type="email"
+                  name="email"
+                  placeholder="Email ID (Optional)"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
+                />
+                <input
                   type="number"
                   name="age"
                   placeholder="Age"
@@ -354,7 +406,7 @@ const BookAppointmentPage = () => {
                           key={d.fullDate}
                           onClick={() => {
                             setSelectedDate(d.fullDate);
-                            setSelectedTime(null); 
+                            setSelectedSlot(null); // Reset slot on date change
                           }}
                           className={`flex flex-col items-center justify-center py-2 sm:py-3 rounded-xl transition-all border ${
                             selectedDate === d.fullDate
@@ -369,7 +421,7 @@ const BookAppointmentPage = () => {
                     </div>
                   </div>
 
-                  {/* ✅ DYNAMIC TIME SLOTS OR NOT AVAILABLE MESSAGE */}
+                  {/* DYNAMIC TIME SLOTS */}
                   <div className="space-y-4 sm:space-y-5">
                     {activeGroups.length === 0 ? (
                        <div className="text-center py-8 text-red-500 bg-red-50 rounded-xl border border-dashed border-red-200">
@@ -378,7 +430,7 @@ const BookAppointmentPage = () => {
                        </div>
                     ) : (
                       activeGroups.map((group) => (
-                        <div key={group.period}>
+                        <div key={group._id || group.period}>
                           <h3 className="font-semibold text-gray-700 mb-2 text-sm sm:text-base capitalize">
                             {group.period}
                           </h3>
@@ -386,13 +438,31 @@ const BookAppointmentPage = () => {
                             {group.slots.map((slot) => {
                               const isFull = slot.bookedCount >= patientLimit;
                               const isBookable = slot.isAvailable && !isFull;
-                              const isSelected = selectedTime === slot.time;
+                              
+                              const isSelected = selectedSlot?.time === slot.time;
 
                               return (
                                 <button
-                                  key={slot._id || slot.time}
+                                  key={slot._id || slot.id || slot.time}
                                   disabled={!isBookable}
-                                  onClick={() => setSelectedTime(slot.time)}
+                                  onClick={() => {
+                                    // ✅ HIGHLY DEFENSIVE ID EXTRACTION
+                                    const aId = currentDayAvailability?._id || currentDayAvailability?.id;
+                                    const gId = group?._id || group?.id;
+                                    const sId = slot?._id || slot?.id;
+
+                                    if (!aId) {
+                                       toast.error("Error: Could not read availability ID from data.");
+                                       return;
+                                    }
+
+                                    setSelectedSlot({
+                                      time: slot.time,
+                                      availabilityId: aId,
+                                      slotGroupId: gId,
+                                      slotId: sId
+                                    });
+                                  }}
                                   className={`
                                     px-3 py-2 text-xs sm:text-sm rounded-lg border transition-all font-medium flex flex-col items-center justify-center min-w-[90px]
                                     ${isSelected 
@@ -461,7 +531,7 @@ const BookAppointmentPage = () => {
                 </div>
                 <div className="flex justify-between text-xs sm:text-sm gap-2">
                   <span className="text-gray-600">Time:</span>
-                  <span className="font-semibold text-right">{selectedTime || 'Not selected'}</span>
+                  <span className="font-semibold text-right">{selectedSlot?.time || 'Not selected'}</span>
                 </div>
                 <div className="flex justify-between text-xs sm:text-sm gap-2">
                   <span className="text-gray-600">Clinic:</span>
@@ -500,10 +570,10 @@ const BookAppointmentPage = () => {
               {/* CONFIRM BUTTON */}
               <button
                 onClick={handleBooking}
-                className="w-full bg-indigo-600 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-sm sm:text-base shadow-sm"
-                disabled={!selectedDoctor || !selectedTime || !acceptTerms}
+                className="w-full bg-indigo-600 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-sm sm:text-base shadow-sm flex items-center justify-center gap-2"
+                disabled={!selectedDoctor || !selectedSlot || !acceptTerms || isBooking}
               >
-                Confirm Booking
+                {isBooking ? <Loader2 className="w-5 h-5 animate-spin" /> : "Confirm Booking"}
               </button>
 
             </div>
