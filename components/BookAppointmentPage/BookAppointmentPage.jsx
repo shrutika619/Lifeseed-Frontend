@@ -6,20 +6,19 @@ import { useSelector } from "react-redux";
 import { Calendar, Clock, MapPin, User, Phone, Mail, Loader2 } from 'lucide-react';
 import { ClinicDoctorService } from "@/app/services/patient/clinicDoctor.service";
 import { bookingService } from "@/app/services/patient/payment.service"; 
+// ✅ Assuming you have a service to get basic user details by ID
+import { getPatientDetailsById } from '@/app/services/admin/leads.service'; 
 import { toast } from 'sonner';
 
-// ✅ HELPER: Generate the next 7 days starting from today in YYYY-MM-DD format
 const generateNext7Days = () => {
   return Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    
     return {
-      fullDate: `${year}-${month}-${day}`, // E.g., "2026-03-23"
+      fullDate: `${year}-${month}-${day}`, 
       day: d.toLocaleDateString('en-US', { weekday: 'short' }),
       date: d.getDate(),
       obj: d
@@ -31,27 +30,26 @@ const BookAppointmentPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clinicId = searchParams.get("clinicId"); 
+  
+  // ✅ Explicitly grab patientUserId from URL (indicates Admin is booking for a patient)
+  const urlPatientUserId = searchParams.get("patientUserId");
 
-  const user = useSelector((state) => state.auth?.user);
+  const loggedInUser = useSelector((state) => state.auth?.user);
 
-  // States for Doctors
+  // States
   const [doctors, setDoctors] = useState([]);
   const [clinicName, setClinicName] = useState("Our Clinic");
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
 
-  // States for Dynamic Slots & Timings
   const [availabilityData, setAvailabilityData] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isBooking, setIsBooking] = useState(false); 
   
   const [visibleDates] = useState(generateNext7Days());
   const [selectedDate, setSelectedDate] = useState(null); 
-  
-  // ✅ Stores the full slot object to capture availabilityId, slotGroupId, and slotId
   const [selectedSlot, setSelectedSlot] = useState(null);
   
-  // Form data state
   const [formData, setFormData] = useState({
     fullName: '',
     contact: '',
@@ -62,18 +60,40 @@ const BookAppointmentPage = () => {
   
   const [acceptTerms, setAcceptTerms] = useState(false);
 
-  // Populate form with logged-in user data
+  // ✅ Auto-Fill Form Logic
   useEffect(() => {
-    if (user) {
-      setFormData({
-        fullName: user.fullName || user.name || '',
-        contact: user.mobileNo || user.phone || '',
-        email: user.email || user.mailId || '',
-        age: user.age || '',
-        gender: user.gender ? user.gender.toLowerCase() : ''
-      });
-    }
-  }, [user]);
+    const autoFillData = async () => {
+      // SCENARIO 1: Admin is booking (patient ID is in URL)
+      if (urlPatientUserId) {
+        try {
+          const res = await getPatientDetailsById(urlPatientUserId);
+          if (res.success && res.data) {
+            setFormData({
+              fullName: res.data.name || res.data.fullName || '',
+              contact: res.data.mobileNo || res.data.phone || '',
+              email: res.data.mailId || res.data.email || '',
+              age: res.data.age || '',
+              gender: res.data.gender ? res.data.gender.toLowerCase() : ''
+            });
+          }
+        } catch (error) {
+          console.error("Failed to auto-fill patient data", error);
+        }
+      } 
+      // SCENARIO 2: Patient is booking for themselves
+      else if (loggedInUser) {
+        setFormData({
+          fullName: loggedInUser.fullName || loggedInUser.name || '',
+          contact: loggedInUser.mobileNo || loggedInUser.phone || '',
+          email: loggedInUser.email || loggedInUser.mailId || '',
+          age: loggedInUser.age || '',
+          gender: loggedInUser.gender ? loggedInUser.gender.toLowerCase() : ''
+        });
+      }
+    };
+
+    autoFillData();
+  }, [loggedInUser, urlPatientUserId]);
 
   // 1. Fetch Doctors 
   useEffect(() => {
@@ -85,15 +105,12 @@ const BookAppointmentPage = () => {
       try {
         setLoadingDoctors(true);
         const res = await ClinicDoctorService.getDoctorsByClinicId(clinicId);
-
         if (res.success && res.data) {
           setClinicName(res.data.clinicName);
-          
           const mappedDoctors = res.data.doctors.map(doc => {
             const ug = doc.underGraduationDegree?.name || "";
             const pg = doc.postGraduationDegree?.name || "";
             const superSpec = doc.superSpecialization?.name || "";
-            
             const qualifications = [ug, pg, superSpec].filter(Boolean).join(", ");
             const fallbackSpec = doc.primarySpecialty?.name || "Specialist";
 
@@ -107,7 +124,6 @@ const BookAppointmentPage = () => {
               image: doc.profileImage || `https://via.placeholder.com/100/6366f1/ffffff?text=${doc.name.charAt(0)}`
             };
           });
-          
           setDoctors(mappedDoctors);
         }
       } catch (error) {
@@ -129,7 +145,6 @@ const BookAppointmentPage = () => {
         setSelectedSlot(null); 
 
         const res = await ClinicDoctorService.getDoctorDetailsById(selectedDoctor);
-        
         if (res.data?.availability) {
           setAvailabilityData(res.data.availability);
         } else {
@@ -144,34 +159,78 @@ const BookAppointmentPage = () => {
     fetchAvailability();
   }, [selectedDoctor, visibleDates]);
 
-  // ✅ SAFELY EXTRACT AVAILABILITY BY SPLITTING ISO STRING
+  // SAFELY EXTRACT AVAILABILITY BY SPLITTING ISO STRING
   const getAvailabilityForDate = (targetDateStr) => {
     return availabilityData.find(a => {
       if (!a.date) return false;
-      // Converts "2026-03-23T01:00:00.000Z" -> "2026-03-23"
       const backendDateStr = a.date.split('T')[0]; 
       return backendDateStr === targetDateStr;
     });
   };
 
   const currentMonthYear = visibleDates[0].obj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  
   const currentDayAvailability = getAvailabilityForDate(selectedDate);
   const patientLimit = currentDayAvailability?.patientLimit || 1;
+
+
+   /**
+ * Checks if a slot time (e.g., "2:30 PM - 3:00 PM") is in the past.
+ * Returns true if the current time is past the START time of the slot.
+ */
+const isSlotInPast = (slotTimeRange) => {
+  try {
+    // 1. Extract the start time (e.g., "2:30 PM")
+    const startTimeStr = slotTimeRange.split(" - ")[0]; 
+    
+    const now = new Date();
+    const [time, modifier] = startTimeStr.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+
+    // 2. Convert to 24-hour format for comparison
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+
+    const slotDate = new Date();
+    slotDate.setHours(hours, minutes, 0, 0);
+
+    return now > slotDate;
+  } catch (err) {
+    return false; // Fallback to show slot if parsing fails
+  }
+};
+
   
   // EXTRACT & SORT: Night -> Morning -> Afternoon -> Evening
   let activeGroups = [];
-  if (currentDayAvailability?.slotGroups) {
-    activeGroups = [...currentDayAvailability.slotGroups].filter(g => g.slots && g.slots.length > 0);
-    const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
-    activeGroups.sort((a, b) => (orderMap[a.period] || 99) - (orderMap[b.period] || 99));
-  }
+
+if (currentDayAvailability?.slotGroups) {
+  // ✅ 1. Determine if the selected date is Today
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isToday = selectedDate === todayStr;
+
+  // ✅ 2. Filter and Map Groups
+  activeGroups = currentDayAvailability.slotGroups
+    .map(group => {
+      // If it's today, filter individual slots by time
+      const filteredSlots = isToday 
+        ? group.slots.filter(slot => !isSlotInPast(slot.time))
+        : group.slots;
+
+      return { ...group, slots: filteredSlots };
+    })
+    // ✅ 3. Only keep groups that still have slots after filtering
+    .filter(g => g.slots && g.slots.length > 0);
+
+  // ✅ 4. Sort groups by period
+  const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
+  activeGroups.sort((a, b) => (orderMap[a.period] || 99) - (orderMap[b.period] || 99));
+}
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ✅ 3. Call Cash Booking API
+  // ✅ 3. Call Cash Booking API (STRICT PAYLOAD MATCH)
   const handleBooking = async () => {
     if (!selectedDoctor || !selectedSlot || !formData.fullName || !formData.contact || !acceptTerms) {
       toast.error('Please fill all required fields and select a time slot');
@@ -181,7 +240,10 @@ const BookAppointmentPage = () => {
     const doctor = doctors.find(d => d.id === selectedDoctor);
     const fee = doctor ? doctor.fee : 0;
 
-    // Construct the exact payload required by your backend
+    // ✅ Priority Logic: URL Param (Admin booking) -> Logged In User -> Guest Walk-in
+    const finalPatientUserId = urlPatientUserId || loggedInUser?._id || loggedInUser?.id || null;
+
+    // Constructing exact JSON payload format
     const payload = {
       bookingData: {
         availabilityId: selectedSlot.availabilityId,
@@ -192,11 +254,14 @@ const BookAppointmentPage = () => {
         patientPhone: String(formData.contact),
         patientEmail: formData.email || "no-email@provided.com",
         patientGender: formData.gender || "other",
-        // ✅ CRITICAL: Required if an Admin is booking on behalf of a patient
-        patientUserId: user?._id || user?.id || null 
       },
       totalAmount: Number(fee)
     };
+
+    // ✅ Attach patientUserId ONLY if it exists (Admin booking or Logged In Patient)
+    if (finalPatientUserId) {
+      payload.bookingData.patientUserId = finalPatientUserId;
+    }
 
     setIsBooking(true);
     try {
@@ -204,7 +269,7 @@ const BookAppointmentPage = () => {
       
       if (res.success) {
         toast.success(res.message || "Booking confirmed!");
-        // Navigate to success page, passing the newly generated appointment ID
+        // Navigate to success page
         router.push(`/confirmbooking?appointmentId=${res.data.appointmentId}`);
       } else {
         toast.error(res.message || "Failed to create booking.");
@@ -318,6 +383,7 @@ const BookAppointmentPage = () => {
                   placeholder="Contact No"
                   value={formData.contact}
                   onChange={handleInputChange}
+                  maxLength={10}
                   className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
                 />
                 <input
