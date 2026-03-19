@@ -7,8 +7,8 @@ import {
   Users,
   HelpCircle,
   FileText,
-  LogOut,
   X,
+  LayoutDashboard,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useDispatch } from "react-redux";
@@ -17,9 +17,10 @@ import { toast } from "sonner";
 
 // ✅ Import Services
 import { logoutUser } from "@/app/services/auth/auth.service"; 
-import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service"; // ⬅️ NEW IMPORT
+import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service";
 
 const menuItems = [
+  { label: "Dashboard", icon: LayoutDashboard, path: "dashboard" }, // ✅ ADDED
   { label: "Time Table", icon: Clock, path: "time-table" },
   { label: "Settings", icon: Settings, path: "settings" },
   { label: "Doctors", icon: Users, path: "doctors" },
@@ -34,22 +35,18 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
 
   const basePath = "/hospitaldashboard";
 
-  // ✅ State to hold the dynamically fetched clinic info
   const [clinicInfo, setClinicInfo] = useState({
     name: "Loading...",
     location: "Loading...",
     initial: "C"
   });
 
-  // ✅ Fetch Clinic Data on Mount
   useEffect(() => {
     const fetchSidebarData = async () => {
       try {
         const response = await getMeClinicProfile();
         if (response.success && response.data) {
           const clinic = response.data.clinic;
-          
-          // Clean up location format (e.g. "Sitaburdi, Nagpur")
           const area = clinic.areaName || "";
           const city = response.data.cityName || "";
           const formattedLocation = [area, city].filter(Boolean).join(", ");
@@ -124,7 +121,7 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
             src="/Images/MEN10.svg"
             alt="MEN10 Logo"
             className="h-8 w-auto cursor-pointer"
-            onClick={() => router.push("/hospitaldashboard/profile")}
+            onClick={() => router.push("/")}
           />
           <button
             onClick={onClose}
@@ -140,7 +137,6 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
             className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
             onClick={() => router.push("/hospitaldashboard/profile")}
           >
-            {/* ✅ Dynamic Initial */}
             <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center flex-shrink-0">
               <span className="text-blue-600 font-semibold text-lg">
                 {clinicInfo.initial}
@@ -148,11 +144,9 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
             </div>
             
             <div className="flex-1 min-w-0">
-              {/* ✅ Dynamic Name */}
               <h3 className="font-semibold text-gray-900 truncate">
                 {clinicInfo.name}
               </h3>
-              {/* ✅ Dynamic Location (Area, City) */}
               <p className="text-sm text-gray-500 truncate">
                 {clinicInfo.location}
               </p>
@@ -177,7 +171,7 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
         <nav className="flex-1 p-4 space-y-2">
           {menuItems.map(({ label, icon: Icon, path }) => (
             <button
-              key={label}
+              key={path}
               onClick={() => handleNavigation(path)}
               className={`
                 w-full flex items-center gap-4 px-4 py-3 rounded-lg text-left
@@ -213,7 +207,6 @@ const HospitalDashboardSidebarPage = ({ isMobileOpen, onClose }) => {
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
           >
-            {/* ✅ Dynamic Initial for Logout button too */}
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-sm">
                 {clinicInfo.initial}

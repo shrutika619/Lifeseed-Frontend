@@ -1,8 +1,11 @@
 "use client";
 import React, { useState } from "react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const PlusPage = () => {
+  const router = useRouter(); // ✅ ROUTER
+
   const [selectedDoctor, setSelectedDoctor] = useState("AV");
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
@@ -31,18 +34,8 @@ const PlusPage = () => {
   ];
 
   const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
 
   const getDaysInMonth = (month, year) => {
@@ -78,8 +71,15 @@ const PlusPage = () => {
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen p-4">
-      {/* Header */}
+      {/* ✅ BACK BUTTON + Header */}
       <div className="mb-6">
+        <button
+          onClick={() => router.back()}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors mb-3 -ml-2"
+          aria-label="Go back"
+        >
+          <ArrowLeft size={22} className="text-gray-600" />
+        </button>
         <h1 className="text-xl font-bold text-gray-900 mb-1">Walk-in Booking</h1>
         <p className="text-sm text-gray-500">
           At our <span className="text-blue-600">Beela, Nagpur</span> clinic.
@@ -120,9 +120,7 @@ const PlusPage = () => {
                   </span>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900 text-sm">
-                    {doctor.name}
-                  </p>
+                  <p className="font-semibold text-gray-900 text-sm">{doctor.name}</p>
                   <p className="text-xs text-gray-500">{doctor.specialty}</p>
                 </div>
               </div>
@@ -220,9 +218,7 @@ const PlusPage = () => {
         <div className="space-y-4">
           {Object.entries(timeSlots).map(([period, slots]) => (
             <div key={period}>
-              <p className="text-sm font-medium text-gray-700 mb-2 capitalize">
-                {period}
-              </p>
+              <p className="text-sm font-medium text-gray-700 mb-2 capitalize">{period}</p>
               <div className="grid grid-cols-3 gap-2">
                 {slots.map((time) => (
                   <button
@@ -254,9 +250,7 @@ const PlusPage = () => {
               </span>
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">
-                {selectedDoctorData?.name}
-              </p>
+              <p className="font-semibold text-gray-900 text-sm">{selectedDoctorData?.name}</p>
               <p className="text-xs text-gray-500">{selectedDoctorData?.specialty}</p>
             </div>
           </div>
@@ -270,9 +264,7 @@ const PlusPage = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Time:</span>
-              <span className="text-gray-900 font-medium">
-                {selectedTimeSlot}
-              </span>
+              <span className="text-gray-900 font-medium">{selectedTimeSlot}</span>
             </div>
           </div>
 
