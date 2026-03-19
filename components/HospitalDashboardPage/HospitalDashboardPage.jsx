@@ -1,29 +1,18 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Plus, Star, Clock, User, Calendar, Droplet, X, Check, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, Star, Clock, User, Calendar, Droplet, X, Check, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-
 import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service";
-import { clinicBookingService } from "@/app/services/clinic/hospitalBooking.service";
 
 const HospitalDashboard = () => {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [requests, setRequests] = useState([]);
-  const [metrics, setMetrics] = useState({ counts: {}, followUpCounts: {}, total: 0 });
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
   const [activeTab, setActiveTab] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showRejectCard, setShowRejectCard] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAbsentModal, setShowAbsentModal] = useState(false);
-
   const [followUpStatus, setFollowUpStatus] = useState('');
   const [paymentReceived, setPaymentReceived] = useState(false);
   const [notes, setNotes] = useState('');
@@ -34,9 +23,60 @@ const HospitalDashboard = () => {
     initial: "C"
   });
 
-  const triggerRefresh = () => setRefreshTrigger(prev => prev + 1);
+  const [requests, setRequests] = useState([
+    {
+      id: 'ED#0298848',
+      time: 'Today 10:30 AM',
+      type: 'Collet CASH ED',
+      amount: 599,
+      patient: {
+        name: 'Pavan Karchal',
+        age: 38,
+        gender: 'Male',
+        bloodGroup: null,
+        initials: 'PK',
+        image: null
+      },
+      slot: 'Today 11 AM - 12 PM',
+      doctor: {
+        name: 'Dr. Ram Sharma',
+        qualification: 'MBBS, M.D Medicine',
+        specialty: 'General Physician',
+        experience: '3 years',
+        rating: 4,
+        available: true,
+        image: null
+      },
+      status: 'pending'
+    },
+    {
+      id: 'ED#0298098',
+      time: 'Today 10:30 AM',
+      type: 'Collet CASH',
+      amount: 599,
+      orderType: 'Low Sperm',
+      patient: {
+        name: 'Pavan Karchal',
+        age: 38,
+        gender: 'Male',
+        bloodGroup: 'O+',
+        initials: 'PK',
+        image: null
+      },
+      slot: 'Today 11 AM - 12 PM',
+      doctor: {
+        name: 'Dr. Shankar Dayal',
+        qualification: 'MBBS, M.D Medicine',
+        specialty: 'General Physician',
+        experience: '3 years',
+        rating: 4,
+        available: true,
+        image: null
+      },
+      status: 'pending'
+    }
+  ]);
 
-  // 1. FETCH CLINIC HEADER
   useEffect(() => {
     const fetchHeaderData = async () => {
       try {
@@ -55,196 +95,28 @@ const HospitalDashboard = () => {
           setClinicHeader({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
         }
       } catch (error) {
+        console.error("Failed to load header clinic data", error);
         setClinicHeader({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
       }
     };
     fetchHeaderData();
   }, []);
 
-  // 2. FETCH BOOKINGS
-  useEffect(() => {
-    const fetchBookings = async () => {
-      setLoading(true);
-      try {
-        let queryStr = '?date=today';
-        if (activeTab === 'booked') queryStr += '&status=Accept';
-        else if (activeTab === 'cancelled') queryStr += '&status=Cancelled';
-        else if (activeTab === 'completed') queryStr += '&status=Complete';
-        else if (activeTab === 'absent') queryStr += '&status=Patient Absent';
-        else if (activeTab === 'new') queryStr += '&status=New';
-        else if (activeTab === 'follow-up') queryStr = '?followUpStatus=Interested';
-        else if (activeTab === 'sold') queryStr = '?followUpStatus=Sell';
-
-        const res = await clinicBookingService.getClinicBookings(queryStr);
-
-        if (res.success && res.data) {
-          setMetrics({
-            counts: res.data.counts || {},
-            followUpCounts: res.data.followUpCounts || {},
-            total: res.data.total || 0
-          });
-
-          const mappedRequests = res.data.bookings.map(b => {
-            const bDate = new Date(b.bookingDate);
-            const isPrepaid = b.paymentMode?.toLowerCase() !== 'cash' || b.paymentStatus === 'COMPLETED';
-            return {
-              id: b.appointmentId || "--",
-              internalBookingId: b.bookingId,
-              time: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-              type: isPrepaid ? 'Prepaid' : 'Collect CASH',
-              amount: b.fees || 0,
-              patient: {
-                name: b.requestBy?.name || "Unknown",
-                age: b.requestBy?.age || "--",
-                gender: b.requestBy?.gender || "Not Specified",
-                initials: (b.requestBy?.name || "U").substring(0, 2).toUpperCase(),
-                image: null,
-                phone: b.requestBy?.phone
-              },
-              slot: b.timeSlot || "Not Scheduled",
-              doctor: {
-                name: b.doctor?.name || "Unknown Doctor",
-                qualification: [b.doctor?.underGradDegree, b.doctor?.postGradDegree].filter(x => x && x !== "--").join(", ") || "Specialist",
-                specialty: b.doctor?.primarySpecialty || "--",
-                experience: `${b.doctor?.experience || 0} years`,
-                rating: 4,
-                available: true,
-                image: b.doctor?.profileImage || null
-              },
-              status: b.status?.toLowerCase() || 'pending',
-              paymentStatus: b.paymentStatus
-            };
-          });
-
-          setRequests(mappedRequests);
-        } else {
-          toast.error(res.message || "Failed to load bookings");
-        }
-      } catch (error) {
-        toast.error("Error communicating with server.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBookings();
-  }, [activeTab, refreshTrigger]);
-
-  // 3. TABS
   const tabs = [
-    { id: 'all', label: 'All', count: metrics.total },
-    { id: 'new', label: 'New', count: metrics.counts['New'] || 0 },
-    { id: 'booked', label: 'Booked', count: metrics.counts['Accept'] || 0 },
-    { id: 'completed', label: 'Completed', count: metrics.counts['Complete'] || 0 },
-    { id: 'absent', label: 'Pt Absent', count: metrics.counts['Patient Absent'] || 0 },
-    { id: 'cancelled', label: 'Cancelled', count: metrics.counts['Cancelled'] || 0 },
-    { id: 'follow-up', label: 'Follow-up', count: metrics.followUpCounts['Interested'] || 0 },
-    { id: 'sold', label: 'Sold', count: metrics.followUpCounts['Sell'] || 0 }
+    { id: 'all', label: 'All', count: requests.length },
+    { id: 'booked', label: 'Booked', count: requests.filter(r => r.status === 'accepted').length },
+    { id: 'cancelled', label: 'Cancelled', count: requests.filter(r => r.status === 'cancelled').length },
+    { id: 'completed', label: 'Completed', count: requests.filter(r => r.status === 'completed').length },
+    { id: 'absent', label: 'Pt Absent', count: requests.filter(r => r.status === 'absent').length },
+    { id: 'follow-up', label: 'Follow-up', count: requests.filter(r => r.status === 'follow-up').length },
+    { id: 'sold', label: 'Sold', count: requests.filter(r => r.status === 'sold').length }
   ];
 
-  // 4. ACTION HANDLERS
-  const handleAccept = async (request) => {
-    const toastId = toast.loading("Accepting booking...");
-    setIsProcessing(true);
-    try {
-      const res = await clinicBookingService.updateBookingStatus(request.internalBookingId, { status: "Accept" });
-      if (res.success) {
-        toast.success("Booking Accepted!", { id: toastId });
-        triggerRefresh();
-      } else {
-        toast.error(res.message || "Failed to accept", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.message || "Server Error", { id: toastId });
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleAccept = (id) => {
+    setRequests(requests.map(req => req.id === id ? { ...req, status: 'accepted' } : req));
+    setShowRejectCard(false);
   };
 
-  const handleCancel = async (request) => {
-    const reason = window.prompt("Reason for cancellation (optional):", "Patient requested");
-    if (reason === null) return;
-    const toastId = toast.loading("Cancelling booking...");
-    setIsProcessing(true);
-    try {
-      const res = await clinicBookingService.updateBookingStatus(request.internalBookingId, { status: "Cancelled", notes: reason });
-      if (res.success) {
-        toast.success("Booking Cancelled", { id: toastId });
-        triggerRefresh();
-      } else {
-        toast.error(res.message || "Failed to cancel", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.message || "Server Error", { id: toastId });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleFinalizeAppointment = async () => {
-    setIsProcessing(true);
-    const toastId = toast.loading("Finalizing appointment...");
-    try {
-      const payload = { status: "Complete" };
-      if (followUpStatus === 'interested') payload.followUpStatus = "Interested";
-      if (followUpStatus === 'sell') payload.followUpStatus = "Sell";
-      const res = await clinicBookingService.updateBookingStatus(selectedRequest.internalBookingId, payload);
-      if (res.success) {
-        toast.success("Appointment completed!", { id: toastId });
-        setShowCompleteModal(false);
-        setSelectedRequest(null);
-        triggerRefresh();
-      } else {
-        toast.error(res.message || "Failed to complete", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.message || "Server Error", { id: toastId });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleCloseRejectAppointment = async () => {
-    setIsProcessing(true);
-    const toastId = toast.loading("Rejecting appointment...");
-    try {
-      const res = await clinicBookingService.updateBookingStatus(selectedRequest.internalBookingId, { status: "Rejected", notes });
-      if (res.success) {
-        toast.success("Appointment rejected", { id: toastId });
-        setShowRejectModal(false);
-        setSelectedRequest(null);
-        triggerRefresh();
-      } else {
-        toast.error(res.message || "Failed to reject", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.message || "Server Error", { id: toastId });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleCloseAbsentAppointment = async () => {
-    setIsProcessing(true);
-    const toastId = toast.loading("Marking patient as absent...");
-    try {
-      const res = await clinicBookingService.updateBookingStatus(selectedRequest.internalBookingId, { status: "Patient Absent", notes });
-      if (res.success) {
-        toast.success("Patient marked as absent", { id: toastId });
-        setShowAbsentModal(false);
-        setSelectedRequest(null);
-        triggerRefresh();
-      } else {
-        toast.error(res.message || "Failed to update", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.message || "Server Error", { id: toastId });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // 5. MODAL TRIGGERS
   const handleRejectClick = (request) => {
     setSelectedRequest(request);
     setShowRejectCard(true);
@@ -260,7 +132,7 @@ const HospitalDashboard = () => {
     setSelectedRequest(request);
     setShowCompleteModal(true);
     setFollowUpStatus('');
-    setPaymentReceived(request.paymentStatus === 'COMPLETED');
+    setPaymentReceived(false);
     setNotes('');
   };
 
@@ -270,7 +142,41 @@ const HospitalDashboard = () => {
     setNotes('');
   };
 
-  const handleMarkCompletePaid = () => setPaymentReceived(true);
+  const handleCancel = (id) => {
+    setRequests(requests.map(req => req.id === id ? { ...req, status: 'cancelled' } : req));
+  };
+
+  const handleMarkCompletePaid = () => {
+    setPaymentReceived(true);
+  };
+
+  const handleFinalizeAppointment = () => {
+    let finalStatus = 'completed';
+    if (followUpStatus === 'interested') finalStatus = 'follow-up';
+    else if (followUpStatus === 'sell') finalStatus = 'sold';
+    setRequests(requests.map(req => req.id === selectedRequest.id ? { ...req, status: finalStatus } : req));
+    setShowCompleteModal(false);
+    setSelectedRequest(null);
+  };
+
+  const handleCloseRejectAppointment = () => {
+    setRequests(requests.map(req => req.id === selectedRequest.id ? { ...req, status: 'rejected' } : req));
+    setShowRejectModal(false);
+    setSelectedRequest(null);
+  };
+
+  const handleCloseAbsentAppointment = () => {
+    setRequests(requests.map(req => req.id === selectedRequest.id ? { ...req, status: 'absent' } : req));
+    setShowAbsentModal(false);
+    setSelectedRequest(null);
+  };
+
+  const filteredRequests = activeTab === 'all'
+    ? requests
+    : requests.filter(req => {
+        if (activeTab === 'booked') return req.status === 'accepted';
+        return req.status === activeTab;
+      });
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
@@ -299,7 +205,7 @@ const HospitalDashboard = () => {
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
 
-        {/* TABS */}
+        {/* TABS ROW */}
         <div className="mb-4 sm:mb-6">
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {tabs.map(tab => (
@@ -320,6 +226,8 @@ const HospitalDashboard = () => {
                 </span>
               </button>
             ))}
+
+            {/* PLUS BUTTON */}
             <button
               onClick={() => router.push('/hospitaldashboard/plus')}
               className="p-1.5 sm:p-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-blue-50 transition-all duration-200 flex items-center justify-center flex-shrink-0"
@@ -330,183 +238,234 @@ const HospitalDashboard = () => {
           </div>
         </div>
 
-        {/* LOADING / EMPTY / CARDS */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
-            <p className="text-gray-500 font-medium">Loading OPD List...</p>
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-dashed border-gray-200">
-            <p className="text-gray-500 font-medium">No bookings found for this filter.</p>
-          </div>
-        ) : (
-          <div className="space-y-3 sm:space-y-4">
-            {requests.map((request) => (
-              <div key={request.internalBookingId} className="relative">
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
+        {/* REQUEST CARDS */}
+        <div className="space-y-3 sm:space-y-4">
+          {filteredRequests.map((request) => (
+            <div key={request.id} className="relative">
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
 
-                  {/* CARD HEADER */}
-                  <div className="px-3 sm:px-6 py-2.5 sm:py-3 bg-gray-50 border-b border-gray-200">
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-600">
-                      <span className="font-medium text-blue-600">{request.id}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1"><Clock size={12} />{request.time}</span>
-                      <span>•</span>
-                      <span className={`font-bold ${request.type === 'Prepaid' ? 'text-green-600' : 'text-orange-500'}`}>
-                        {request.type}
-                      </span>
-                    </div>
+                {/* CARD HEADER */}
+                <div className="px-3 sm:px-6 py-2.5 sm:py-3 bg-gray-50 border-b border-gray-200">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-600">
+                    <span className="font-medium">• {request.id}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1"><Clock size={12} />{request.time}</span>
+                    <span>•</span>
+                    <span>{request.type === 'Collet CASH ED' ? 'Prepaid' : request.type}</span>
                   </div>
+                  {request.orderType && (
+                    <p className="text-xs sm:text-sm text-gray-700 mt-1 font-medium">{request.orderType}</p>
+                  )}
+                </div>
 
-                  <div className="p-3 sm:p-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div className="p-3 sm:p-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
 
-                      {/* PATIENT INFO */}
+                    {/* PATIENT INFO */}
+                    <div className="flex items-start gap-2.5 sm:gap-3">
+                      {request.patient.image ? (
+                        <img src={request.patient.image} alt={request.patient.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
+                          <User size={20} className="text-white" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-base sm:text-lg text-gray-900 truncate">{request.patient.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 mt-0.5 text-xs sm:text-sm text-gray-600">
+                          <span>{request.patient.gender}</span>
+                          <span>•</span>
+                          <span>{request.patient.age} yrs</span>
+                          {request.patient.bloodGroup && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <Droplet size={12} className="text-red-500" />
+                                {request.patient.bloodGroup}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div className="items-center gap-1.5 mt-2 text-xs sm:text-sm text-gray-700 bg-blue-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg inline-flex">
+                          <Calendar size={12} />
+                          <span className="font-medium">{request.slot}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DOCTOR INFO */}
+                    <div className="border-t lg:border-t-0 lg:border-l border-gray-200 pt-3 lg:pt-0 lg:pl-6">
+                      <p className="text-xs sm:text-sm text-gray-600 mb-2">Booking for</p>
                       <div className="flex items-start gap-2.5 sm:gap-3">
-                        {request.patient.image ? (
-                          <img src={request.patient.image} alt={request.patient.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
+                        {request.doctor.image ? (
+                          <img src={request.doctor.image} alt={request.doctor.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
                         ) : (
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white font-bold text-sm">{request.patient.initials}</span>
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                            <User size={20} className="text-white" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-base sm:text-lg text-gray-900 truncate">{request.patient.name}</h3>
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 mt-0.5 text-xs sm:text-sm text-gray-600">
-                            <span>{request.patient.phone}</span>
-                            <span>•</span>
-                            <span>{request.patient.age} yrs</span>
-                          </div>
-                          <div className="items-center gap-1.5 mt-2 text-xs sm:text-sm text-gray-700 bg-blue-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg inline-flex">
-                            <Calendar size={12} className="text-blue-600" />
-                            <span className="font-bold text-blue-700">{request.slot}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* DOCTOR INFO */}
-                      <div className="border-t lg:border-t-0 lg:border-l border-gray-200 pt-3 lg:pt-0 lg:pl-6">
-                        <p className="text-xs sm:text-sm text-gray-500 mb-2 font-medium uppercase tracking-wider">Consulting Doctor</p>
-                        <div className="flex items-start gap-2.5 sm:gap-3">
-                          {request.doctor.image ? (
-                            <img src={request.doctor.image} alt={request.doctor.name} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0" />
-                          ) : (
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                              <User size={17} className="text-blue-600" />
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm sm:text-base text-gray-900 truncate">{request.doctor.name}</h4>
+                              <p className="text-xs text-gray-600 truncate">{request.doctor.qualification}</p>
                             </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-sm sm:text-base text-gray-900 truncate">{request.doctor.name}</h4>
-                            <p className="text-xs sm:text-sm text-gray-600 mt-0.5">{request.doctor.specialty}</p>
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">{request.doctor.qualification}</p>
+                            {request.doctor.available && (
+                              <span className="bg-emerald-500 text-white text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full whitespace-nowrap flex-shrink-0">
+                                Available
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs sm:text-sm text-gray-700 mt-1 truncate">
+                            {request.doctor.specialty} • Exp ~ {request.doctor.experience}
+                          </p>
+                          <div className="flex items-center gap-0.5 sm:gap-1 mt-1.5">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={14} className={i < request.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
+                            ))}
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* ACTION BUTTONS */}
-                    {request.status === 'new' && (
-                      <div className="flex items-center gap-3 sm:gap-4 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                        <button disabled={isProcessing} onClick={() => handleAccept(request)} className="bg-emerald-500 text-white px-4 sm:px-6 py-2 rounded-lg font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 text-sm sm:text-base">Accept Booking</button>
-                        <button disabled={isProcessing} onClick={() => handleRejectClick(request)} className="text-red-500 hover:bg-red-50 px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base">Reject</button>
-                      </div>
-                    )}
-                    {request.status === 'accept' && (
-                      <div className="flex items-center gap-3 sm:gap-4 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                        <button disabled={isProcessing} onClick={() => handleCompleteClick(request)} className="bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm sm:text-base">Mark Complete</button>
-                        <button disabled={isProcessing} onClick={() => handleAbsentClick(request)} className="text-red-500 hover:bg-red-50 px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base">Patient Absent</button>
-                        <button disabled={isProcessing} onClick={() => handleCancel(request)} className="text-yellow-600 hover:bg-yellow-50 px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 text-sm sm:text-base">Cancel</button>
-                      </div>
-                    )}
-                    {request.status === 'complete' && (
-                      <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                        <div className="bg-emerald-50 text-emerald-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium flex items-center gap-2 text-sm sm:text-base">
-                          <Check size={16} /> Appointment Finalized
-                        </div>
-                      </div>
-                    )}
-                    {request.status === 'patient absent' && (
-                      <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                        <div className="bg-red-50 text-red-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium flex items-center gap-2 text-sm sm:text-base">
-                          <X size={16} /> Marked as Absent
-                        </div>
-                      </div>
-                    )}
-                    {request.status === 'cancelled' && (
-                      <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                        <div className="bg-yellow-50 text-yellow-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-sm sm:text-base">Appointment Cancelled</div>
-                      </div>
-                    )}
-                    {request.status === 'rejected' && (
-                      <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                        <div className="bg-red-50 text-red-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-sm sm:text-base">✗ Appointment Rejected</div>
-                      </div>
-                    )}
                   </div>
+
+                  {/* ACTION BUTTONS */}
+                  {request.status === 'pending' && (
+                    <div className="flex items-center gap-4 sm:gap-6 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <button onClick={() => handleAccept(request.id)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-sm sm:text-base transition-colors">Accept</button>
+                      <button onClick={() => handleRejectClick(request)} className="text-red-500 hover:text-red-600 font-semibold text-sm sm:text-base transition-colors">Reject</button>
+                    </div>
+                  )}
+                  {request.status === 'accepted' && (
+                    <div className="flex items-center gap-4 sm:gap-6 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <button onClick={() => handleCompleteClick(request)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-sm sm:text-base transition-colors">Complete</button>
+                      <button onClick={() => handleAbsentClick(request)} className="text-red-500 hover:text-red-600 font-semibold text-sm sm:text-base transition-colors">Absent</button>
+                      <button onClick={() => handleCancel(request.id)} className="text-yellow-600 hover:text-yellow-700 font-semibold text-sm sm:text-base transition-colors">Cancel</button>
+                    </div>
+                  )}
+                  {request.status === 'completed' && (
+                    <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <div className="bg-emerald-50 text-emerald-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-center text-sm sm:text-base">✓ Appointment Finalized</div>
+                    </div>
+                  )}
+                  {request.status === 'absent' && (
+                    <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <div className="bg-red-50 text-red-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-center text-sm sm:text-base">Marked as Absent</div>
+                    </div>
+                  )}
+                  {request.status === 'cancelled' && (
+                    <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <div className="bg-yellow-50 text-yellow-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-center text-sm sm:text-base">Appointment Cancelled</div>
+                    </div>
+                  )}
+                  {request.status === 'rejected' && (
+                    <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <div className="bg-red-50 text-red-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-center text-sm sm:text-base">✗ Appointment Closed</div>
+                    </div>
+                  )}
+                  {request.status === 'follow-up' && (
+                    <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <div className="bg-blue-50 text-blue-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-center text-sm sm:text-base">📋 Follow-up Required</div>
+                    </div>
+                  )}
+                  {request.status === 'sold' && (
+                    <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                      <div className="bg-purple-50 text-purple-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-center text-sm sm:text-base">💰 Sold</div>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </main>
 
-      {/* COMPLETE MODAL */}
+      {/* ── COMPLETE MODAL ── */}
       {showCompleteModal && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Complete Consultation</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Complete</h2>
               <button onClick={() => setShowCompleteModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                 <X size={22} className="text-gray-500" />
               </button>
             </div>
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-              <div className="border-b border-gray-100 pb-4">
-                <p className="text-xs sm:text-sm text-blue-600 font-bold mb-1">{selectedRequest.id} • {selectedRequest.type}</p>
-                <h3 className="font-bold text-gray-900 text-base sm:text-lg">{selectedRequest.patient.name}</h3>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">Slot: <span className="font-bold text-gray-800">{selectedRequest.slot}</span></p>
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+              <div className="border-b border-gray-200 pb-4">
+                <p className="text-xs sm:text-sm text-blue-600 font-medium mb-2">• {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type === 'Collet CASH ED' ? 'Prepaid' : selectedRequest.type}</p>
+                <div className="flex items-center gap-3 mt-3">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-base sm:text-lg flex-shrink-0">
+                      {selectedRequest.patient.initials}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-gray-900">{selectedRequest.patient.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600">{selectedRequest.patient.gender} • {selectedRequest.patient.age} years</p>
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-2">Slot: {selectedRequest.slot}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-gray-600 mb-2">Booking for</p>
+                <div className="flex items-center gap-3">
+                  {selectedRequest.doctor.image ? (
+                    <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <User size={18} className="text-blue-600" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base text-gray-900">{selectedRequest.doctor.name}</h4>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.qualification}</p>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                    <div className="flex items-center gap-0.5 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={11} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-gray-700 uppercase tracking-wider text-[11px] mb-2">Follow Up Required?</h4>
+                <h4 className="font-semibold text-sm sm:text-base text-gray-900 mb-2 sm:mb-3">Follow Up</h4>
                 <select
                   value={followUpStatus}
                   onChange={(e) => setFollowUpStatus(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-gray-700 text-sm font-medium"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white text-sm text-gray-700"
                 >
-                  <option value="">No Follow Up</option>
+                  <option value="">Select Follow Up</option>
                   <option value="not-interested">Not Interested</option>
-                  <option value="sell">Sell Package</option>
-                  <option value="interested">Interested in Procedure</option>
+                  <option value="sell">Sell</option>
+                  <option value="interested">Interested</option>
                 </select>
               </div>
 
-              {selectedRequest.type === 'Prepaid' ? (
-                <div className="bg-blue-50 rounded-xl p-4 sm:p-5 border border-blue-200">
-                  <div className="flex items-center gap-2 text-blue-700 mb-1">
-                    <Check size={16} className="bg-blue-600 text-white rounded-full p-0.5" />
-                    <p className="font-bold text-sm">Prepaid Online</p>
+              {selectedRequest.type === 'Collet CASH ED' ? (
+                <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border-2 border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <Check size={18} className="bg-blue-600 text-white rounded-full p-0.5" />
+                    <p className="font-semibold text-sm">Prepaid</p>
                   </div>
-                  <p className="text-2xl sm:text-3xl font-black text-blue-700">₹{selectedRequest.amount}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-600">₹{selectedRequest.amount}</p>
                 </div>
               ) : !paymentReceived ? (
-                <div className="bg-emerald-50 rounded-xl p-4 sm:p-5 border-2 border-dashed border-emerald-300 flex justify-between items-center">
-                  <div>
-                    <p className="text-xs text-emerald-600 font-bold uppercase mb-1">To Collect</p>
-                    <p className="text-2xl sm:text-3xl font-black text-emerald-700">₹{selectedRequest.amount}</p>
-                  </div>
-                  <button onClick={handleMarkCompletePaid} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2 rounded-lg font-bold text-sm shadow-sm">
-                    Mark Paid
-                  </button>
+                <div className="bg-emerald-50 rounded-lg p-3 sm:p-4 border-2 border-dashed border-emerald-200">
+                  <p className="text-xs sm:text-sm text-emerald-700 font-medium mb-1">Please Collect Cash</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-700">₹{selectedRequest.amount}</p>
                 </div>
               ) : (
-                <div className="bg-emerald-50 rounded-xl p-4 sm:p-5 border border-emerald-200">
-                  <div className="flex items-center gap-2 text-emerald-700 mb-1">
-                    <Check size={16} className="bg-emerald-600 text-white rounded-full p-0.5" />
-                    <p className="font-bold text-sm">Cash Collected</p>
+                <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border-2 border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <Check size={18} className="bg-blue-600 text-white rounded-full p-0.5" />
+                    <p className="font-semibold text-sm">Online Payment Received</p>
                   </div>
-                  <p className="text-2xl sm:text-3xl font-black text-emerald-700">₹{selectedRequest.amount}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-600">₹{selectedRequest.amount}</p>
                 </div>
               )}
 
@@ -522,117 +481,228 @@ const HospitalDashboard = () => {
               </div>
 
               <button
-                onClick={handleFinalizeAppointment}
-                disabled={(selectedRequest.type === 'Collect CASH' && !paymentReceived) || isProcessing}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 sm:py-4 rounded-xl flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
+                onClick={selectedRequest.type === 'Collet CASH ED' || paymentReceived ? handleFinalizeAppointment : handleMarkCompletePaid}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 sm:py-4 rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check size={18} />}
-                Finalize Appointment
+                <Check size={18} />
+                {selectedRequest.type === 'Collet CASH ED' || paymentReceived ? 'Finalize Appointment' : 'Mark as Completed & Paid'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* REJECT CARD MODAL */}
+      {/* ── REJECT CARD MODAL ── */}
       {showRejectCard && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto">
-            <div className="space-y-4 sm:space-y-5">
-              <div className="text-xs sm:text-sm text-gray-600 font-medium">
-                • {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="text-xs sm:text-sm text-gray-600">
+                <span className="font-medium">• {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</span>
               </div>
-              <div className="flex items-start gap-2.5 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold text-sm">{selectedRequest.patient.initials}</span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div className="flex items-start gap-2.5 sm:gap-3">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center flex-shrink-0">
+                      <User size={20} className="text-white" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-base sm:text-lg text-gray-900 truncate">{selectedRequest.patient.name}</h3>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs sm:text-sm text-gray-600">
+                      <span>{selectedRequest.patient.gender}</span>
+                      <span>•</span>
+                      <span>{selectedRequest.patient.age} years</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 text-xs sm:text-sm text-gray-700 bg-blue-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg inline-flex">
+                      <Calendar size={12} />
+                      <span className="font-medium">{selectedRequest.slot}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-base sm:text-lg text-gray-900">{selectedRequest.patient.name}</h3>
-                  <div className="items-center gap-1.5 mt-2 text-xs sm:text-sm text-gray-700 bg-blue-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg inline-flex">
-                    <Calendar size={12} />
-                    <span className="font-medium">{selectedRequest.slot}</span>
+                <div className="border-t lg:border-t-0 lg:border-l border-gray-200 pt-3 lg:pt-0 lg:pl-6">
+                  <p className="text-xs sm:text-sm text-gray-600 mb-2">Booking for</p>
+                  <div className="flex items-start gap-2.5 sm:gap-3">
+                    {selectedRequest.doctor.image ? (
+                      <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                        <User size={20} className="text-white" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm sm:text-base text-gray-900 truncate">{selectedRequest.doctor.name}</h4>
+                          <p className="text-xs text-gray-600 truncate">{selectedRequest.doctor.qualification}</p>
+                        </div>
+                        {selectedRequest.doctor.available && (
+                          <span className="bg-emerald-500 text-white text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full whitespace-nowrap flex-shrink-0">Available</span>
+                        )}
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-700 mt-1 truncate">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                      <div className="flex items-center gap-0.5 mt-1.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} size={13} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 pt-3 sm:pt-4 border-t border-gray-200">
-                <button onClick={() => { setShowRejectCard(false); handleAccept(selectedRequest); }} className="text-emerald-500 hover:text-emerald-600 font-semibold text-sm sm:text-base transition-colors">Accept Instead</button>
-                <button onClick={handleRejectFromCard} className="text-red-500 hover:text-red-600 font-semibold text-sm sm:text-base transition-colors">Confirm Reject</button>
-                <button onClick={() => setShowRejectCard(false)} className="text-gray-500 hover:text-gray-700 font-semibold text-sm sm:text-base transition-colors ml-auto">Go Back</button>
+              <div className="flex items-center gap-4 sm:gap-6 pt-3 sm:pt-4 border-t border-gray-200">
+                <button onClick={() => handleAccept(selectedRequest.id)} className="text-emerald-500 hover:text-emerald-600 font-semibold text-sm sm:text-base transition-colors">Complete</button>
+                <button onClick={handleRejectFromCard} className="text-red-500 hover:text-red-600 font-semibold text-sm sm:text-base transition-colors">Absent</button>
+                <button onClick={() => setShowRejectCard(false)} className="text-yellow-600 hover:text-yellow-700 font-semibold text-sm sm:text-base transition-colors">Cancel</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* REJECT MODAL */}
+      {/* ── REJECT MODAL ── */}
       {showRejectModal && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
             <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Reject Booking</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Reject</h2>
               <button onClick={() => setShowRejectModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                 <X size={22} className="text-gray-500" />
               </button>
             </div>
-            <div className="p-4 sm:p-6 space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Reason for Rejection</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Doctor unavailable, slot clash..."
-                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none resize-none text-sm"
-                  rows={3}
-                />
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+              <div className="border-b border-gray-200 pb-4">
+                <p className="text-xs sm:text-sm text-blue-600 font-medium mb-2">• {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</p>
+                <div className="flex items-center gap-3 mt-3">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-base flex-shrink-0">
+                      {selectedRequest.patient.initials}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-gray-900">{selectedRequest.patient.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600">{selectedRequest.patient.gender} • {selectedRequest.patient.age} years</p>
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-2">Slot: {selectedRequest.slot}</p>
               </div>
-              <button
-                onClick={handleCloseRejectAppointment}
-                disabled={isProcessing}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 sm:py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base"
-              >
-                {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <X size={18} />}
-                Confirm Rejection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ABSENT MODAL */}
-      {showAbsentModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Patient Absent</h2>
-              <button onClick={() => setShowAbsentModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-                <X size={22} className="text-gray-500" />
-              </button>
-            </div>
-            <div className="p-4 sm:p-6 space-y-4">
-              <p className="text-xs sm:text-sm text-gray-600">Mark <span className="font-bold text-gray-900">{selectedRequest?.patient.name}</span> as a no-show for this appointment?</p>
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-gray-600 mb-2">Booking for</p>
+                <div className="flex items-center gap-3">
+                  {selectedRequest.doctor.image ? (
+                    <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <User size={17} className="text-blue-600" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base text-gray-900">{selectedRequest.doctor.name}</h4>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.qualification}</p>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                    <div className="flex items-center gap-0.5 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={11} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Tried calling, phone switched off..."
-                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none resize-none text-sm"
+                  placeholder="Enter any notes about the consultation..."
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none resize-none text-sm"
                   rows={3}
                 />
               </div>
               <button
-                onClick={handleCloseAbsentAppointment}
-                disabled={isProcessing}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 sm:py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base"
+                onClick={handleCloseRejectAppointment}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 sm:py-4 rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check size={18} />}
-                Confirm Absence
+                <Check size={18} /> Close Appointment
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── ABSENT MODAL ── */}
+      {showAbsentModal && selectedRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Absent</h2>
+              <button onClick={() => setShowAbsentModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                <X size={22} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+              <div className="border-b border-gray-200 pb-4">
+                <p className="text-xs sm:text-sm text-blue-600 font-medium mb-2">• {selectedRequest.id} • {selectedRequest.time} • {selectedRequest.type}</p>
+                <div className="flex items-center gap-3 mt-3">
+                  {selectedRequest.patient.image ? (
+                    <img src={selectedRequest.patient.image} alt={selectedRequest.patient.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-base flex-shrink-0">
+                      {selectedRequest.patient.initials}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-gray-900">{selectedRequest.patient.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600">{selectedRequest.patient.gender} • {selectedRequest.patient.age} years</p>
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-2">Slot: {selectedRequest.slot}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-gray-600 mb-2">Booking for</p>
+                <div className="flex items-center gap-3">
+                  {selectedRequest.doctor.image ? (
+                    <img src={selectedRequest.doctor.image} alt={selectedRequest.doctor.name} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <User size={17} className="text-blue-600" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base text-gray-900">{selectedRequest.doctor.name}</h4>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.qualification}</p>
+                    <p className="text-xs text-gray-600">{selectedRequest.doctor.specialty} • Exp ~ {selectedRequest.doctor.experience}</p>
+                    <div className="flex items-center gap-0.5 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={11} className={i < selectedRequest.doctor.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Add Notes (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter any notes about the consultation..."
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none resize-none text-sm"
+                  rows={3}
+                />
+              </div>
+              <button
+                onClick={handleCloseAbsentAppointment}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 sm:py-4 rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <Check size={18} /> Close Appointment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
