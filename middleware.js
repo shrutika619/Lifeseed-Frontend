@@ -11,7 +11,7 @@ const ROUTE_PERMISSIONS = {
   // '/clinic':      ['clinic_admin', 'doctor'],
   '/hospitaldashboard': ['clinic_admin', 'doctor'],
   '/profile':     ['patient', 'clinic_admin', 'doctor', 'admin', 'super_admin'], 
-  '/bookappointment': ['patient'], 
+  '/bookappointment': ['patient', 'clinic_admin', 'doctor', 'admin', 'super_admin'], 
 };
 
 // Define Auth Pages (to redirect logged-in users AWAY from)

@@ -15,8 +15,10 @@ import {
   getCustomerOrderHistory,
 } from '@/app/services/admin/leads.service'; 
 import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
-import { adminTicketService } from '@/app/services/admin/adminTicket.service'; // ✅ IMPORTED TICKET SERVICE
-import { getAllCities } from "@/app/services/patient/clinic.service";
+import { adminTicketService } from '@/app/services/admin/adminTicket.service'; 
+import { useSelector } from "react-redux";
+// ✅ IMPORT BOTH APIs
+import { getAllCities, getAllClinics } from "@/app/services/patient/clinic.service";
 import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
@@ -580,10 +582,18 @@ const TicketTab = ({ activities, userId }) => {
 /* ─────────────────────────────────────────────
    CITY SELECT MODAL
 ───────────────────────────────────────────── */
-const CitySelectModal = ({ onClose }) => {
-  const [cities, setCities] = useState([]);
-  const [loading, setLoading] = useState(true);
+const CitySelectModal = ({ onClose, userId }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
+  const [step, setStep] = useState(1); // 1: City, 2: Hospital
+  const [loading, setLoading] = useState(true);
+  const [cities, setCities] = useState([]);
+  const [clinics, setClinics] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(null);
+
+  // 1. Fetch Cities on Mount
   useEffect(() => {
     const fetchCityData = async () => {
       try {
@@ -602,31 +612,71 @@ const CitySelectModal = ({ onClose }) => {
     fetchCityData();
   }, []);
 
-  const handleCitySelect = (slug) => {
-    const finalSlug = slug || "nagpur"; 
-    window.location.href = `/clinic/${finalSlug}/`;
+  // 2. Fetch Hospitals when City is selected
+  const handleCitySelect = async (city) => {
+    setSelectedCity(city);
+    setStep(2);
+    setLoading(true);
+    try {
+      // ✅ Call your existing getAllClinics service and pass the city name (or ID if your backend prefers)
+      const response = await getAllClinics(city.name); 
+      
+      // ✅ Handle the specific response structure from your service
+      if (response.success && Array.isArray(response.clinics)) {
+        setClinics(response.clinics);
+      } else {
+        toast.error(response.message || "No clinics found for this city");
+        setStep(1); // Go back to city selection
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load hospitals for this city");
+      setStep(1); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Route to internal booking page when a hospital is clicked
+  const handleClinicSelect = (clinicId) => {
+    // Uses the CRM fast-track route, preserving the user context
+    router.push(`${basePath}/book-appointment?clinicId=${clinicId}&patientUserId=${userId}`);
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 bg-blue-600">
-          <h3 className="font-bold text-white text-lg">Select Clinic City</h3>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+        
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-6 py-4 bg-blue-600 shrink-0">
+          <div className="flex items-center gap-3 text-white">
+            {step === 2 && (
+              <button onClick={() => setStep(1)} className="hover:bg-blue-500 p-1 rounded-full transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+            <h3 className="font-bold text-lg">
+              {step === 1 ? "Select Clinic City" : `Hospitals in ${selectedCity.name}`}
+            </h3>
+          </div>
           <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors">
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
         
+        {/* BODY (SCROLLABLE) */}
         <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100 min-h-[200px] relative">
           {loading ? (
-             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2 bg-white/80 z-10">
                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-               <p className="text-sm font-medium">Loading cities...</p>
+               <p className="text-sm font-medium">{step === 1 ? "Loading cities..." : "Loading hospitals..."}</p>
              </div>
-          ) : cities.length > 0 ? (
-            cities.map((city, idx) => (
+          ) : step === 1 ? (
+             // --- STEP 1: RENDER CITIES ---
+             cities.length > 0 ? cities.map((city, idx) => (
               <button
-                key={city._id || idx} type="button" onClick={() => handleCitySelect(city.name?.toLowerCase())}
+                key={city._id || idx} type="button" onClick={() => handleCitySelect(city)}
                 className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
               >
                 <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
@@ -635,36 +685,174 @@ const CitySelectModal = ({ onClose }) => {
                   <p className="text-xs text-slate-500">{city.state || "India"}</p>
                 </div>
               </button>
-            ))
+            )) : (
+               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                 <p className="text-sm">No cities found.</p>
+               </div>
+            )
           ) : (
-             <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                <p className="text-sm">No clinics found.</p>
-             </div>
+             // --- STEP 2: RENDER HOSPITALS ---
+             clinics.length > 0 ? clinics.map((clinic, idx) => (
+              <button
+                key={clinic._id || idx} type="button" onClick={() => handleClinicSelect(clinic._id)}
+                className="w-full flex flex-col px-6 py-4 hover:bg-blue-50 transition-colors text-left border-l-4 border-transparent hover:border-blue-500"
+              >
+                <p className="font-bold text-slate-800 text-sm">{clinic.clinicName || clinic.name}</p>
+                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{clinic.fulladdress || clinic.address}</p>
+              </button>
+            )) : (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                <p className="text-sm">No hospitals found in this city.</p>
+              </div>
+            )
           )}
         </div>
         
-        <div className="px-6 py-3 border-t border-slate-100">
-          <p className="text-xs text-slate-400 text-center">Can't find your city? Contact Customer Support</p>
+        {/* FOOTER */}
+        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
+          <p className="text-xs text-slate-400 text-center">Can't find what you're looking for? Contact Support</p>
+        </div>
+        
+      </div>
+    </div>
+  );
+};
+
+
+const AdminClinicSelectModal = ({ onClose, userId }) => {
+  const router = useRouter();
+
+  const [step, setStep] = useState(1); // 1: City, 2: Hospital
+  const [loading, setLoading] = useState(true);
+  const [cities, setCities] = useState([]);
+  const [clinics, setClinics] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(null);
+
+  // 1. Fetch Cities on Mount
+  useEffect(() => {
+    const fetchCityData = async () => {
+      try {
+        const response = await getAllCities();
+        const data = response?.data || response; 
+        if (Array.isArray(data)) setCities(data);
+      } catch (error) {
+        toast.error("Failed to load cities");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCityData();
+  }, []);
+
+  // 2. Fetch Hospitals when City is selected
+  const handleCitySelect = async (city) => {
+    setSelectedCity(city);
+    setStep(2);
+    setLoading(true);
+    try {
+      // ✅ Pass city._id correctly
+      const response = await getAllClinics(city._id); 
+      
+      if (response.success && Array.isArray(response.clinics)) {
+        setClinics(response.clinics);
+      } else {
+        toast.error(response.message || "No hospitals found for this city");
+        setStep(1); 
+      }
+    } catch (error) {
+      toast.error("Failed to load hospitals for this city");
+      setStep(1); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Route to Booking Page
+  const handleClinicSelect = (clinicId) => {
+    router.push(`/bookappointment?clinicId=${clinicId}&patientUserId=${userId}`);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+        
+        <div className="flex items-center justify-between px-6 py-4 bg-blue-600 shrink-0">
+          <div className="flex items-center gap-3 text-white">
+            {step === 2 && (
+              <button onClick={() => setStep(1)} className="hover:bg-blue-500 p-1 rounded-full transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <h3 className="font-bold text-lg">
+              {step === 1 ? "Select City" : `Hospitals in ${selectedCity.name}`}
+            </h3>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors">
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
+        
+        <div className="overflow-y-auto flex-1 divide-y divide-slate-100 relative min-h-[250px]">
+          {loading ? (
+             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3 bg-white/80 z-10">
+               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+               <p className="text-sm font-medium">{step === 1 ? "Loading cities..." : "Loading hospitals..."}</p>
+             </div>
+          ) : step === 1 ? (
+             cities.length > 0 ? cities.map((city, idx) => (
+              <button
+                key={city._id || idx} type="button" onClick={() => handleCitySelect(city)}
+                className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+              >
+                <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-800 text-sm uppercase">{city.name}</p>
+                  <p className="text-xs text-slate-500">{city.state || "India"}</p>
+                </div>
+              </button>
+            )) : (
+               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 h-full"><p className="text-sm">No cities found.</p></div>
+            )
+          ) : (
+            clinics.length > 0 ? clinics.map((clinic, idx) => (
+              <button
+                key={clinic._id || idx} type="button" onClick={() => handleClinicSelect(clinic._id)}
+                className="w-full flex flex-col px-6 py-4 hover:bg-blue-50 transition-colors text-left border-l-4 border-transparent hover:border-blue-500"
+              >
+                <p className="font-bold text-slate-800 text-sm">{clinic.clinicName || clinic.name}</p>
+                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{clinic.fulladdress || clinic.address}</p>
+              </button>
+            )) : (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 h-full"><p className="text-sm">No hospitals found in this city.</p></div>
+            )
+          )}
         </div>
       </div>
     </div>
   );
 };
 
+
 /* ─────────────────────────────────────────────
    BOOK CONSULTATION MODAL
 ───────────────────────────────────────────── */
 const BookConsultationModal = ({ onClose, userId }) => {
   const router = useRouter();
-  const [showCityModal, setShowCityModal] = useState(false);
+  const pathname = usePathname();
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
+  
+  // ✅ Controls the new 2-step modal
+  const [showClinicModal, setShowClinicModal] = useState(false);
 
-  if (showCityModal) return <CitySelectModal onClose={onClose} />;
+  // If "In Clinic" is clicked, show our upgraded modal
+  if (showClinicModal) return <AdminClinicSelectModal onClose={onClose} userId={userId} />;
 
   const handleTeleconsultationClick = () => {
     if (userId) {
-      router.push(`/free-consultation?admin_booking=true&userId=${userId}`);
+      router.push(`${basePath}/free-consultation?admin_booking=true&userId=${userId}`);
     } else {
-      router.push('/free-consultation');
+      router.push(`${basePath}/free-consultation`);
     }
     onClose();
   };
@@ -679,8 +867,9 @@ const BookConsultationModal = ({ onClose, userId }) => {
           </button>
         </div>
         <div className="flex flex-col gap-4">
+          
           <button
-            type="button" onClick={() => setShowCityModal(true)}
+            type="button" onClick={() => setShowClinicModal(true)} // ✅ Triggers new modal
             className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-[#0097A7] hover:bg-[#E0F7FA] transition-all group"
           >
             <div className="w-11 h-11 rounded-full bg-[#E0F7FA] flex items-center justify-center group-hover:bg-[#0097A7] transition-all">
