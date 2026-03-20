@@ -8,7 +8,7 @@ export const adminInclinicService = {
    */
   getAllInClinicBookings: async (queryParams = "") => {
     try {
-      const response = await api.get(`/admin/inClinicBooking${queryParams}`);
+      const response = await api.get(`${Constants.urlEndPoints.ADMIN_INCLINIC_BOOKINGS}${queryParams}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -17,7 +17,7 @@ export const adminInclinicService = {
 
   cancelInClinicBooking: async (bookingId, notes = "") => {
     try {
-      const response = await api.patch(`/admin/inClinicBooking/${bookingId}/cancel`, { notes });
+      const response = await api.patch(Constants.urlEndPoints.ADMIN_CANCEL_INCLINIC_BOOKING(bookingId), { notes });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

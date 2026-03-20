@@ -1,9 +1,10 @@
 import api from "@/lib/axios";
+import { Constants } from "@/app/utils/constants";
 
 // 1. Fetch Consultations (Tele & In-Clinic)
 export const getMyBookingsHistory = async () => {
   try {
-    const response = await api.get('/patient-profile/bookings');
+    const response = await api.get(Constants.urlEndPoints.PATIENT_BOOKINGS);
     return response.data;
   } catch (error) {
     console.error("Error fetching bookings:", error);
@@ -14,7 +15,7 @@ export const getMyBookingsHistory = async () => {
 // 2. Fetch Medicine Orders
 export const getMyOrdersHistory = async () => {
   try {
-    const response = await api.get('/patient-profile/orders');
+    const response = await api.get(Constants.urlEndPoints.PATIENT_ORDERS);
     return response.data;
   } catch (error) {
     console.error("Error fetching orders:", error);
@@ -25,7 +26,7 @@ export const getMyOrdersHistory = async () => {
 // 3. Cancel Booking 
 export const cancelMyBooking = async (recordId, type) => {
   try {
-    const response = await api.patch(`/patient-profile/bookings/${recordId}/cancel?type=${type}`);
+    const response = await api.patch(`${Constants.urlEndPoints.PATIENT_BOOKINGS}/${recordId}/cancel?type=${type}`);
     return response.data;
   } catch (error) {
     console.error("Error cancelling booking:", error);
@@ -33,10 +34,10 @@ export const cancelMyBooking = async (recordId, type) => {
   }
 };
 
-// 4. ✅ NEW: Get Booking Details
+// 4. Get Booking Details
 export const getMyBookingDetails = async (recordId, type) => {
   try {
-    const response = await api.get(`/patient-profile/bookings/${recordId}?type=${type}`);
+    const response = await api.get(`${Constants.urlEndPoints.PATIENT_BOOKINGS}/${recordId}?type=${type}`);
     return response.data;
   } catch (error) {
     console.error("Error fetching booking details:", error);

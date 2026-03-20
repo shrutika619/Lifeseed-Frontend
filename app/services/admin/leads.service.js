@@ -132,9 +132,7 @@ export const getCustomerOrderHistory = async (userId) => {
 
 export const searchPatients = async (phoneOrName) => {
   try {
-    // Assuming the endpoint is /customer/search-patient?phone=123
-    // Adjust the URL if you have a specific constant for it in your Constants file
-    const response = await api.get(`/customer/search-patient`, {
+    const response = await api.get(Constants.urlEndPoints.SEARCH_PATIENTS, {
       params: { phone: phoneOrName }
     });
     return response.data;

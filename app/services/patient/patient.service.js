@@ -1,32 +1,24 @@
 import api from "@/lib/axios";
+import { Constants } from "@/app/utils/constants";
 
-/**
- * ✅ FIXED: Get Patient Profile
- * Backend extracts userId from JWT token in Authorization header
- * No need to pass userId as parameter
- */
 export const getPatientProfile = async () => {
   try {
-    // ✅ No userId in URL - backend uses JWT token
-    // URL is constructed from api baseURL + relative path
-    const response = await api.get('/patient-profile');
+    const response = await api.get(Constants.urlEndPoints.GET_PATIENT_PROFILE);
     
     return {
       success: true,
       data: response.data.data || response.data
     };
   } catch (error) {
-    // ✅ Silently handle 404 (New User) WITHOUT logging an error
     if (error.response?.status === 404) {
       return {
         success: false,
-        isNotFound: true, // Frontend can check this to show the setup screen
+        isNotFound: true, 
         data: null,
         message: "New user - Profile not setup yet"
       };
     }
 
-    // Only log actual unexpected errors (500s, network failures, etc.)
     console.error("Get profile error:", error);
     
     return {
@@ -36,14 +28,9 @@ export const getPatientProfile = async () => {
   }
 };
 
-/**
- * ✅ Save/Update Patient Profile
- * Backend extracts userId from JWT token in Authorization header
- */
 export const savePatientProfile = async (profileData) => {
   try {
-    // ✅ No userId in URL - backend uses JWT token
-    const response = await api.post('/patient-profile/save', profileData);
+    const response = await api.post(Constants.urlEndPoints.SAVE_PATIENT_PROFILE, profileData);
     
     return {
       success: true,
@@ -58,13 +45,9 @@ export const savePatientProfile = async (profileData) => {
   }
 };
 
-/**
- * ✅ Update Patient Profile (if you have separate update endpoint)
- */
 export const updatePatientProfile = async (profileData) => {
   try {
-    // ✅ No userId in URL - backend uses JWT token
-    const response = await api.put('/patient-profile', profileData);
+    const response = await api.put(Constants.urlEndPoints.UPDATE_PATIENT_PROFILE, profileData);
     
     return {
       success: true,

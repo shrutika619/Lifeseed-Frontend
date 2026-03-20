@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { Constants } from "@/app/utils/constants";
 
 export const clinicBookingService = {
   /**
@@ -7,7 +8,7 @@ export const clinicBookingService = {
    */
   getClinicBookings: async (queryParams = "") => {
     try {
-      const response = await api.get(`/inClinicBookings${queryParams}`);
+      const response = await api.get(`${Constants.urlEndPoints.GET_INCLINIC_BOOKINGS}${queryParams}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -16,7 +17,7 @@ export const clinicBookingService = {
 
   updateBookingStatus: async (bookingId, payload) => {
     try {
-      const response = await api.patch(`/inClinicBookings/${bookingId}/status`, payload);
+      const response = await api.patch(Constants.urlEndPoints.UPDATE_INCLINIC_BOOKING_STATUS(bookingId), payload);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
