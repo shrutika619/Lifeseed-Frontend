@@ -129,7 +129,7 @@ const MyOrderPage = () => {
                 specialization: "General Physician",
                 timeSlot: b.bookingDate ? `${new Date(b.bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${b.timeSlot || '--'}` : b.timeSlot || '--',
                 clinicName: typeof cName === 'string' ? cName : "--",
-                clinicAddress: "--", 
+                clinicAddress: b.clinic?.address || "--", 
                 bookedOn: b.bookingDate ? `Booked on ${new Date(b.bookingDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
                 amountPaid: b.fees > 0 ? `₹${b.fees}` : "Free",
                 rawCreatedAt: b.bookingDate || new Date().toISOString(), 
@@ -229,7 +229,6 @@ const MyOrderPage = () => {
     <div className="min-h-screen bg-[#f8fafc] font-sans relative">
       <div className="max-w-4xl mx-auto px-4 py-8">
         
-        {/* ✅ ADDED BACK BUTTON TO PAGE HEADER */}
         <div className="flex items-center gap-3 mb-6">
            <button 
              onClick={() => router.back()}
@@ -378,9 +377,20 @@ const MyOrderPage = () => {
                           </button>
                         )}
 
+                        {/* ✅ LIST VIEW DIRECTIONS (Fallback to Search since link isn't in this API) */}
                         {order.actions?.includes("directions") && (
                           <button
-                            onClick={() => showToast("Opening directions...")}
+                            onClick={() => {
+                              const clinicName = order.clinicName !== '--' ? order.clinicName : '';
+                              const clinicAddress = order.clinicAddress !== '--' ? order.clinicAddress : '';
+                              const query = `${clinicName} ${clinicAddress}`.trim();
+                              
+                              if (query) {
+                                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+                              } else {
+                                showToast("Clinic location details are missing.");
+                              }
+                            }}
                             className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl bg-slate-800 text-white hover:bg-slate-900 shadow-md flex items-center justify-center gap-2 transition-colors"
                           >
                             <Navigation className="w-4 h-4" /> Directions
@@ -495,14 +505,35 @@ const MyOrderPage = () => {
                 <>
                   <div>
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Clinic Information</h3>
-                    <div className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                      <div className="bg-blue-50 p-2 rounded-lg text-blue-600 mt-0.5">
-                        <MapPin size={18} />
+                    <div className="flex flex-col gap-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-blue-50 p-2 rounded-lg text-blue-600 mt-0.5">
+                          <MapPin size={18} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-slate-800">{detailsData.clinic?.name}</p>
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">{detailsData.clinic?.address}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-sm text-slate-800">{detailsData.clinic?.name}</p>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{detailsData.clinic?.address}</p>
-                      </div>
+                      
+                      {/* ✅ MODAL DIRECTIONS (Uses API link if available) */}
+                      <button
+                        onClick={() => {
+                          if (detailsData.clinic?.googleMapsLink) {
+                            window.open(detailsData.clinic.googleMapsLink, '_blank');
+                          } else {
+                            const query = `${detailsData.clinic?.name || ''} ${detailsData.clinic?.address || ''}`.trim();
+                            if (query) {
+                              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+                            } else {
+                              showToast("Directions link not provided by clinic.");
+                            }
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-800 text-white hover:bg-slate-900 rounded-xl text-sm font-bold shadow-md transition-colors"
+                      >
+                        <Navigation size={16} /> Get Directions
+                      </button>
                     </div>
                   </div>
 

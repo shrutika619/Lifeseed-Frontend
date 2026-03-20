@@ -669,8 +669,8 @@ const BookConsultationModal = ({ onClose, userId }) => {
   if (showClinicModal) return <AdminClinicSelectModal onClose={onClose} userId={userId} />;
 
   const handleTeleconsultationClick = () => {
-    if (userId) router.push(`${basePath}/free-consultation?admin_booking=true&userId=${userId}`);
-    else router.push(`${basePath}/free-consultation`);
+    if (userId) router.push(`/free-consultation?admin_booking=true&userId=${userId}`);
+    else router.push(`/free-consultation`);
     onClose();
   };
 

@@ -19,12 +19,13 @@ import {
   Phone
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { getMyBookingDetails } from "@/app/services/patient/order.service"; // Ensure path is correct
+import { getMyBookingDetails } from "@/app/services/patient/order.service"; 
 
 const ConfirmBookingContent = () => {
   const searchParams = useSearchParams();
   const bookingId = searchParams.get('bookingId');
-  const type = 'inclinic' // 'tele' or 'inclinic'
+  // ✅ FIX: Extract type from URL, fallback to 'inclinic' if missing
+  const type = searchParams.get('type') || 'inclinic'; 
 
   const receiptRef = useRef(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -248,7 +249,18 @@ const ConfirmBookingContent = () => {
           <div className="flex flex-col sm:flex-row gap-3 mb-8 pb-8 border-b border-gray-100">
             {type === 'inclinic' && (
               <button 
-                onClick={() => window.open('https://maps.google.com', '_blank')}
+                onClick={() => {
+                  // ✅ Safe fallback for Google Maps
+                  if (bookingData?.clinic?.googleMapsLink) {
+                    window.open(bookingData.clinic.googleMapsLink, '_blank');
+                  } else if (bookingData?.clinic?.address) {
+                    // Fallback: Search the address string on Google Maps
+                    const encodedAddress = encodeURIComponent(bookingData.clinic.address);
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+                  } else {
+                    toast.error("Location link unavailable.");
+                  }
+                }}
                 className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-indigo-400 transition-all"
               >
                 <MapPin className="w-4 h-4" />
@@ -319,7 +331,6 @@ const ConfirmBookingContent = () => {
   );
 };
 
-// Next.js 13+ requires components using useSearchParams to be wrapped in Suspense
 export default function ConfirmBookingPage() {
   return (
     <Suspense fallback={
