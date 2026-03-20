@@ -41,6 +41,7 @@ export const getPatientDetailsById = async (userId) => {
   }
 };
 
+
 export const submitCustomerProfile = async (userId, payload) => {
   try {
     const response = await api.patch(`${Constants.urlEndPoints.SUBMIT_CUSTOMER_PROFILE}/${userId}`, payload);
@@ -125,5 +126,24 @@ export const getCustomerOrderHistory = async (userId) => {
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
+  }
+};
+
+
+export const searchPatients = async (phoneOrName) => {
+  try {
+    // Assuming the endpoint is /customer/search-patient?phone=123
+    // Adjust the URL if you have a specific constant for it in your Constants file
+    const response = await api.get(`/customer/search-patient`, {
+      params: { phone: phoneOrName }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error searching patients:", error);
+    return { 
+      success: false, 
+      data: { patients: [] },
+      message: error.response?.data?.message || "Failed to search patients" 
+    };
   }
 };

@@ -13,17 +13,17 @@ import {
   createCustomerProfile, 
   getAdminDropdownData,
   getCustomerOrderHistory,
+  searchPatients 
 } from '@/app/services/admin/leads.service'; 
 import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
 import { adminTicketService } from '@/app/services/admin/adminTicket.service'; 
 import { useSelector } from "react-redux";
-// ✅ IMPORT BOTH APIs
 import { getAllCities, getAllClinics } from "@/app/services/patient/clinic.service";
 import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
   XCircle, Save, ChevronDown, RotateCcw,
-  Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil
+  Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil, Search, UserCheck
 } from 'lucide-react';
 import { customerProfileSchema } from '@/app/utils/validation/customerProfileSchema';
 
@@ -80,7 +80,7 @@ const ticketStatusIcon = (s) => {
 const OrderHistoryTab = ({ userId }) => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false); // State to toggle "Show More"
+  const [showAll, setShowAll] = useState(false); 
   
   const router = useRouter();
   const pathname = usePathname();
@@ -102,7 +102,7 @@ const OrderHistoryTab = ({ userId }) => {
             combined.push({
               id: booking.requestId || booking.recordId,
               type: 'Teleconsultation',
-              categoryName: 'Teleconsultation', // Used for filtering
+              categoryName: 'Teleconsultation',
               icon: '🔮',
               iconBg: '#f3e8ff',
               doctor: booking.doctorName || 'Not Assigned',
@@ -119,7 +119,6 @@ const OrderHistoryTab = ({ userId }) => {
                 { label: 'Agent', value: booking.agentName || '--' },
                 ...(booking.cancelledBy ? [{ label: 'Cancelled By', value: booking.cancelledBy }] : [])
               ],
-              // Add conditional actions
               actions: [
                 'View Details', 
                 'Place Order',
@@ -140,7 +139,7 @@ const OrderHistoryTab = ({ userId }) => {
             combined.push({
               id: order.orderId,
               type: 'Medicine Order',
-              categoryName: 'Medicine Order', // Used for filtering
+              categoryName: 'Medicine Order', 
               icon: '🧴',
               iconBg: '#e0f2fe',
               doctor: null,
@@ -163,37 +162,53 @@ const OrderHistoryTab = ({ userId }) => {
           });
         }
 
-        // 3. Dummy In-Clinic
-        combined.push({
-          id: 'dummy-ic-1',
-          type: 'In-Clinic Consultation',
-          categoryName: 'In-Clinic Consultation', // Used for filtering
-          icon: '📋',
-          iconBg: '#fef9c3',
-          doctor: 'Dr. Rohan Gupta',
-          specialization: 'General Physician',
-          location: 'Apollo Clinic, Koregaon Park',
-          date: 'Nov 28, 2024',
-          timeSlot: '5:00 PM - 5:30 PM',
-          status: 'Upcoming',
-          statusColor: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-          details: [
-            { label: 'Order ID',      value: '#IC-67890' },
-            { label: 'Patient Age',  value: '34' },
-            { label: 'Amount Paid',  value: '$80.00' },
-          ],
-          actions: ['View Details', 'Get Directions'],
-          rawCreatedAt: '2024-11-21T10:00:00Z'
-        });
+        // 3. Map Real In-Clinic Bookings
+        if (res.data.inClinicBookings && Array.isArray(res.data.inClinicBookings)) {
+          res.data.inClinicBookings.forEach(booking => {
+            const status = booking.inClinicStatus || 'New';
+            
+            let statusColor = { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' }; 
+            if (status === 'Accept') statusColor = { bg: '#ecfeff', text: '#0e7490', border: '#a5f3fc' }; 
+            if (status === 'Complete') statusColor = { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' }; 
+            if (status === 'Cancelled') statusColor = { bg: '#fef2f2', text: '#be123c', border: '#fecaca' }; 
+            if (status === 'Patient Absent') statusColor = { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' }; 
 
-        // Sort combined by date descending
+            const fees = booking.fees || 0;
+            const paid = booking.paidAmount || 0;
+            const balanceDue = fees - paid;
+
+            combined.push({
+              id: booking.bookingId,
+              type: 'In-Clinic Consultation',
+              categoryName: 'In-Clinic Consultation', 
+              icon: '🏥',
+              iconBg: '#fef9c3',
+              doctor: booking.doctor?.name || 'Not Assigned',
+              location: booking.clinic?.name || '--',
+              date: booking.bookingDate ? new Date(booking.bookingDate).toLocaleDateString() : '--',
+              timeSlot: booking.timeSlot || '--',
+              status: status,
+              statusColor: statusColor,
+              orderId: booking.appointmentId,
+              details: [
+                { label: 'Fees', value: `₹${fees}` },
+                { label: 'Amount Paid', value: `₹${paid}` },
+                { label: 'Balance Due', value: `₹${balanceDue}` },
+                { label: 'Payment Mode', value: booking.paymentMode || '--' },
+                ...(booking.cancelledBy ? [{ label: 'Cancelled By', value: booking.cancelledBy }] : [])
+              ],
+              actions: ['View Details', 'Get Directions'],
+              rawCreatedAt: booking.bookingDate
+            });
+          });
+        }
+
         combined.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
         setHistoryData(combined);
       } else {
         toast.error(res.message || "Failed to load history");
       }
     } catch (error) {
-      console.error("Error loading history", error);
       toast.error("Error fetching order history.");
     } finally {
       setLoading(false);
@@ -210,11 +225,10 @@ const OrderHistoryTab = ({ userId }) => {
     
     const toastId = toast.loading("Cancelling booking...");
     try {
-      // Assuming you imported this service at the top of your file
       const res = await adminTeleconsultationService.cancelBooking(recordId);
       if (res.success) {
         toast.success("Booking Cancelled Successfully", { id: toastId });
-        fetchAllHistory(); // Re-fetch to update UI
+        fetchAllHistory(); 
       } else {
         toast.error(res.message || "Failed to cancel booking", { id: toastId });
       }
@@ -223,16 +237,12 @@ const OrderHistoryTab = ({ userId }) => {
     }
   };
 
-  // --- Filter Logic for "Show More" ---
   const getVisibleData = () => {
     if (showAll) return historyData;
-
-    // Only take top 2 from each category
     const categoryCounts = {};
     return historyData.filter((item) => {
       const cat = item.categoryName;
       if (!categoryCounts[cat]) categoryCounts[cat] = 0;
-      
       if (categoryCounts[cat] < 2) {
         categoryCounts[cat]++;
         return true;
@@ -246,7 +256,7 @@ const OrderHistoryTab = ({ userId }) => {
   }
 
   if (historyData.length === 0) {
-    return <div className="text-center py-10 text-slate-500 text-sm">No history found for this patient.</div>;
+    return <div className="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-200 rounded-2xl bg-slate-50">No history found for this patient.</div>;
   }
 
   const visibleData = getVisibleData();
@@ -254,7 +264,7 @@ const OrderHistoryTab = ({ userId }) => {
   return (
     <div className="space-y-4">
       {visibleData.map((order) => (
-        <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0" style={{ background: order.iconBg }}>
@@ -268,7 +278,7 @@ const OrderHistoryTab = ({ userId }) => {
                     {order.specialization && <span className="text-slate-400"> ({order.specialization})</span>}
                   </p>
                 )}
-                {order.location && <p className="text-xs text-slate-400 mt-0.5">{order.location}</p>}
+                {order.location && order.location !== '--' && <p className="text-xs text-slate-400 mt-0.5">{order.location}</p>}
                 {order.date && (
                   <p className="text-xs font-semibold text-slate-600 mt-1">
                     {order.timeSlot ? <>Time Slot: <span className="text-slate-800">{order.date}</span>&nbsp;•&nbsp;{order.timeSlot}</> : order.date}
@@ -292,7 +302,7 @@ const OrderHistoryTab = ({ userId }) => {
               {order.details.map((d) => (
                 <div key={d.label} className="flex justify-between text-xs">
                   <span className="text-slate-400">{d.label}:</span>
-                  <span className="font-semibold text-slate-700">{d.value}</span>
+                  <span className="font-semibold text-slate-700 capitalize">{d.value}</span>
                 </div>
               ))}
             </div>
@@ -338,7 +348,6 @@ const OrderHistoryTab = ({ userId }) => {
         </div>
       ))}
 
-      {/* Show More / Show Less Button */}
       {historyData.length > visibleData.length || showAll ? (
         <button
           type="button"
@@ -348,15 +357,12 @@ const OrderHistoryTab = ({ userId }) => {
           {showAll ? "Show Less" : `View All History (${historyData.length})`}
         </button>
       ) : null}
-
     </div>
   );
 };
+
 /* ─────────────────────────────────────────────
-   TICKET TAB COMPONENT (Wired to Real API)
-───────────────────────────────────────────── */
-/* ─────────────────────────────────────────────
-   TICKET TAB COMPONENT (Wired to Real API)
+   TICKET TAB COMPONENT
 ───────────────────────────────────────────── */
 const TicketCard = ({ ticket, userId }) => {
   const [activeStatus, setActiveStatus] = useState(ticket.ticketStatus || ticket.status || 'Open');
@@ -364,7 +370,7 @@ const TicketCard = ({ ticket, userId }) => {
   const [commentInput, setCommentInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [isFetchingComments, setIsFetchingComments] = useState(false); // ✅ Added loading state
+  const [isFetchingComments, setIsFetchingComments] = useState(false);
 
   const statuses = ['Open', 'Unresolved', 'Resolved', 'Closed', 'Fake'];
 
@@ -373,15 +379,12 @@ const TicketCard = ({ ticket, userId }) => {
   });
   const metaString = `${createdDate} • Assigned to: ${ticket.assignedName || ticket.assignedTo || 'Unassigned'}`;
 
-  // Update Status API
   const handleStatusChange = async (newStatus) => {
     if (newStatus === activeStatus) return;
-    
     setIsUpdating(true);
     try {
       const payload = { status: newStatus, ticketStatus: newStatus };
       const res = await adminTicketService.updateTicketStatus(userId, ticket.activityId, payload);
-      
       if (res.success) {
         setActiveStatus(newStatus);
         toast.success(`Ticket marked as ${newStatus}`);
@@ -395,27 +398,15 @@ const TicketCard = ({ ticket, userId }) => {
     }
   };
 
-  // Add Comment API
   const handleAddComment = async () => {
     if (!commentInput.trim()) return;
-    
     const payload = { text: commentInput.trim() };
-
     try {
       const res = await adminTicketService.addTicketComment(userId, ticket.activityId, payload);
-      
       if (res.success) {
         toast.success("Comment added");
-        
-        // Optimistically add the new comment to the UI
-        const newCommentObj = { 
-          id: Date.now(), // Temporary ID
-          author: 'You', 
-          time: 'Just now', 
-          text: payload.text 
-        };
-        
-        setComments(prev => [newCommentObj, ...prev]); // Add to top of the list
+        const newCommentObj = { id: Date.now(), author: 'You', time: 'Just now', text: payload.text };
+        setComments(prev => [newCommentObj, ...prev]); 
         setCommentInput(''); 
       } else {
         toast.error(res.message || "Failed to add comment");
@@ -425,17 +416,13 @@ const TicketCard = ({ ticket, userId }) => {
     }
   };
 
-  // ✅ Fetch Comments API
   const loadComments = async () => {
     if (!showComments) {
-      // We are opening the comments section, let's fetch the latest data
       setIsFetchingComments(true);
-      setShowComments(true); // Open immediately to show the loader
-      
+      setShowComments(true); 
       try {
         const res = await adminTicketService.getTicketDetail(userId, ticket.activityId);
         if (res.success && res.data) {
-          // Map backend comments to our UI structure
           const mappedComments = (res.data.comments || []).map(c => ({
             id: c.commentId,
             author: c.agentName || 'Admin',
@@ -444,19 +431,16 @@ const TicketCard = ({ ticket, userId }) => {
             }),
             text: c.text
           }));
-          
           setComments(mappedComments);
         } else {
           toast.error("Failed to load comments");
         }
       } catch (error) {
-        console.error("Error fetching ticket details:", error);
         toast.error("Error fetching comments");
       } finally {
         setIsFetchingComments(false);
       }
     } else {
-      // Just close it
       setShowComments(false);
     }
   };
@@ -519,9 +503,7 @@ const TicketCard = ({ ticket, userId }) => {
                 ) : (
                   <>
                     <div className="space-y-2 mb-3 max-h-[200px] overflow-y-auto pr-2">
-                      {comments.length === 0 && (
-                          <p className="text-[11px] text-slate-400 italic">No comments yet.</p>
-                      )}
+                      {comments.length === 0 && <p className="text-[11px] text-slate-400 italic">No comments yet.</p>}
                       {comments.map((c, i) => (
                         <div key={c.id || i} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                           <div className="flex justify-between items-center mb-1">
@@ -559,7 +541,6 @@ const TicketCard = ({ ticket, userId }) => {
 }
 
 const TicketTab = ({ activities, userId }) => {
-  // Filter activities to only render categories mapped as 'Ticket'
   const tickets = activities.filter(a => a.category === 'Ticket');
 
   if (tickets.length === 0) {
@@ -580,155 +561,19 @@ const TicketTab = ({ activities, userId }) => {
 }
 
 /* ─────────────────────────────────────────────
-   CITY SELECT MODAL
+   ADMIN CLINIC/HOSPITAL SELECT MODAL
 ───────────────────────────────────────────── */
-const CitySelectModal = ({ onClose, userId }) => {
+const AdminClinicSelectModal = ({ onClose, userId }) => {
   const router = useRouter();
   const pathname = usePathname();
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
-  const [step, setStep] = useState(1); // 1: City, 2: Hospital
+  const [step, setStep] = useState(1); 
   const [loading, setLoading] = useState(true);
   const [cities, setCities] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [selectedCity, setSelectedCity] = useState(null);
 
-  // 1. Fetch Cities on Mount
-  useEffect(() => {
-    const fetchCityData = async () => {
-      try {
-        const response = await getAllCities();
-        const data = response?.data || response; 
-        if (Array.isArray(data)) {
-          setCities(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch cities", error);
-        toast.error("Failed to load cities");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCityData();
-  }, []);
-
-  // 2. Fetch Hospitals when City is selected
-  const handleCitySelect = async (city) => {
-    setSelectedCity(city);
-    setStep(2);
-    setLoading(true);
-    try {
-      // ✅ Call your existing getAllClinics service and pass the city name (or ID if your backend prefers)
-      const response = await getAllClinics(city.name); 
-      
-      // ✅ Handle the specific response structure from your service
-      if (response.success && Array.isArray(response.clinics)) {
-        setClinics(response.clinics);
-      } else {
-        toast.error(response.message || "No clinics found for this city");
-        setStep(1); // Go back to city selection
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to load hospitals for this city");
-      setStep(1); 
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. Route to internal booking page when a hospital is clicked
-  const handleClinicSelect = (clinicId) => {
-    // Uses the CRM fast-track route, preserving the user context
-    router.push(`${basePath}/book-appointment?clinicId=${clinicId}&patientUserId=${userId}`);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-        
-        {/* HEADER */}
-        <div className="flex items-center justify-between px-6 py-4 bg-blue-600 shrink-0">
-          <div className="flex items-center gap-3 text-white">
-            {step === 2 && (
-              <button onClick={() => setStep(1)} className="hover:bg-blue-500 p-1 rounded-full transition-colors">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            )}
-            <h3 className="font-bold text-lg">
-              {step === 1 ? "Select Clinic City" : `Hospitals in ${selectedCity.name}`}
-            </h3>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors">
-            <X className="w-5 h-5 text-white" />
-          </button>
-        </div>
-        
-        {/* BODY (SCROLLABLE) */}
-        <div className="overflow-y-auto max-h-[380px] divide-y divide-slate-100 min-h-[200px] relative">
-          {loading ? (
-             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2 bg-white/80 z-10">
-               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-               <p className="text-sm font-medium">{step === 1 ? "Loading cities..." : "Loading hospitals..."}</p>
-             </div>
-          ) : step === 1 ? (
-             // --- STEP 1: RENDER CITIES ---
-             cities.length > 0 ? cities.map((city, idx) => (
-              <button
-                key={city._id || idx} type="button" onClick={() => handleCitySelect(city)}
-                className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
-              >
-                <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800 text-sm uppercase">{city.name}</p>
-                  <p className="text-xs text-slate-500">{city.state || "India"}</p>
-                </div>
-              </button>
-            )) : (
-               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                 <p className="text-sm">No cities found.</p>
-               </div>
-            )
-          ) : (
-             // --- STEP 2: RENDER HOSPITALS ---
-             clinics.length > 0 ? clinics.map((clinic, idx) => (
-              <button
-                key={clinic._id || idx} type="button" onClick={() => handleClinicSelect(clinic._id)}
-                className="w-full flex flex-col px-6 py-4 hover:bg-blue-50 transition-colors text-left border-l-4 border-transparent hover:border-blue-500"
-              >
-                <p className="font-bold text-slate-800 text-sm">{clinic.clinicName || clinic.name}</p>
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{clinic.fulladdress || clinic.address}</p>
-              </button>
-            )) : (
-              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                <p className="text-sm">No hospitals found in this city.</p>
-              </div>
-            )
-          )}
-        </div>
-        
-        {/* FOOTER */}
-        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
-          <p className="text-xs text-slate-400 text-center">Can't find what you're looking for? Contact Support</p>
-        </div>
-        
-      </div>
-    </div>
-  );
-};
-
-
-const AdminClinicSelectModal = ({ onClose, userId }) => {
-  const router = useRouter();
-
-  const [step, setStep] = useState(1); // 1: City, 2: Hospital
-  const [loading, setLoading] = useState(true);
-  const [cities, setCities] = useState([]);
-  const [clinics, setClinics] = useState([]);
-  const [selectedCity, setSelectedCity] = useState(null);
-
-  // 1. Fetch Cities on Mount
   useEffect(() => {
     const fetchCityData = async () => {
       try {
@@ -744,15 +589,12 @@ const AdminClinicSelectModal = ({ onClose, userId }) => {
     fetchCityData();
   }, []);
 
-  // 2. Fetch Hospitals when City is selected
   const handleCitySelect = async (city) => {
     setSelectedCity(city);
     setStep(2);
     setLoading(true);
     try {
-      // ✅ Pass city._id correctly
       const response = await getAllClinics(city._id); 
-      
       if (response.success && Array.isArray(response.clinics)) {
         setClinics(response.clinics);
       } else {
@@ -767,16 +609,14 @@ const AdminClinicSelectModal = ({ onClose, userId }) => {
     }
   };
 
-  // 3. Route to Booking Page
   const handleClinicSelect = (clinicId) => {
     router.push(`/bookappointment?clinicId=${clinicId}&patientUserId=${userId}`);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
-        
         <div className="flex items-center justify-between px-6 py-4 bg-blue-600 shrink-0">
           <div className="flex items-center gap-3 text-white">
             {step === 2 && (
@@ -784,13 +624,9 @@ const AdminClinicSelectModal = ({ onClose, userId }) => {
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
-            <h3 className="font-bold text-lg">
-              {step === 1 ? "Select City" : `Hospitals in ${selectedCity.name}`}
-            </h3>
+            <h3 className="font-bold text-lg">{step === 1 ? "Select City" : `Hospitals in ${selectedCity.name}`}</h3>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors">
-            <X className="w-5 h-5 text-white" />
-          </button>
+          <button onClick={onClose} className="p-1 hover:bg-blue-500 rounded-full transition-colors"><X className="w-5 h-5 text-white" /></button>
         </div>
         
         <div className="overflow-y-auto flex-1 divide-y divide-slate-100 relative min-h-[250px]">
@@ -801,31 +637,18 @@ const AdminClinicSelectModal = ({ onClose, userId }) => {
              </div>
           ) : step === 1 ? (
              cities.length > 0 ? cities.map((city, idx) => (
-              <button
-                key={city._id || idx} type="button" onClick={() => handleCitySelect(city)}
-                className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
-              >
+              <button key={city._id || idx} type="button" onClick={() => handleCitySelect(city)} className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left">
                 <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800 text-sm uppercase">{city.name}</p>
-                  <p className="text-xs text-slate-500">{city.state || "India"}</p>
-                </div>
+                <div><p className="font-bold text-slate-800 text-sm uppercase">{city.name}</p><p className="text-xs text-slate-500">{city.state || "India"}</p></div>
               </button>
-            )) : (
-               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 h-full"><p className="text-sm">No cities found.</p></div>
-            )
+            )) : <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 h-full"><p className="text-sm">No cities found.</p></div>
           ) : (
             clinics.length > 0 ? clinics.map((clinic, idx) => (
-              <button
-                key={clinic._id || idx} type="button" onClick={() => handleClinicSelect(clinic._id)}
-                className="w-full flex flex-col px-6 py-4 hover:bg-blue-50 transition-colors text-left border-l-4 border-transparent hover:border-blue-500"
-              >
+              <button key={clinic._id || idx} type="button" onClick={() => handleClinicSelect(clinic._id)} className="w-full flex flex-col px-6 py-4 hover:bg-blue-50 transition-colors text-left border-l-4 border-transparent hover:border-blue-500">
                 <p className="font-bold text-slate-800 text-sm">{clinic.clinicName || clinic.name}</p>
                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">{clinic.fulladdress || clinic.address}</p>
               </button>
-            )) : (
-              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 h-full"><p className="text-sm">No hospitals found in this city.</p></div>
-            )
+            )) : <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 h-full"><p className="text-sm">No hospitals found in this city.</p></div>
           )}
         </div>
       </div>
@@ -841,19 +664,13 @@ const BookConsultationModal = ({ onClose, userId }) => {
   const router = useRouter();
   const pathname = usePathname();
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
-  
-  // ✅ Controls the new 2-step modal
   const [showClinicModal, setShowClinicModal] = useState(false);
 
-  // If "In Clinic" is clicked, show our upgraded modal
   if (showClinicModal) return <AdminClinicSelectModal onClose={onClose} userId={userId} />;
 
   const handleTeleconsultationClick = () => {
-    if (userId) {
-      router.push(`${basePath}/free-consultation?admin_booking=true&userId=${userId}`);
-    } else {
-      router.push(`${basePath}/free-consultation`);
-    }
+    if (userId) router.push(`${basePath}/free-consultation?admin_booking=true&userId=${userId}`);
+    else router.push(`${basePath}/free-consultation`);
     onClose();
   };
 
@@ -862,36 +679,16 @@ const BookConsultationModal = ({ onClose, userId }) => {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-bold text-slate-800 text-lg">Book Consultation</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
         <div className="flex flex-col gap-4">
-          
-          <button
-            type="button" onClick={() => setShowClinicModal(true)} // ✅ Triggers new modal
-            className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-[#0097A7] hover:bg-[#E0F7FA] transition-all group"
-          >
-            <div className="w-11 h-11 rounded-full bg-[#E0F7FA] flex items-center justify-center group-hover:bg-[#0097A7] transition-all">
-              <MapPin className="w-5 h-5 text-[#0097A7] group-hover:text-white transition-all" />
-            </div>
-            <div className="text-left">
-              <p className="font-bold text-slate-800 text-sm">In Clinic</p>
-              <p className="text-xs text-slate-500">Physical visit at clinic</p>
-            </div>
+          <button type="button" onClick={() => setShowClinicModal(true)} className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-[#0097A7] hover:bg-[#E0F7FA] transition-all group">
+            <div className="w-11 h-11 rounded-full bg-[#E0F7FA] flex items-center justify-center group-hover:bg-[#0097A7] transition-all"><MapPin className="w-5 h-5 text-[#0097A7] group-hover:text-white transition-all" /></div>
+            <div className="text-left"><p className="font-bold text-slate-800 text-sm">In Clinic</p><p className="text-xs text-slate-500">Physical visit at clinic</p></div>
           </button>
-          
-          <button
-            type="button" onClick={handleTeleconsultationClick}
-            className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group"
-          >
-            <div className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-all">
-              <Monitor className="w-5 h-5 text-blue-600 group-hover:text-white transition-all" />
-            </div>
-            <div className="text-left">
-              <p className="font-bold text-slate-800 text-sm">TeleConsultation</p>
-              <p className="text-xs text-slate-500">Online video/call consultation</p>
-            </div>
+          <button type="button" onClick={handleTeleconsultationClick} className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all group">
+            <div className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-all"><Monitor className="w-5 h-5 text-blue-600 group-hover:text-white transition-all" /></div>
+            <div className="text-left"><p className="font-bold text-slate-800 text-sm">TeleConsultation</p><p className="text-xs text-slate-500">Online video/call consultation</p></div>
           </button>
         </div>
       </div>
@@ -914,7 +711,7 @@ const CreatableSelect = ({ field, register, setValue, watch, error }) => {
             defaultValue={currentValue}
             placeholder="Type new name..."
             onBlur={(e) => { setValue(field.name, e.target.value, { shouldValidate: true }); setIsEditing(false); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { setValue(field.name, e.target.value, { shouldValidate: true }); setIsEditing(false); } if (e.key === 'Escape') setIsEditing(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setValue(field.name, e.target.value, { shouldValidate: true }); setIsEditing(false); } if (e.key === 'Escape') setIsEditing(false); }}
             className="flex-1 p-2.5 border-2 border-blue-400 rounded-xl text-sm outline-none bg-white"
           />
         </div>
@@ -979,6 +776,7 @@ const CustomerProfilePage = () => {
   const isNewUser = !userId; 
 
   const isSuperAdminRoute = pathname.startsWith('/super-admin');
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
   
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -991,6 +789,11 @@ const CustomerProfilePage = () => {
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [activities, setActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
+
+  // ✅ DEBOUNCED SEARCH STATE
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // ADDRESS STATE
   const [addresses, setAddresses] = useState([]);
@@ -1013,8 +816,8 @@ const CustomerProfilePage = () => {
   });
 
   const [activityErrors, setActivityErrors] = useState({});
-
   const watchedLeadOwner = watch("leadOwner");
+  const watchedContact = watch("contact"); // ✅ Watch the phone number input
 
   useEffect(() => {
     if (watchedLeadOwner) {
@@ -1102,7 +905,42 @@ const CustomerProfilePage = () => {
     fetchActivities();
   }, [fetchActivities]);
 
-  // 3. ADD NEW ACTIVITY LOG — with yup validation
+
+  // ✅ DEBOUNCED SEARCH EFFECT (Watches the 'contact' form field)
+  useEffect(() => {
+    if (!isNewUser) return; // Only run this when creating a new user
+
+    const handler = setTimeout(async () => {
+      const query = watchedContact?.trim() || "";
+      
+      // Start searching when 4 or more digits are typed
+      if (query.length >= 4) {
+        setIsSearching(true);
+        setShowDropdown(true);
+        try {
+          const res = await searchPatients(query);
+          if (res.success && res.data?.patients?.length > 0) {
+            setSearchResults(res.data.patients);
+          } else {
+            setSearchResults([]); // Found nothing
+          }
+        } catch (error) {
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        // Less than 4 digits, hide dropdown
+        setSearchResults(null);
+        setShowDropdown(false);
+      }
+    }, 500); // 500ms Debounce
+
+    return () => clearTimeout(handler);
+  }, [watchedContact, isNewUser]);
+
+
+  // 3. ADD NEW ACTIVITY LOG 
   const addNewActivity = async () => {
     const type       = watch('activityType');
     const notes      = watch('activityNotes');
@@ -1212,7 +1050,6 @@ const CustomerProfilePage = () => {
 
   const handleSaveAddress = async (e) => {
     e.preventDefault();
-
     try {
       await addressFormSchema.validate(addressForm, { abortEarly: false });
       setAddressErrors({});
@@ -1321,7 +1158,6 @@ const CustomerProfilePage = () => {
       const res = await createCustomerProfile(payload);
       if (res.success) {
         toast.success("User created successfully!", { duration: 5000 }); 
-        const basePath = pathname.split('/newuser')[0];
         const generatedUserId = res.data.userId || res.data._id || res.data.leadId;
         router.push(`${basePath}/log-in-user/customerprofile?userId=${generatedUserId}`);
       } else {
@@ -1378,7 +1214,7 @@ const CustomerProfilePage = () => {
       <form onSubmit={handleSubmit(onFinalSubmit)} className="max-w-5xl mx-auto space-y-6">
         
         {/* HEADER */}
-        <div className="flex flex-wrap justify-between items-end bg-white p-6 rounded-2xl shadow-sm border border-slate-200 gap-4">
+        <div className="flex flex-wrap justify-between items-end bg-white p-6 rounded-2xl shadow-sm border border-slate-200 gap-4 relative z-10">
           <div className="flex items-center gap-4">
             <button type="button" onClick={() => window.history.back()} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all">
               <ArrowLeft size={16} /> Back
@@ -1410,42 +1246,132 @@ const CustomerProfilePage = () => {
 
         {/* BASIC INFORMATION */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          {[
-            { label: "Name", name: "name", required: true }, 
-            { label: "Age", name: "age" },
-            { label: "Contact Number", name: "contact", required: true }, 
-            { label: "WhatsApp Number", name: "whatsapp" },
-            { 
-              label: "Lead Owner", name: "leadOwner", type: "creatable", 
-              options: adminList.map(a => a.fullName), disabled: isNewUser || !isSuperAdminRoute 
-            }, 
-            { 
-              label: "Lead Stage", name: "leadStage", type: "select", 
-              options: ["New", "Interested", "Follow-Up", "Future", "N-Interested", "Cancel", "Regular"] 
-            },
-            { label: "City", name: "city" },
-            { label: "Mail Id", name: "email" }
-          ].map((f) => (
-            <div key={f.name}>
-              <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
-                {f.label} {f.required && <span className="text-red-500">*</span>}
-              </label>
-              {f.type === "select" ? (
-                <div className="relative">
-                  <select {...register(f.name)} className={`w-full appearance-none p-2.5 bg-slate-50 border ${errors[f.name] ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-500`}>
-                    <option value="">Select...</option>
-                    {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
-                </div>
-              ) : f.type === "creatable" ? (
-                <CreatableSelect field={f} register={register} setValue={setValue} watch={watch} error={errors[f.name]} />
-              ) : (
-                <input {...register(f.name)} placeholder="Enter" className={`w-full p-2.5 border ${errors[f.name] ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400`} />
-              )}
-              {errors[f.name] && <p className="text-red-500 text-[10px] mt-1">{errors[f.name]?.message}</p>}
+          
+          {/* Name */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Name <span className="text-red-500">*</span></label>
+            <input {...register("name")} placeholder="Enter" className={`w-full p-2.5 border ${errors.name ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400`} />
+            {errors.name && <p className="text-red-500 text-[10px] mt-1">{errors.name.message}</p>}
+          </div>
+
+          {/* Age */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Age</label>
+            <input {...register("age")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+          </div>
+
+          {/* ✅ CONTACT NUMBER WITH ELEVATED Z-INDEX FOR DROPDOWN */}
+          <div className="relative z-30">
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Contact Number <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <input 
+                {...register("contact")} 
+                type="tel"
+                maxLength={10}
+                autoComplete="off"
+                placeholder="Enter 10-digit number"
+                className={`w-full p-2.5 border ${errors.contact ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400 pr-10`} 
+              />
+              {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-500" size={16} />}
             </div>
-          ))}
+            {errors.contact && <p className="text-red-500 text-[10px] mt-1">{errors.contact.message}</p>}
+
+            {/* THE FLOATING DROPDOWN */}
+            {showDropdown && isNewUser && watchedContact?.length >= 4 && (
+              <div className="absolute top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 max-h-[300px] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+                {searchResults && searchResults.length > 0 ? (
+                  <div className="p-2">
+                    <div className="flex items-center gap-2 px-2 py-1.5 mb-1 bg-blue-50/50 rounded-lg">
+                      <UserCheck className="text-blue-500" size={14} />
+                      <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Existing Patients Found</p>
+                    </div>
+                    {searchResults.map(patient => (
+                      <button 
+                        key={patient.userId}
+                        type="button"
+                        onClick={() => router.push(`${basePath}/log-in-user/customerprofile?userId=${patient.userId}`)}
+                        className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0 text-left group"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">
+                            {patient.displayName?.split('—')[0]?.trim() || 'Unknown Name'}
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium tracking-wide mt-1">
+                            ID: {patient.customerId || 'N/A'} • 📞 {patient.mobileNo}
+                          </p>
+                        </div>
+                        <span className="text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-wider group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                          Open Profile
+                        </span>
+                      </button>
+                    ))}
+                    <div className="mt-2 pt-2 border-t border-slate-100 px-2 text-center pb-1">
+                       <button 
+                         type="button"
+                         onClick={() => setShowDropdown(false)}
+                         className="text-[11px] font-bold text-slate-400 hover:text-slate-600 underline underline-offset-2"
+                       >
+                         Dismiss & Continue Creating New
+                       </button>
+                    </div>
+                  </div>
+                ) : !isSearching ? (
+                  <div className="p-5 text-center">
+                    <p className="text-sm font-bold text-slate-700">No matches found.</p>
+                    <p className="text-[11px] text-slate-500 mt-1 mb-3">You can proceed with creating a new profile.</p>
+                    <button 
+                       type="button"
+                       onClick={() => setShowDropdown(false)}
+                       className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg font-bold text-xs transition-colors"
+                     >
+                       Continue Typing
+                     </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          {/* WhatsApp */}
+          <div className="relative z-20">
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">WhatsApp Number</label>
+            <input {...register("whatsapp")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+          </div>
+
+          {/* Lead Owner */}
+          <div className="relative z-10">
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Lead Owner</label>
+            <CreatableSelect 
+              field={{ name: "leadOwner", options: adminList.map(a => a.fullName), disabled: isNewUser || !isSuperAdminRoute }} 
+              register={register} setValue={setValue} watch={watch} error={errors.leadOwner} 
+            />
+            {errors.leadOwner && <p className="text-red-500 text-[10px] mt-1">{errors.leadOwner.message}</p>}
+          </div>
+
+          {/* Lead Stage */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Lead Stage</label>
+            <div className="relative">
+              <select {...register("leadStage")} className="w-full appearance-none p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500">
+                <option value="">Select...</option>
+                {["New", "Interested", "Follow-Up", "Future", "N-Interested", "Cancel", "Regular"].map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} />
+            </div>
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">City</label>
+            <input {...register("city")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Mail Id</label>
+            <input {...register("email")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
+          </div>
+
         </div>
 
         {/* DELIVERY ADDRESS */}
