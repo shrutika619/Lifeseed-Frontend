@@ -12,16 +12,20 @@ import {
   Activity,
   UserRound,
   X,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Clock,
+  User,
+  CreditCard,
+  ArrowLeft
 } from "lucide-react";
-// ✅ IMPORT BOTH API CALLS
-import { getMyBookingsHistory, getMyOrdersHistory, cancelMyBooking } from "@/app/services/patient/order.service"; 
+import { getMyBookingsHistory, getMyOrdersHistory, cancelMyBooking, getMyBookingDetails } from "@/app/services/patient/order.service"; 
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const normalizedStatus = status?.toLowerCase() || '';
   
-  let styles = "bg-slate-50 text-slate-600 border border-slate-200"; // Default
+  let styles = "bg-slate-50 text-slate-600 border border-slate-200"; 
 
   if (['upcoming', 'new', 'pending', 'order placed', 'accept'].includes(normalizedStatus)) {
     styles = "bg-blue-50 text-blue-600 border border-blue-100";
@@ -58,8 +62,12 @@ const MyOrderPage = () => {
   const [activeFilter, setActiveFilter] = useState("booking");
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
 
-  const [cancelModalId, setCancelModalId] = useState(null);
+  const [cancelData, setCancelData] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  const [detailsData, setDetailsData] = useState(null);
+  const [detailsType, setDetailsType] = useState(null); 
+  const [isFetchingDetails, setIsFetchingDetails] = useState(null);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -71,7 +79,6 @@ const MyOrderPage = () => {
     const fetchAllHistory = async () => {
       setLoading(true);
       try {
-        // ✅ Fetch from both APIs simultaneously
         const [bookingsRes, ordersRes] = await Promise.all([
           getMyBookingsHistory().catch(() => ({ success: false })),
           getMyOrdersHistory().catch(() => ({ success: false }))
@@ -79,11 +86,7 @@ const MyOrderPage = () => {
 
         const combined = [];
 
-        // ==========================================
-        // 1. MAP API 1: BOOKINGS (/patient-profile/bookings)
-        // ==========================================
         if (bookingsRes.success && bookingsRes.data) {
-          
           // A. Teleconsultations
           if (bookingsRes.data.teleBookings && Array.isArray(bookingsRes.data.teleBookings.bookings)) {
             bookingsRes.data.teleBookings.bookings.forEach(b => {
@@ -103,7 +106,7 @@ const MyOrderPage = () => {
                 bookedOn: b.bookingDate ? `Booked on ${new Date(b.bookingDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
                 amountPaid: "Prepaid", 
                 rawCreatedAt: b.bookingDate || new Date().toISOString(), 
-                actions: isCancellable ? ["cancel", "callNow"] : ["details"]
+                actions: isCancellable ? ["cancel", "callNow", "details"] : ["details"]
               });
             });
           }
@@ -130,34 +133,34 @@ const MyOrderPage = () => {
                 bookedOn: b.bookingDate ? `Booked on ${new Date(b.bookingDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
                 amountPaid: b.fees > 0 ? `₹${b.fees}` : "Free",
                 rawCreatedAt: b.bookingDate || new Date().toISOString(), 
-                actions: isCancellable ? ["cancel", "directions"] : ["details"]
+                actions: isCancellable ? ["cancel", "directions", "details"] : ["details"]
               });
             });
           }
         }
 
-        // ==========================================
-        // 2. MAP API 2: ORDERS (/patient-profile/orders)
-        // ==========================================
-        if (ordersRes.success && ordersRes.data && Array.isArray(ordersRes.data.orders)) {
-          ordersRes.data.orders.forEach(b => {
-            combined.push({
-              id: b.orderId || b.orderNumber,
-              recordId: b.orderId,
-              type: "Medicine Order",
-              category: "order", 
-              icon: Package,
-              status: b.deliveryStatus || "Pending",
-              medicineName: b.productName || "Medicines",
-              moreItems: "", 
-              orderedOn: b.createdAt ? `Ordered on ${new Date(b.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
-              amountPaid: `₹${b.amountPaid || 0}`,
-              rawCreatedAt: b.createdAt || new Date().toISOString(), 
-            });
-          });
+        if (ordersRes.success && ordersRes.data) {
+           const rawOrders = ordersRes.data.orders || ordersRes.data.medicineOrders?.orders || ordersRes.data.medicineOrders;
+           if (rawOrders && Array.isArray(rawOrders)) {
+              rawOrders.forEach(b => {
+                combined.push({
+                  id: b.orderId || b.orderNumber,
+                  recordId: b.orderId,
+                  type: "Medicine Order",
+                  category: "order", 
+                  icon: Package,
+                  status: b.deliveryStatus || "Pending",
+                  medicineName: b.productName || "Medicines",
+                  moreItems: "", 
+                  orderedOn: b.createdAt ? `Ordered on ${new Date(b.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
+                  amountPaid: `₹${b.amountPaid || 0}`,
+                  rawCreatedAt: b.createdAt || new Date().toISOString(), 
+                  actions: ["reorder", "details"]
+                });
+              });
+           }
         }
 
-        // Sort descending by date
         combined.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
         setOrders(combined);
 
@@ -171,13 +174,12 @@ const MyOrderPage = () => {
     fetchAllHistory();
   }, [refreshTrigger]);
 
-  // ✅ CANCEL HANDLER
   const confirmCancelBooking = async () => {
-    if (!cancelModalId) return;
+    if (!cancelData) return;
 
     setIsCancelling(true);
     try {
-      const res = await cancelMyBooking(cancelModalId);
+      const res = await cancelMyBooking(cancelData.id, cancelData.type);
       if (res.success) {
         showToast("Booking cancelled successfully.");
         setRefreshTrigger(prev => prev + 1); 
@@ -188,7 +190,26 @@ const MyOrderPage = () => {
       showToast(err.message || "Error cancelling booking.");
     } finally {
       setIsCancelling(false);
-      setCancelModalId(null); 
+      setCancelData(null); 
+    }
+  };
+
+  const handleViewDetails = async (order) => {
+    const type = order.type === "Teleconsultation" ? "tele" : "inclinic";
+    
+    setIsFetchingDetails(order.recordId);
+    try {
+      const res = await getMyBookingDetails(order.recordId, type);
+      if (res.success && res.data) {
+        setDetailsData(res.data);
+        setDetailsType(type);
+      } else {
+        showToast(res.message || "Failed to load details.");
+      }
+    } catch (err) {
+      showToast("Error fetching details.");
+    } finally {
+      setIsFetchingDetails(null);
     }
   };
 
@@ -208,7 +229,15 @@ const MyOrderPage = () => {
     <div className="min-h-screen bg-[#f8fafc] font-sans relative">
       <div className="max-w-4xl mx-auto px-4 py-8">
         
-        <div className="flex items-center justify-between mb-6">
+        {/* ✅ ADDED BACK BUTTON TO PAGE HEADER */}
+        <div className="flex items-center gap-3 mb-6">
+           <button 
+             onClick={() => router.back()}
+             className="flex items-center justify-center p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+             aria-label="Go back"
+           >
+             <ArrowLeft size={20} className="text-slate-600" />
+           </button>
            <h1 className="text-2xl font-bold text-slate-800">My Orders & Bookings</h1>
         </div>
 
@@ -319,17 +348,28 @@ const MyOrderPage = () => {
                       {/* ACTIONS */}
                       <div className="flex flex-wrap gap-3 w-full sm:w-auto mt-2 sm:mt-0">
                         
-                        {order.actions.includes("cancel") && (
+                        {order.actions?.includes("cancel") && (
                           <button
-                            onClick={() => setCancelModalId(order.recordId)}
+                            onClick={() => setCancelData({
+                              id: order.recordId,
+                              type: order.type === "Teleconsultation" ? "tele" : "inclinic"
+                            })}
                             className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
                           >
                             Cancel Booking
                           </button>
                         )}
 
+                        {order.actions?.includes("reorder") && (
+                          <button
+                            onClick={() => showToast("Reorder placed!")}
+                            className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            Reorder
+                          </button>
+                        )}
 
-                        {order.actions.includes("callNow") && (
+                        {order.actions?.includes("callNow") && (
                           <button
                             onClick={() => showToast("Calling now...")}
                             className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200 flex items-center justify-center gap-2 transition-colors"
@@ -338,7 +378,7 @@ const MyOrderPage = () => {
                           </button>
                         )}
 
-                        {order.actions.includes("directions") && (
+                        {order.actions?.includes("directions") && (
                           <button
                             onClick={() => showToast("Opening directions...")}
                             className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl bg-slate-800 text-white hover:bg-slate-900 shadow-md flex items-center justify-center gap-2 transition-colors"
@@ -347,6 +387,15 @@ const MyOrderPage = () => {
                           </button>
                         )}
 
+                        {order.actions?.includes("details") && (
+                          <button
+                            onClick={() => handleViewDetails(order)}
+                            disabled={isFetchingDetails === order.recordId}
+                            className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                          >
+                            {isFetchingDetails === order.recordId ? <Loader2 size={16} className="animate-spin"/> : "View Details"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -357,7 +406,8 @@ const MyOrderPage = () => {
         )}
       </div>
 
-      {cancelModalId && (
+      {/* ✅ CANCEL CONFIRMATION MODAL */}
+      {cancelData && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
@@ -366,7 +416,7 @@ const MyOrderPage = () => {
                 <h2 className="text-lg font-bold">Cancel Booking</h2>
               </div>
               <button 
-                onClick={() => !isCancelling && setCancelModalId(null)} 
+                onClick={() => !isCancelling && setCancelData(null)} 
                 disabled={isCancelling}
                 className="p-1 hover:bg-rose-100 rounded-full transition-colors disabled:opacity-50"
               >
@@ -380,7 +430,7 @@ const MyOrderPage = () => {
               </p>
               <div className="flex gap-3">
                 <button 
-                  onClick={() => setCancelModalId(null)}
+                  onClick={() => setCancelData(null)}
                   disabled={isCancelling}
                   className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-colors disabled:opacity-50"
                 >
@@ -394,6 +444,130 @@ const MyOrderPage = () => {
                   {isCancelling ? <Loader2 size={16} className="animate-spin" /> : "Yes, Cancel"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ DETAILS MODAL */}
+      {detailsData && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-md w-full animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200 overflow-hidden max-h-[90vh] flex flex-col">
+            
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2 text-slate-800">
+                <FileText size={20} className="text-blue-600" />
+                <h2 className="text-lg font-bold">Booking Details</h2>
+              </div>
+              <button 
+                onClick={() => setDetailsData(null)} 
+                className="p-1 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-6">
+              
+              {/* Common Header Info */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booking ID</p>
+                    <p className="font-mono text-sm font-bold text-slate-800">{detailsData.appointmentId || detailsData.requestId}</p>
+                  </div>
+                  <StatusBadge status={detailsData.inClinicStatus || detailsData.consultationStatus} />
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200/60">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={10} /> Time Slot</p>
+                    <p className="text-xs font-semibold text-slate-700">{detailsData.timeSlot}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Calendar size={10} /> Booked On</p>
+                    <p className="text-xs font-semibold text-slate-700">{new Date(detailsData.bookingDate).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic rendering based on type */}
+              {detailsType === 'inclinic' ? (
+                <>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Clinic Information</h3>
+                    <div className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                      <div className="bg-blue-50 p-2 rounded-lg text-blue-600 mt-0.5">
+                        <MapPin size={18} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-slate-800">{detailsData.clinic?.name}</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{detailsData.clinic?.address}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Payment Summary</h3>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Consultation Fee</span>
+                        <span className="font-semibold text-slate-800">₹{detailsData.fees}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Amount Paid</span>
+                        <span className="font-semibold text-emerald-600">₹{detailsData.paidAmount}</span>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100 flex justify-between">
+                        <span className="text-sm font-bold text-slate-800">Balance Due</span>
+                        <span className="font-bold text-rose-600 text-base">₹{detailsData.balanceDue}</span>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100 flex items-center gap-2 text-xs font-medium text-slate-500">
+                        <CreditCard size={14} /> Payment Mode: <span className="uppercase font-bold text-slate-700">{detailsData.paymentMode}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Contact Information</h3>
+                    <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                      <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
+                        <Phone size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Phone</p>
+                        <p className="font-bold text-sm text-slate-800 mt-0.5">{detailsData.bookingContactNumber || "Not provided"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {detailsData.concernedAbout && detailsData.concernedAbout.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Concerned About</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {detailsData.concernedAbout.map((concern, idx) => (
+                          <span key={idx} className="bg-rose-50 text-rose-700 border border-rose-100 text-xs font-bold px-3 py-1.5 rounded-lg">
+                            {concern}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Cancellation Note if applicable */}
+              {detailsData.cancelledBy && (
+                <div className="bg-rose-50 border border-rose-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-rose-800 mb-1 flex items-center gap-1.5"><AlertCircle size={14} /> Cancellation Details</p>
+                  <p className="text-xs text-rose-600">Cancelled by: <span className="font-bold capitalize">{detailsData.cancelledBy}</span></p>
+                  {detailsData.rejectedNote && (
+                    <p className="text-xs text-rose-600 mt-1 italic">"{detailsData.rejectedNote}"</p>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         </div>

@@ -270,7 +270,7 @@ if (currentDayAvailability?.slotGroups) {
       if (res.success) {
         toast.success(res.message || "Booking confirmed!");
         // Navigate to success page
-        router.push(`/confirmbooking?appointmentId=${res.data.appointmentId}`);
+        router.push(`/confirmbooking?bookingId=${res.bookingId}`);
       } else {
         toast.error(res.message || "Failed to create booking.");
       }

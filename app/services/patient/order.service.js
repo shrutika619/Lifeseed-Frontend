@@ -22,13 +22,24 @@ export const getMyOrdersHistory = async () => {
   }
 };
 
-// 3. Cancel Booking
-export const cancelMyBooking = async (recordId) => {
+// 3. Cancel Booking 
+export const cancelMyBooking = async (recordId, type) => {
   try {
-    const response = await api.patch(`/patient-profile/bookings/${recordId}/cancel`);
+    const response = await api.patch(`/patient-profile/bookings/${recordId}/cancel?type=${type}`);
     return response.data;
   } catch (error) {
     console.error("Error cancelling booking:", error);
+    throw error.response?.data || error;
+  }
+};
+
+// 4. ✅ NEW: Get Booking Details
+export const getMyBookingDetails = async (recordId, type) => {
+  try {
+    const response = await api.get(`/patient-profile/bookings/${recordId}?type=${type}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching booking details:", error);
     throw error.response?.data || error;
   }
 };

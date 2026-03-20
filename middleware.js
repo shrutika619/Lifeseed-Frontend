@@ -10,7 +10,7 @@ const ROUTE_PERMISSIONS = {
   '/admin':       ['admin', 'super_admin'],
   // '/clinic':      ['clinic_admin', 'doctor'],
   '/hospitaldashboard': ['clinic_admin', 'doctor'],
-  '/profile':     ['patient', 'clinic_admin', 'doctor', 'admin', 'super_admin'], 
+  '/profile':     ['patient', 'clinic_admin'], 
   '/bookappointment': ['patient', 'clinic_admin', 'doctor', 'admin', 'super_admin'], 
 };
 
@@ -52,7 +52,7 @@ export async function middleware(request) {
   
   // A. Logged-in users visiting Login pages should be redirected to their dashboard
   if (isLoggedIn && AUTH_PAGES.includes(pathname)) {
-      if (ROLES.CLINIC.includes(userRole)) return NextResponse.redirect(new URL('/hospitaldashboard', request.url));
+      if (ROLES.CLINIC.includes(userRole)) return NextResponse.redirect(new URL('/hospitaldashboard/dashboard', request.url));
       if (userRole === 'super_admin') return NextResponse.redirect(new URL('/super-admin/dashboard', request.url));
       if (userRole === 'admin') return NextResponse.redirect(new URL('/admin/dashboard', request.url));
       return NextResponse.redirect(new URL('/', request.url));
@@ -61,7 +61,7 @@ export async function middleware(request) {
   // B. Allow access to completely public pages (like Home) without checks
   // NOTE: Clinic Admins usually shouldn't see the landing page after login, forcing them to dashboard
   if (pathname === '/' && isLoggedIn && ROLES.CLINIC.includes(userRole)) {
-      return NextResponse.redirect(new URL('/hospitaldashboard', request.url));
+      return NextResponse.redirect(new URL('/hospitaldashboard/dashboard', request.url));
   }
   
   // If it's a public page and not a special redirect case above, let them pass
@@ -107,7 +107,7 @@ export async function middleware(request) {
     if (!allowedRoles.includes(userRole)) {
        // ⛔ UNAUTHORIZED ACCESS ATTEMPT
        // Redirect them to their appropriate home to stop them
-       if (ROLES.CLINIC.includes(userRole)) return NextResponse.redirect(new URL('/hospitaldashboard', request.url));
+       if (ROLES.CLINIC.includes(userRole)) return NextResponse.redirect(new URL('/hospitaldashboard/dashboard', request.url));
        if (userRole === 'patient') return NextResponse.redirect(new URL('/', request.url));
        
        return NextResponse.redirect(new URL('/', request.url)); // Fallback
