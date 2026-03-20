@@ -17,7 +17,6 @@ import {
 } from '@/app/services/admin/leads.service'; 
 import { adminAddressService } from '@/app/services/admin/adminAddress.service'; 
 import { adminTicketService } from '@/app/services/admin/adminTicket.service'; 
-import { useSelector } from "react-redux";
 import { getAllCities, getAllClinics } from "@/app/services/patient/clinic.service";
 import { toast } from 'sonner';
 import { 
@@ -86,7 +85,7 @@ const OrderHistoryTab = ({ userId }) => {
   const pathname = usePathname();
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
-  const fetchAllHistory = async () => {
+  const fetchAllHistory = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getCustomerOrderHistory(userId);
@@ -213,18 +212,19 @@ const OrderHistoryTab = ({ userId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
     fetchAllHistory();
-  }, [userId]);
+  }, [userId, fetchAllHistory]);
 
   const handleCancelTeleconsultation = async (recordId) => {
     if (!window.confirm("Are you sure you want to cancel this booking?")) return;
     
     const toastId = toast.loading("Cancelling booking...");
     try {
+      // Assuming you have this service imported
       const res = await adminTeleconsultationService.cancelBooking(recordId);
       if (res.success) {
         toast.success("Booking Cancelled Successfully", { id: toastId });
@@ -817,7 +817,7 @@ const CustomerProfilePage = () => {
 
   const [activityErrors, setActivityErrors] = useState({});
   const watchedLeadOwner = watch("leadOwner");
-  const watchedContact = watch("contact"); // ✅ Watch the phone number input
+  const watchedContact = watch("contact");
 
   useEffect(() => {
     if (watchedLeadOwner) {
@@ -906,14 +906,13 @@ const CustomerProfilePage = () => {
   }, [fetchActivities]);
 
 
-  // ✅ DEBOUNCED SEARCH EFFECT (Watches the 'contact' form field)
+  // ✅ DEBOUNCED SEARCH EFFECT
   useEffect(() => {
-    if (!isNewUser) return; // Only run this when creating a new user
+    if (!isNewUser) return;
 
     const handler = setTimeout(async () => {
       const query = watchedContact?.trim() || "";
       
-      // Start searching when 4 or more digits are typed
       if (query.length >= 4) {
         setIsSearching(true);
         setShowDropdown(true);
@@ -922,7 +921,7 @@ const CustomerProfilePage = () => {
           if (res.success && res.data?.patients?.length > 0) {
             setSearchResults(res.data.patients);
           } else {
-            setSearchResults([]); // Found nothing
+            setSearchResults([]); 
           }
         } catch (error) {
           setSearchResults([]);
@@ -930,11 +929,10 @@ const CustomerProfilePage = () => {
           setIsSearching(false);
         }
       } else {
-        // Less than 4 digits, hide dropdown
         setSearchResults(null);
         setShowDropdown(false);
       }
-    }, 500); // 500ms Debounce
+    }, 500); 
 
     return () => clearTimeout(handler);
   }, [watchedContact, isNewUser]);
@@ -1112,7 +1110,9 @@ const CustomerProfilePage = () => {
         return toast.error("Flat No, Street Area, and Pin Code are required for the initial address.");
       }
     }
+    
     setIsSaving(true);
+    
     const selectedAdmin = adminList.find(a => a.fullName === data.leadOwner);
     let leadOwnerId = selectedAdmin ? selectedAdmin._id : data.leadOwner; 
     if (!selectedAdmin && data.leadOwner === customerData?.currentAdmin?.fullName) {
@@ -1133,17 +1133,6 @@ const CustomerProfilePage = () => {
       sendWhatsAppNotification: !!data.sendWhatsApp,
     };
 
-    if (isNewUser) {
-      payload.deliveryAddress = {
-        label: data.addressLabel || "Home",
-        flatNo: data.flatNo || "",
-        streetArea: data.street || "",
-        landmark: data.landmark || "",
-        pinCode: data.pincode || "",
-        contactNumber: data.contact || "" 
-      };
-    }
-
     if (!isNewUser) {
       payload.leadOwner = leadOwnerId;
     }
@@ -1155,22 +1144,58 @@ const CustomerProfilePage = () => {
           scheduledDate: act.scheduledDate, scheduledTime: act.scheduledTime, assignedTo: act.assignedToId
         }));
       }
-      const res = await createCustomerProfile(payload);
-      if (res.success) {
-        toast.success("User created successfully!", { duration: 5000 }); 
-        const generatedUserId = res.data.userId || res.data._id || res.data.leadId;
-        router.push(`${basePath}/log-in-user/customerprofile?userId=${generatedUserId}`);
-      } else {
-        toast.error(res.message || "Failed to create user.", { duration: 5000 }); 
+      
+      try {
+        // 1. Create the user profile first
+        const res = await createCustomerProfile(payload);
+        
+        if (res.success) {
+          const generatedUserId = res.data.userId || res.data._id || res.data.leadId;
+          
+          // 2. ✅ Check if address fields are filled, then call createUserAddress
+          const hasAddress = data.flatNo || data.street || data.pincode;
+          if (hasAddress) {
+            const addressPayload = {
+              label: data.addressLabel || "Home",
+              flatNo: data.flatNo || "",
+              streetArea: data.street || "",
+              landmark: data.landmark || "",
+              pinCode: data.pincode || "",
+              contactNumber: data.contact || "" 
+            };
+            
+            try {
+              await adminAddressService.createUserAddress(generatedUserId, addressPayload);
+            } catch (addrError) {
+              console.error("Failed to save address:", addrError);
+              toast.error("User created, but failed to save initial address.");
+            }
+          }
+
+          toast.success("User created successfully!", { duration: 5000 }); 
+          router.push(`${basePath}/log-in-user/customerprofile?userId=${generatedUserId}`);
+        } else {
+          toast.error(res.message || "Failed to create user.", { duration: 5000 }); 
+        }
+      } catch (error) {
+        console.error("Error creating user:", error);
+        toast.error("An error occurred while creating the user.");
       }
+      
     } else {
-      const res = await submitCustomerProfile(userId, payload);
-      if (res.success) {
-        toast.success("Profile saved successfully!", { duration: 5000 }); 
-      } else {
-        toast.error(res.message || "Failed to update profile.", { duration: 5000 }); 
+      try {
+        const res = await submitCustomerProfile(userId, payload);
+        if (res.success) {
+          toast.success("Profile saved successfully!", { duration: 5000 }); 
+        } else {
+          toast.error(res.message || "Failed to update profile.", { duration: 5000 }); 
+        }
+      } catch (error) {
+        console.error("Error updating user:", error);
+        toast.error("An error occurred while updating the profile.");
       }
     }
+    
     setIsSaving(false);
   };
 
@@ -1260,7 +1285,7 @@ const CustomerProfilePage = () => {
             <input {...register("age")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
           </div>
 
-          {/* ✅ CONTACT NUMBER WITH ELEVATED Z-INDEX FOR DROPDOWN */}
+          {/* CONTACT NUMBER */}
           <div className="relative z-30">
             <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Contact Number <span className="text-red-500">*</span></label>
             <div className="relative">
