@@ -67,13 +67,16 @@ const HospitalDashboard = () => {
       setLoading(true);
       try {
         let queryStr = '?date=today';
+        
         if (activeTab === 'booked') queryStr += '&status=Accept';
         else if (activeTab === 'cancelled') queryStr += '&status=Cancelled';
         else if (activeTab === 'completed') queryStr += '&status=Complete';
         else if (activeTab === 'absent') queryStr += '&status=Patient Absent';
         else if (activeTab === 'new') queryStr += '&status=New';
+        
         else if (activeTab === 'follow-up') queryStr = '?followUpStatus=Interested';
         else if (activeTab === 'sold') queryStr = '?followUpStatus=Sell';
+        else if (activeTab === 'not-interested') queryStr = '?followUpStatus=Not Interested';
 
         const res = await clinicBookingService.getClinicBookings(queryStr);
 
@@ -87,6 +90,11 @@ const HospitalDashboard = () => {
           const mappedRequests = res.data.bookings.map(b => {
             const bDate = new Date(b.bookingDate);
             const isPrepaid = b.paymentMode?.toLowerCase() !== 'cash' || b.paymentStatus === 'COMPLETED';
+            
+            const patientData = b.bookingPatientDetails || {};
+            const accountData = b.patientDetails || {};
+            const doctorData = b.doctor || {};
+
             return {
               id: b.appointmentId || "--",
               internalBookingId: b.bookingId,
@@ -94,24 +102,28 @@ const HospitalDashboard = () => {
               type: isPrepaid ? 'Prepaid' : 'Collect CASH',
               amount: b.fees || 0,
               orderType: b.notes || null,
+              
               patient: {
-                name: b.requestBy?.name || "Unknown",
-                age: b.requestBy?.age || "--",
-                gender: b.requestBy?.gender || "Not Specified",
-                initials: (b.requestBy?.name || "U").substring(0, 2).toUpperCase(),
+                name: patientData.name || accountData.name || "Unknown",
+                age: patientData.age || accountData.age || "--",
+                gender: patientData.gender || accountData.gender || "Not Specified",
+                initials: (patientData.name || accountData.name || "U").substring(0, 2).toUpperCase(),
                 image: null,
-                phone: b.requestBy?.phone
+                phone: patientData.contact || accountData.loginNumber || "--"
               },
+              
               slot: b.timeSlot || "Not Scheduled",
+              
               doctor: {
-                name: b.doctor?.name || "Unknown Doctor",
-                qualification: [b.doctor?.underGradDegree, b.doctor?.postGradDegree].filter(x => x && x !== "--").join(", ") || "Specialist",
-                specialty: b.doctor?.primarySpecialty || "--",
-                experience: `${b.doctor?.experience || 0} years`,
+                name: doctorData.name || "Unknown Doctor",
+                qualification: [doctorData.underGradDegree, doctorData.postGradDegree].filter(x => x && x !== "--").join(", ") || "Specialist",
+                specialty: doctorData.primarySpecialty || "--",
+                experience: doctorData.experience ? `${doctorData.experience} years` : "--",
                 rating: 4,
                 available: true,
-                image: b.doctor?.profileImage || null
+                image: doctorData.profileImage || null
               },
+              
               status: b.status?.toLowerCase() || 'pending',
               paymentStatus: b.paymentStatus
             };
@@ -140,7 +152,8 @@ const HospitalDashboard = () => {
     { id: 'absent', label: 'Pt Absent', count: metrics.counts['Patient Absent'] || 0 },
     { id: 'cancelled', label: 'Cancelled', count: metrics.counts['Cancelled'] || 0 },
     { id: 'follow-up', label: 'Follow-up', count: metrics.followUpCounts['Interested'] || 0 },
-    { id: 'sold', label: 'Sold', count: metrics.followUpCounts['Sell'] || 0 }
+    { id: 'sold', label: 'Sold', count: metrics.followUpCounts['Sell'] || 0 },
+    { id: 'not-interested', label: 'Not Interested', count: metrics.followUpCounts['Not Interested'] || metrics.followUpCounts['Not-Interested'] || 0 }
   ];
 
   // 4. ACTION HANDLERS
@@ -189,6 +202,8 @@ const HospitalDashboard = () => {
       const payload = { status: "Complete" };
       if (followUpStatus === 'interested') payload.followUpStatus = "Interested";
       if (followUpStatus === 'sell') payload.followUpStatus = "Sell";
+      if (followUpStatus === 'not-interested') payload.followUpStatus = "Not Interested";
+      
       const res = await clinicBookingService.updateBookingStatus(selectedRequest.internalBookingId, payload);
       if (res.success) {
         toast.success("Appointment completed!", { id: toastId });
@@ -508,6 +523,7 @@ const HospitalDashboard = () => {
                   className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-gray-700 text-sm font-medium"
                 >
                   <option value="">No Follow Up</option>
+                  {/* ✅ Added missing options here in the select dropdown */}
                   <option value="not-interested">Not Interested</option>
                   <option value="sell">Sell Package</option>
                   <option value="interested">Interested in Procedure</option>

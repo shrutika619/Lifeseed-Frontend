@@ -47,6 +47,7 @@ export default function AdminClinicsPage() {
     setLoading(true);
     
     const result = await getAllClinics(signal);
+    console.log(result);
     
     if (result.canceled) return; 
 
@@ -63,7 +64,7 @@ export default function AdminClinicsPage() {
         address: c.areaName || "Nagpur",
         fullAddress: c.fulladdress,
         googleLink: c.googleMapsLink,
-        doctors: "0 Doctors", 
+        doctors: c.totalDoctors, 
         transactions: "00",   
         status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : 
                 (c.status === "pending" || c.status === "PENDING") ? "New" : 
