@@ -19,12 +19,12 @@ import {
   Phone
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { getMyBookingDetails } from "@/app/services/patient/order.service"; 
+import { toast } from 'sonner';
+import { getMyBookingDetails, getBookingReceiptHTML } from "@/app/services/patient/order.service"; 
 
 const ConfirmBookingContent = () => {
   const searchParams = useSearchParams();
   const bookingId = searchParams.get('bookingId');
-  // ✅ FIX: Extract type from URL, fallback to 'inclinic' if missing
   const type = searchParams.get('type') || 'inclinic'; 
 
   const receiptRef = useRef(null);
@@ -60,48 +60,46 @@ const ConfirmBookingContent = () => {
     fetchDetails();
   }, [bookingId, type]);
 
-  // Function to handle PDF Download using print
-  const handleDownloadReceipt = () => {
-    const element = receiptRef.current;
-    if (!element) return;
+  // ✅ UPDATED: Fetch HTML from server and print
+  const handleDownloadReceipt = async () => {
+    if (!bookingData?._id && !bookingId) {
+      toast.error("Invalid booking ID");
+      return;
+    }
+
+    const targetId = bookingData?._id || bookingId;
 
     setIsDownloading(true);
+    const toastId = toast.loading("Generating receipt...");
 
-    const printWindow = window.open('', '', 'width=800,height=600');
-    const receiptHTML = element.innerHTML;
-    const displayId = bookingData?.appointmentId || bookingData?.requestId || bookingId;
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Appointment Receipt - ${displayId}</title>
-          <style>
-            body {
-              font-family: system-ui, -apple-system, sans-serif;
-              margin: 20px;
-              background: white;
-            }
-            * {
-              box-sizing: border-box;
-            }
-          </style>
-          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-        </head>
-        <body>
-          ${receiptHTML}
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    
-    // Wait for content to load then print
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
+    try {
+      const res = await getBookingReceiptHTML(targetId);
+      
+      if (res.success && res.html) {
+        toast.success("Receipt generated successfully", { id: toastId });
+        
+        // Open a new window
+        const printWindow = window.open('', '', 'width=800,height=600');
+        
+        // Inject the raw HTML received from the server
+        printWindow.document.write(res.html);
+        printWindow.document.close();
+        
+        // Wait for content/images to load then print
+        setTimeout(() => {
+          printWindow.print();
+          // Optional: close window after print dialog is closed
+          // printWindow.close(); 
+        }, 500);
+
+      } else {
+        toast.error(res.message || "Could not generate receipt.", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error communicating with server for receipt.", { id: toastId });
+    } finally {
       setIsDownloading(false);
-    }, 500);
+    }
   };
 
   // ─── LOADING STATE ───
@@ -137,7 +135,7 @@ const ConfirmBookingContent = () => {
 
   // ─── DATA EXTRACTION ───
   const displayId = bookingData.appointmentId || bookingData.requestId || bookingId;
-  const doctorName = bookingData.doctor?.name || "Specialist";
+  const doctorName = bookingData.doctor?.name || bookingData.doctorName || "Specialist";
   const fees = bookingData.fees || 0;
   const paymentMode = bookingData.paymentMode?.toLowerCase() === 'cash' ? 'To be paid at clinic' : 'Prepaid / Online';
   
@@ -199,16 +197,16 @@ const ConfirmBookingContent = () => {
               <div className="text-sm">
                 {type === 'inclinic' ? (
                   <>
-                    <div className="font-bold text-gray-900">{bookingData.clinic?.name || "Clinic"}</div>
+                    <div className="font-bold text-gray-900">{bookingData.clinic?.name || bookingData.clinic?.clinicName || "Clinic"}</div>
                     <div className="text-gray-500 mt-1 text-xs leading-relaxed">
-                      {bookingData.clinic?.address || "Address available in app"}
+                      {bookingData.clinic?.address || bookingData.clinic?.fulladdress || "Address available in app"}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="font-bold text-gray-900">Online Teleconsultation</div>
                     <div className="text-gray-500 mt-1 text-xs leading-relaxed">
-                      Registered Phone: <span className="font-semibold text-gray-700">{bookingData.bookingContactNumber || "Not Provided"}</span>
+                      Registered Phone: <span className="font-semibold text-gray-700">{bookingData.bookingContactNumber || bookingData.patientDetails?.loginNumber || bookingData.bookingPatientDetails?.contact || "Not Provided"}</span>
                     </div>
                   </>
                 )}
@@ -247,18 +245,28 @@ const ConfirmBookingContent = () => {
         {/* Action Buttons */}
         <div className="px-6 md:px-8 pb-8">
           <div className="flex flex-col sm:flex-row gap-3 mb-8 pb-8 border-b border-gray-100">
+            
             {type === 'inclinic' && (
               <button 
                 onClick={() => {
-                  // ✅ Safe fallback for Google Maps
-                  if (bookingData?.clinic?.googleMapsLink) {
-                    window.open(bookingData.clinic.googleMapsLink, '_blank');
-                  } else if (bookingData?.clinic?.address) {
-                    // Fallback: Search the address string on Google Maps
-                    const encodedAddress = encodeURIComponent(bookingData.clinic.address);
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
-                  } else {
-                    toast.error("Location link unavailable.");
+                  if (bookingData?.clinic) {
+                    // Try direct map link first
+                    if (bookingData.clinic.googleMapsLink) {
+                       window.open(bookingData.clinic.googleMapsLink, '_blank');
+                       return;
+                    }
+                    
+                    // Fallback to Search
+                    const clinicName = bookingData.clinic.name || bookingData.clinic.clinicName || '';
+                    const clinicAddress = bookingData.clinic.address || bookingData.clinic.fulladdress || '';
+                    
+                    const query = `${clinicName} ${clinicAddress}`.trim();
+                    if (query) {
+                      const encodedQuery = encodeURIComponent(query);
+                      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedQuery}`, '_blank');
+                    } else {
+                      toast.error("Clinic location details are missing.");
+                    }
                   }
                 }}
                 className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-indigo-400 transition-all"
@@ -267,6 +275,7 @@ const ConfirmBookingContent = () => {
                 Get Directions
               </button>
             )}
+
             <button 
               onClick={handleDownloadReceipt}
               disabled={isDownloading}

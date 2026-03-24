@@ -4,6 +4,14 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { adminTeleconsultationService } from '@/app/services/admin/adminTeleconsultation.service'
 import { toast } from 'sonner'
 import { Loader2, X } from 'lucide-react'
+import * as yup from 'yup'
+
+// ✅ 1. Define the Yup Validation Schema
+const consultationSchema = yup.object().shape({
+  consultedBy: yup.string().trim().required('Doctor name is required'),
+  consultationStatus: yup.string().required('Please select a consultation status'),
+  customerSellResponse: yup.string().required('Please select a customer sell response'),
+});
 
 const CONSULTATION_STATUS_OPTIONS = [
   { label: 'Reschedule', count: 6, color: '#f0f4ff', border: '#c5d0f5', text: '#3b5bdb' },
@@ -24,8 +32,8 @@ const CUSTOMER_SELL_OPTIONS = [
   { label: 'Time pass',      count: 6, color: '#f0f4ff', border: '#c5d0f5', text: '#3b5bdb' },
 ]
 
-const ChipSelector = ({ options, selected, onSelect }) => (
-  <div style={chipStyles.wrapper}>
+const ChipSelector = ({ options, selected, onSelect, error }) => (
+  <div style={{ ...chipStyles.wrapper, ...(error ? { padding: '8px', border: '1px dashed #fca5a5', borderRadius: '10px', background: '#fef2f2' } : {}) }}>
     {options.map((opt) => {
       const isSelected = selected === opt.label
       return (
@@ -68,16 +76,15 @@ const AdminDoctorPanalPage = () => {
   const pathname = usePathname()
   const recordId = searchParams.get('recordId')
 
-  // To dynamically handle `/admin` vs `/super-admin`
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
-  // --- Data States ---
   const [loading, setLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [patientDetails, setPatientDetails] = useState(null)
+  
+  const [accountDetails, setAccountDetails] = useState(null)
+  const [bookingPatientDetails, setBookingPatientDetails] = useState(null)
   const [bookingDetails, setBookingDetails] = useState(null)
 
-  // --- Form States ---
   const [consultedBy, setConsultedBy] = useState('')
   const [consultationStatus, setConsultationStatus] = useState('')
   const [customerSellResponse, setCustomerSellResponse] = useState('')
@@ -86,18 +93,17 @@ const AdminDoctorPanalPage = () => {
   const [consultationNotes, setConsultationNotes] = useState('')
   const [testsAdvised, setTestsAdvised] = useState('')
   
-  // File States
   const [prescriptionFile, setPrescriptionFile] = useState(null)
   const [existingPrescription, setExistingPrescription] = useState(null) 
   
-  // Modal State
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  // Computed Logic for Blocked Status
+  // ✅ 2. Error State
+  const [formErrors, setFormErrors] = useState({})
+
   const isRescheduleBlocked = consultationStatus === 'Cancelled' || consultationStatus === 'Complete';
 
-  // Fetch Data on Load
   useEffect(() => {
     if (!recordId) return;
 
@@ -106,8 +112,10 @@ const AdminDoctorPanalPage = () => {
       try {
         const res = await adminTeleconsultationService.getBookingDetails(recordId);
         if (res.success && res.data) {
-          const { patientDetails: pd, bookingDetails: bd, consultationPanel: cp } = res.data;
-          setPatientDetails(pd);
+          const { patientDetails: acc, bookingPatientDetails: pt, bookingDetails: bd, consultationPanel: cp } = res.data;
+          
+          setAccountDetails(acc);
+          setBookingPatientDetails(pt);
           setBookingDetails(bd);
 
           if (cp.consultedByDoctor) setConsultedBy(cp.consultedByDoctor);
@@ -156,7 +164,7 @@ const AdminDoctorPanalPage = () => {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      const fileName = existingPrescription.split('/').pop().split('?')[0] || `prescription_${patientDetails?.name || 'patient'}`;
+      const fileName = existingPrescription.split('/').pop().split('?')[0] || `prescription_${bookingPatientDetails?.name || 'patient'}`;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
@@ -174,6 +182,28 @@ const AdminDoctorPanalPage = () => {
       toast.error("Invalid Record ID");
       return;
     }
+
+    // ✅ 3. Validate before saving
+    try {
+      await consultationSchema.validate({
+        consultedBy,
+        consultationStatus,
+        customerSellResponse
+      }, { abortEarly: false });
+      
+      setFormErrors({}); // Clear errors if validation passes
+    } catch (err) {
+      if (err instanceof yup.ValidationError) {
+        const errors = {};
+        err.inner.forEach((error) => {
+          errors[error.path] = error.message;
+        });
+        setFormErrors(errors);
+        toast.error("Please fill in all required fields");
+        return; // Stop execution if validation fails
+      }
+    }
+
     setIsSaving(true);
     try {
       const formData = new FormData();
@@ -206,7 +236,6 @@ const AdminDoctorPanalPage = () => {
     }
   }
 
-  // ✅ UPDATED TO REDIRECT TO PLACE ORDER PAGE
   const handlePlaceOrder = () => {
     if (!recordId) {
       toast.error("No record found to place order");
@@ -220,21 +249,16 @@ const AdminDoctorPanalPage = () => {
       toast.error(`${consultationStatus} appointments cannot be rescheduled.`);
       return;
     }
-
     if (!recordId) {
       toast.error("No record found to reschedule");
       return;
     }
-
-    const patientUserId = patientDetails?.userId || patientDetails?.id;
-    if (!patientUserId) {
-      toast.error("Could not find Patient User ID");
+    const patientId = accountDetails?.userId;
+    if (!patientId) {
+      toast.error("Could not find Patient Account ID");
       return;
     }
-
-    router.push(
-      `/free-consultation?rescheduleRecordId=${recordId}&userId=${patientUserId}&admin_booking=true`
-    );
+    router.push(`/free-consultation?rescheduleRecordId=${recordId}&patientId=${patientId}&admin_booking=true`);
   };
 
   const handleCancel = () => {
@@ -244,6 +268,7 @@ const AdminDoctorPanalPage = () => {
       setFollowUpDate('')
       setFollowUpTime('')
       setPrescriptionFile(null)
+      setFormErrors({}) // clear errors on cancel
     }
   }
 
@@ -284,7 +309,7 @@ const AdminDoctorPanalPage = () => {
     )
   }
 
-  if (!patientDetails || !bookingDetails) {
+  if (!accountDetails || !bookingPatientDetails || !bookingDetails) {
     return (
       <div style={{...styles.page, alignItems: 'center', justifyContent: 'center'}}>
         <p style={{color: '#555', fontWeight: '500'}}>Booking details not found.</p>
@@ -307,11 +332,31 @@ const AdminDoctorPanalPage = () => {
           <h2 style={styles.sectionTitle}>Patient Details <span style={styles.titleNote}>(For Doctor)</span></h2>
           <div style={styles.divider} />
           <div style={styles.grid}>
-            <InfoRow label="Patient ID:" value={patientDetails.customerId} />
-            <InfoRow label="Name:" value={patientDetails.name} />
-            <InfoRow label="Age:" value={patientDetails.age} />
-            <InfoRow label="Contact:" value={`${patientDetails.contact}${patientDetails.email !== '--' ? `, ${patientDetails.email}` : ''}`} />
-            <InfoRow label="Location:" value={patientDetails.city} />
+            <InfoRow label="Patient Name:" value={bookingPatientDetails.name || '--'} />
+            <InfoRow label="Age / Gender:" value={`${bookingPatientDetails.age || '--'} / ${bookingPatientDetails.gender || '--'}`} />
+            <InfoRow label="Contact:" value={bookingPatientDetails.contact || accountDetails.loginNumber} />
+            {bookingPatientDetails.concernedAbout?.length > 0 && (
+              <div style={{...styles.infoRow, alignItems: 'center'}}>
+                <span style={styles.label}>Concerns:</span>
+                <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end'}}>
+                  {bookingPatientDetails.concernedAbout.map((c, i) => (
+                    <span key={i} style={styles.concernBadge}>{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>Account Details</h2>
+          <div style={styles.divider} />
+          <div style={styles.grid}>
+            <InfoRow label="Customer ID:" value={accountDetails.customerId || '--'} />
+            <InfoRow label="Account Name:" value={accountDetails.name || '--'} />
+            <InfoRow label="Login Number:" value={accountDetails.loginNumber || '--'} />
+            <InfoRow label="Email:" value={accountDetails.email || '--'} />
+            <InfoRow label="Location:" value={accountDetails.city || '--'} />
           </div>
         </section>
 
@@ -319,13 +364,13 @@ const AdminDoctorPanalPage = () => {
           <h2 style={styles.sectionTitle}>Booking Details</h2>
           <div style={styles.divider} />
           <div style={styles.grid}>
-            <InfoRow label="Request ID:" value={bookingDetails.requestId} />
+            <InfoRow label="Request ID:" value={bookingDetails.requestId || '--'} />
             <InfoRow label="Booking Date:" value={formatDateTime(bookingDetails.bookingDate)} />
-            <InfoRow label="Appointment:" value={`${formatDateOnly(bookingDetails.appointmentDate)}, ${bookingDetails.timeSlot}`} />
-            <InfoRow label="Agent:" value={bookingDetails.agentName} />
+            <InfoRow label="Appointment:" value={`${formatDateOnly(bookingDetails.appointmentDate)}, ${bookingDetails.timeSlot || '--'}`} />
+            <InfoRow label="Agent:" value={bookingDetails.agentName || '--'} />
             <div style={styles.infoRow}>
               <span style={styles.label}>Status:</span>
-              <span style={styles.badge}>{bookingDetails.consultationStatus || 'New'}</span>
+              <span style={styles.badge}>{consultationStatus || 'New'}</span>
             </div>
           </div>
         </section>
@@ -334,32 +379,47 @@ const AdminDoctorPanalPage = () => {
           <h2 style={styles.sectionTitle}>Consultation Panel</h2>
           <div style={styles.divider} />
 
+          {/* ✅ 4. Display Validation Errors in UI */}
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Consulted by (Doctor)</label>
+            <label style={styles.formLabel}>Consulted by (Doctor) <span style={{color: '#ef4444'}}>*</span></label>
             <input
-              style={styles.input}
+              style={{...styles.input, borderColor: formErrors.consultedBy ? '#fca5a5' : '#dde1ea', backgroundColor: formErrors.consultedBy ? '#fef2f2' : '#fafbfc'}}
               value={consultedBy}
-              onChange={(e) => setConsultedBy(e.target.value)}
+              onChange={(e) => {
+                setConsultedBy(e.target.value);
+                if(formErrors.consultedBy) setFormErrors({...formErrors, consultedBy: null});
+              }}
               placeholder="Doctor name"
             />
+            {formErrors.consultedBy && <span style={styles.errorText}>{formErrors.consultedBy}</span>}
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Consultation Status</label>
+            <label style={styles.formLabel}>Consultation Status <span style={{color: '#ef4444'}}>*</span></label>
             <ChipSelector
               options={CONSULTATION_STATUS_OPTIONS}
               selected={consultationStatus}
-              onSelect={setConsultationStatus}
+              error={!!formErrors.consultationStatus}
+              onSelect={(val) => {
+                setConsultationStatus(val);
+                if(formErrors.consultationStatus) setFormErrors({...formErrors, consultationStatus: null});
+              }}
             />
+            {formErrors.consultationStatus && <span style={styles.errorText}>{formErrors.consultationStatus}</span>}
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Customer Sell Response</label>
+            <label style={styles.formLabel}>Customer Sell Response <span style={{color: '#ef4444'}}>*</span></label>
             <ChipSelector
               options={CUSTOMER_SELL_OPTIONS}
               selected={customerSellResponse}
-              onSelect={setCustomerSellResponse}
+              error={!!formErrors.customerSellResponse}
+              onSelect={(val) => {
+                setCustomerSellResponse(val);
+                if(formErrors.customerSellResponse) setFormErrors({...formErrors, customerSellResponse: null});
+              }}
             />
+            {formErrors.customerSellResponse && <span style={styles.errorText}>{formErrors.customerSellResponse}</span>}
           </div>
 
           <div style={styles.formGroup}>
@@ -465,8 +525,9 @@ const styles = {
   grid: { display: 'flex', flexDirection: 'column', gap: '8px' },
   infoRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', fontSize: '13.5px' },
   label: { color: '#777', minWidth: '100px', fontWeight: '500' },
-  value: { color: '#1a1a2e', textAlign: 'right', flex: 1 },
+  value: { color: '#1a1a2e', textAlign: 'right', flex: 1, textTransform: 'capitalize' },
   badge: { background: '#e8f5e9', color: '#388e3c', borderRadius: '20px', padding: '2px 14px', fontSize: '12px', fontWeight: '600', border: '1px solid #a5d6a7' },
+  concernBadge: { background: '#fff0f2', color: '#e11d48', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: '600', border: '1px solid #ffe4e6' },
   formGroup: { marginBottom: '16px' },
   formLabel: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#444', marginBottom: '6px' },
   optional: { fontWeight: '400', color: '#999', fontSize: '12px' },
@@ -491,7 +552,8 @@ const styles = {
   modalCloseBtn: { background: '#fee2e2', border: 'none', color: '#ef4444', borderRadius: '50%', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   modalBody: { flex: 1, padding: '20px', background: '#f1f5f9', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   previewImage: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
-  previewIframe: { width: '100%', height: '100%', border: 'none', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
+  previewIframe: { width: '100%', height: '100%', border: 'none', borderRadius: '8px', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+  errorText: { color: '#ef4444', fontSize: '11px', marginTop: '4px', display: 'block', fontWeight: '500' }
 }
 
 export default AdminDoctorPanalPage

@@ -610,7 +610,7 @@ const AdminClinicSelectModal = ({ onClose, userId }) => {
   };
 
   const handleClinicSelect = (clinicId) => {
-    router.push(`/bookappointment?clinicId=${clinicId}&patientUserId=${userId}`);
+    router.push(`/bookappointment?clinicId=${clinicId}&patientId=${userId}`);
     onClose();
   };
 
@@ -772,7 +772,7 @@ const CustomerProfilePage = () => {
   const pathname = usePathname();
   const router = useRouter();
   
-  const userId = searchParams.get('userId'); 
+  const userId = searchParams.get('patientId'); 
   const isNewUser = !userId; 
 
   const isSuperAdminRoute = pathname.startsWith('/super-admin');
@@ -1285,17 +1285,26 @@ const CustomerProfilePage = () => {
             <input {...register("age")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
           </div>
 
-          {/* CONTACT NUMBER */}
+          {/* ✅ CONTACT NUMBER WITH ELEVATED Z-INDEX FOR DROPDOWN */}
           <div className="relative z-30">
-            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">Contact Number <span className="text-red-500">*</span></label>
+            <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
+              Contact Number <span className="text-red-500">*</span>
+            </label>
             <div className="relative">
               <input 
                 {...register("contact")} 
                 type="tel"
                 maxLength={10}
                 autoComplete="off"
+                disabled={!isNewUser} // ✅ Conditionally disabled
                 placeholder="Enter 10-digit number"
-                className={`w-full p-2.5 border ${errors.contact ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-400 pr-10`} 
+                className={`w-full p-2.5 border ${
+                  errors.contact ? 'border-red-400' : 'border-slate-200'
+                } rounded-xl text-sm outline-none pr-10 transition-colors ${
+                  !isNewUser 
+                    ? 'bg-slate-100 text-slate-500 cursor-not-allowed font-semibold' 
+                    : 'bg-white focus:border-blue-400'
+                }`} 
               />
               {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-500" size={16} />}
             </div>

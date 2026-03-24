@@ -19,7 +19,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getLoginUsersLeads } from "@/app/services/admin/leads.service"; 
 
 // --- Action Menu Component ---
-const ActionMenu = ({ userId }) => {
+const ActionMenu = ({ patientId }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const router = useRouter();
@@ -52,7 +52,7 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              router.push(`${pathname}/customerprofile?userId=${userId}`);
+              router.push(`${pathname}/customerprofile?patientId=${patientId}`);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
@@ -62,11 +62,11 @@ const ActionMenu = ({ userId }) => {
             <span className="font-medium">CRM Profile</span>
           </button>
 
-          {/* ✅ 2nd — Place Order */}
+          {/* 2nd — Place Order */}
           <button
             onClick={() => {
               setOpen(false);
-              router.push(`/super-admin/log-in-user/placeorder?userId=${userId}`);  // ✅ ONLY THIS LINE CHANGED
+              router.push(`${basePath}/log-in-user/placeorder?patientId=${patientId}`);  
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
@@ -457,7 +457,7 @@ const AdminLoginInUserPage = () => {
                         </td>
 
                         <td className="px-6 py-4 text-center">
-                          <ActionMenu userId={user.userId} />
+                          <ActionMenu patientId={user.patientId || user.userId} />
                         </td>
                       </tr>
                     );
@@ -503,21 +503,19 @@ const AdminLoginInUserPage = () => {
                         )}
                       </h3>
                     </div>
-                    <ActionMenu userId={user.userId} />
+                    <ActionMenu patientId={user.patientId || user.userId} />
                   </div>
 
-                  {/* Contact Info */}
                   <div className="space-y-1 mb-4 pb-4 border-b border-slate-100">
                     <p className="text-sm text-slate-600">{user.customerInfo?.phone}</p>
                     {user.customerInfo?.email && user.customerInfo.email !== "--" && (
                       <p className="text-sm text-slate-600">{user.customerInfo.email}</p>
                     )}
                     {user.customerInfo?.city && user.customerInfo.city !== "--" && (
-                      <p className="text-sm text-slate-500 italic">{user.customerInfo.city}</p>
+                      <p className="text-sm text-slate-400 italic">{user.customerInfo.city}</p>
                     )}
                   </div>
 
-                  {/* Grid Info - Assessment & Last Update */}
                   <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
                     <div 
                       onClick={() => hasAssessment && setSelectedAssessment(user.assessment)}
@@ -543,7 +541,6 @@ const AdminLoginInUserPage = () => {
                     </div>
                   </div>
 
-                  {/* Grid Info - Assign To & Next Call */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assigned To</span>
@@ -563,7 +560,6 @@ const AdminLoginInUserPage = () => {
         </>
       )}
 
-      {/* Assessment Modal Render */}
       <AssessmentModal 
         assessment={selectedAssessment} 
         onClose={() => setSelectedAssessment(null)} 
@@ -573,7 +569,6 @@ const AdminLoginInUserPage = () => {
   );
 };
 
-// Reusable Clickable Badge Component
 const Badge = ({ count, label, color, onClick }) => (
   <div 
     onClick={onClick}

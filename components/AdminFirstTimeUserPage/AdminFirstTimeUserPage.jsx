@@ -9,13 +9,15 @@ import {
   Loader2, 
   ChevronDown,
   User,
-  ArrowLeft
+  ArrowLeft,
+  X,
+  CheckCircle2 
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getFirstTimeLeads } from "@/app/services/admin/leads.service"; 
 
 // --- Action Menu Component ---
-const ActionMenu = ({ userId }) => {
+const ActionMenu = ({ patientId }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   
@@ -46,7 +48,7 @@ const ActionMenu = ({ userId }) => {
           <button
             onClick={() => {
               setOpen(false);
-              router.push(`${pathname}/customerprofile?userId=${userId}`);
+              router.push(`${pathname}/customerprofile?patientId=${patientId}`);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
@@ -356,7 +358,7 @@ const AdminFirstTimeUserPage = () => {
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{lead.leadSource}</td>
                         <td className="px-6 py-4 text-center">
-                          <ActionMenu userId={lead.userId} />
+                          <ActionMenu patientId={lead.patientId} />
                         </td>
                       </tr>
                     );
@@ -399,7 +401,7 @@ const AdminFirstTimeUserPage = () => {
                         )}
                       </h3>
                     </div>
-                    <ActionMenu userId={lead.userId} />
+                    <ActionMenu patientId={lead.patientId} />
                   </div>
 
                   <div className="space-y-1 mb-4 pb-4 border-b border-gray-100">

@@ -102,7 +102,6 @@ const PRODUCTS = [
    HISTORY MODAL (Unchanged)
 ───────────────────────────────────────────── */
 function HistoryModal({ userId, onClose }) {
-  // ... (History modal content remains exactly as you had it) ...
   const [activeTab, setActiveTab] = useState("orderHistory");
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -382,16 +381,25 @@ export default function AdminPlaceOrderPage() {
         
         if (res.success && res.data) {
           const d = res.data;
-          setResolvedUserId(d.userId);
-          setPatientId(d.customerId);
-          setPatientName(d.patientName);
-          setContactNo(d.contact);
-          setAgentName(d.agentName);
-          setDoctorName(d.doctorName);
           
-          setSavedAddresses(d.savedAddresses || []);
-          if (d.savedAddresses && d.savedAddresses.length > 0) {
-            setSelectedAddressId(d.savedAddresses[0]._id);
+          // ✅ Map using new JSON structure
+          const pd = d.patientDetails || {};
+          const bpd = d.bookingPatientDetails || {};
+          const bd = d.bookingDetails || {};
+
+          setResolvedUserId(pd.userId);
+          setPatientId(pd.customerId);
+          // Use bookingPatientDetails.name if available, otherwise fallback to account name
+          setPatientName(bpd.name || pd.name); 
+          // Use bookingPatientDetails.contact if available, otherwise fallback to account loginNumber
+          setContactNo(bpd.contact || pd.loginNumber);
+          
+          setAgentName(bd.agentName);
+          setDoctorName(bd.doctorName);
+          
+          setSavedAddresses(bd.savedAddresses || []);
+          if (bd.savedAddresses && bd.savedAddresses.length > 0) {
+            setSelectedAddressId(bd.savedAddresses[0]._id);
           }
         } else {
           toast.error(res.message || "Failed to load prefetch data");

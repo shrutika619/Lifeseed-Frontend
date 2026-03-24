@@ -31,8 +31,8 @@ const BookAppointmentPage = () => {
   const searchParams = useSearchParams();
   const clinicId = searchParams.get("clinicId"); 
   
-  // ✅ Explicitly grab patientUserId from URL (indicates Admin is booking for a patient)
-  const urlPatientUserId = searchParams.get("patientUserId");
+  // ✅ UPDATED: Extract patientId from URL 
+  const urlPatientId = searchParams.get("patientId");
 
   const loggedInUser = useSelector((state) => state.auth?.user);
 
@@ -64,9 +64,9 @@ const BookAppointmentPage = () => {
   useEffect(() => {
     const autoFillData = async () => {
       // SCENARIO 1: Admin is booking (patient ID is in URL)
-      if (urlPatientUserId) {
+      if (urlPatientId) {
         try {
-          const res = await getPatientDetailsById(urlPatientUserId);
+          const res = await getPatientDetailsById(urlPatientId);
           if (res.success && res.data) {
             setFormData({
               fullName: res.data.name || res.data.fullName || '',
@@ -93,7 +93,7 @@ const BookAppointmentPage = () => {
     };
 
     autoFillData();
-  }, [loggedInUser, urlPatientUserId]);
+  }, [loggedInUser, urlPatientId]);
 
   // 1. Fetch Doctors 
   useEffect(() => {
@@ -241,7 +241,7 @@ if (currentDayAvailability?.slotGroups) {
     const fee = doctor ? doctor.fee : 0;
 
     // ✅ Priority Logic: URL Param (Admin booking) -> Logged In User -> Guest Walk-in
-    const finalPatientUserId = urlPatientUserId || loggedInUser?._id || loggedInUser?.id || null;
+    const finalPatientId = urlPatientId || loggedInUser?._id || loggedInUser?.id || null;
 
     // Constructing exact JSON payload format
     const payload = {
@@ -258,15 +258,15 @@ if (currentDayAvailability?.slotGroups) {
       totalAmount: Number(fee)
     };
 
-    // ✅ Attach patientUserId ONLY if it exists (Admin booking or Logged In Patient)
-    if (finalPatientUserId) {
-      payload.bookingData.patientUserId = finalPatientUserId;
+    // ✅ Attach patientId ONLY if it exists (Admin booking or Logged In Patient)
+    if (finalPatientId) {
+      payload.bookingData.patientUserId = finalPatientId;
     }
 
     setIsBooking(true);
     try {
       const res = await bookingService.createCashBooking(payload);
-      
+      console.log(res)
       if (res.success) {
         toast.success(res.message || "Booking confirmed!");
         // Navigate to success page

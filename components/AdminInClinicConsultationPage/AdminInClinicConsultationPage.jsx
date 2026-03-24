@@ -24,7 +24,7 @@ const CallModal = ({ patient, onClose }) => {
           <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center"><User className="w-6 h-6 text-blue-600" /></div>
           <div>
             <p className="font-semibold text-slate-800">{patient.name}</p>
-            <p className="text-sm text-slate-500">Age {patient.age}</p>
+            <p className="text-sm text-slate-500">Age {patient.age || '--'}</p>
             <p className="text-base font-bold text-blue-600 mt-0.5">{patient.phone}</p>
           </div>
         </div>
@@ -72,7 +72,7 @@ const CancelModal = ({ item, onClose, onRefresh }) => {
         </div>
         <div className="mb-5">
           <p className="text-sm text-slate-600 mb-4">
-            Are you sure you want to cancel the booking for <span className="font-bold text-slate-800">{item.customer.name}</span>?
+            Are you sure you want to cancel the booking for <span className="font-bold text-slate-800">{item.patient.name}</span>?
           </p>
           <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1.5 ml-1">Reason for Cancellation</label>
           <textarea
@@ -103,9 +103,9 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
   const handleDownload = () => {
     const content = [
       `Request ID: ${item.id}`,
-      `Patient: ${item.customer.name}, Age ${item.customer.age}`,
-      `Phone: ${item.customer.phone}`,
-      `Email: ${item.customer.email}`,
+      `Patient: ${item.patient.name}, Age ${item.patient.age}`,
+      `Phone: ${item.patient.phone}`,
+      `Email: ${item.account.email}`,
       `Agent: ${item.agent}`,
       `Hospital: ${item.hospital}`,
       `Doctor: ${item.doctor}`,
@@ -122,8 +122,8 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
     onClose();
   };
 
-  const profileHref = item.userId 
-    ? `/super-admin/in-clinic-consultation/customerprofile?userId=${item.userId}` 
+  const profileHref = item.patientId 
+    ? `/super-admin/in-clinic-consultation/customerprofile?patientId=${item.patientId}` 
     : `/super-admin/in-clinic-consultation/customerprofile`;
 
   const actions = [
@@ -131,7 +131,7 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
     { icon: PhoneCall, label: "Call Clinic",    color: "text-slate-600",   bg: "hover:bg-slate-50",   onClick: () => { window.location.href = "tel:+911800000000"; onClose(); } },
     { icon: FileText,  label: "Profile & CRM", color: "text-indigo-600",  bg: "hover:bg-indigo-50",  onClick: () => { router.push(profileHref); onClose(); } },
     { icon: Calendar,  label: "Reschedule",    color: "text-orange-600",  bg: "hover:bg-orange-50",  onClick: () => { alert(`Reschedule ${item.id}`); onClose(); } },
-    { icon: Phone,     label: "Call Patient",  color: "text-blue-600",    bg: "hover:bg-blue-50",    onClick: () => { window.location.href = `tel:${item.customer.phone}`; onClose(); } },
+    { icon: Phone,     label: "Call Patient",  color: "text-blue-600",    bg: "hover:bg-blue-50",    onClick: () => { window.location.href = `tel:${item.patient.phone}`; onClose(); } },
     { icon: Download,  label: "Download",      color: "text-emerald-600", bg: "hover:bg-emerald-50", onClick: handleDownload },
     { icon: FileText,  label: "Ticket",        color: "text-cyan-600",    bg: "hover:bg-cyan-50",    onClick: () => { alert(`Ticket raised for ${item.id}`); onClose(); } },
   ];
@@ -161,13 +161,13 @@ const ActionCell = ({ item, onRefresh }) => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const profileHref = item.userId 
-    ? `/super-admin/in-clinic-consultation/customerprofile?userId=${item.userId}` 
+  const profileHref = item.patientId 
+    ? `/super-admin/in-clinic-consultation/customerprofile?patientId=${item.patientId}` 
     : `/super-admin/in-clinic-consultation/customerprofile`;
 
   return (
     <>
-      {callModal && <CallModal patient={item.customer} onClose={() => setCallModal(false)} />}
+      {callModal && <CallModal patient={item.patient} onClose={() => setCallModal(false)} />}
       {cancelModal && <CancelModal item={item} onClose={() => setCancelModal(false)} onRefresh={onRefresh} />}
       
       <div className="flex items-center justify-center gap-1.5">
@@ -258,6 +258,7 @@ const AdminInClinicConsultationPage = () => {
         }
 
         const res = await adminInclinicService.getAllInClinicBookings(`?${params.toString()}`);
+        console.log(res)
         
         if (res.success && res.data) {
           setMetrics({
@@ -265,13 +266,16 @@ const AdminInClinicConsultationPage = () => {
             followUpCounts: res.data.followUpCounts || {}
           });
 
+          // ✅ SPLIT MAPPING
           const mappedData = res.data.bookings.map(b => {
             const bDate = new Date(b.bookingDate);
+            const patientData = b.bookingPatientDetails || {};
+            const accountData = b.patientDetails || {};
             
             return {
               id: b.appointmentId || "--",
               internalBookingId: b.bookingId,
-              userId: b.requestBy?.userId,
+              patientId: accountData.patientId, // Passed for CRM routing
               
               bookingDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
               appointment: b.timeSlot ? b.timeSlot : "--",
@@ -281,13 +285,23 @@ const AdminInClinicConsultationPage = () => {
               status: b.status || "New",
               agent: b.agent || "Self",
               
-              customer: { 
-                name: b.requestBy?.name || "--", 
-                age: b.requestBy?.age || "--", 
-                phone: b.requestBy?.phone || "--", 
-                email: b.requestBy?.email || "--", 
-                location: "--" 
+              // Map Actual Patient
+              patient: { 
+                name: patientData.name || "--", 
+                age: patientData.age || "--", 
+                gender: patientData.gender || "--", 
+                phone: patientData.contact || accountData.loginNumber || "--",
+                concernedAbout: patientData.concernedAbout || []
               },
+              
+              // Map Account Owner
+              account: {
+                name: accountData.name || "--",
+                phone: accountData.loginNumber || "--",
+                email: accountData.email || "--",
+                city: accountData.city || "--"
+              },
+
               hospital: b.clinic?.name || "--",
               doctor: b.doctor?.name || "--",
             };
@@ -409,8 +423,8 @@ const AdminInClinicConsultationPage = () => {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/60">
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Request Id</th>
-                    <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Booking Date</th>
-                    <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Request by</th>
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Booked By</th>
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Agent</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hospital</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
@@ -421,22 +435,43 @@ const AdminInClinicConsultationPage = () => {
                 <tbody>
                   {bookingData.map((item, i) => (
                     <tr key={item.internalBookingId || i} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/20 transition-colors">
-                      <td className="px-5 py-5 text-sm font-bold text-slate-700 whitespace-nowrap">{item.id}</td>
                       <td className="px-5 py-5">
-                        <p className="text-sm text-slate-700 whitespace-nowrap">{item.bookingDate.split(',')[0]}</p>
-                        <p className="text-sm text-slate-700 whitespace-nowrap">{item.bookingDate.split(',')[1]}</p>
-                        <p className="text-sm font-semibold text-slate-500 mt-1 capitalize">{item.paymentMode}</p>
+                        <p className="text-sm font-bold text-slate-700 whitespace-nowrap">{item.id}</p>
+                        <p className="text-[11px] text-slate-500 mt-1">{item.bookingDate.split(',')[0]}</p>
+                        <p className="text-[11px] text-slate-500">{item.bookingDate.split(',')[1]}</p>
                       </td>
+                      
+                      {/* ✅ BOOKED BY COLUMN */}
                       <td className="px-5 py-5">
-                        <p className="text-sm text-slate-800 font-semibold">{item.customer.name} <span className="font-normal text-slate-500 text-xs ml-1">Age {item.customer.age}</span></p>
-                        <p className="text-sm text-slate-600 mt-0.5">{item.customer.phone}</p>
-                        <p className="text-xs text-slate-500 truncate max-w-[150px]" title={item.customer.email}>{item.customer.email}</p>
+                        <p className="text-sm text-slate-800 font-semibold">{item.account.name}</p>
+                        <p className="text-sm text-slate-600 mt-0.5">📞 {item.account.phone}</p>
+                        {item.account.email !== "--" && <p className="text-xs text-slate-500 truncate max-w-[150px]" title={item.account.email}>{item.account.email}</p>}
+                        {item.account.city !== "--" && <p className="text-xs text-slate-500">{item.account.city}</p>}
                       </td>
+                      
+                      {/* ✅ PATIENT COLUMN */}
+                      <td className="px-5 py-5">
+                        <p className="text-sm text-slate-800 font-semibold">
+                          {item.patient.name} 
+                          {item.patient.age !== "--" && <span className="font-normal text-slate-500 text-xs ml-1">Age {item.patient.age}</span>}
+                        </p>
+                        <p className="text-sm text-slate-600 mt-0.5">📞 {item.patient.phone}</p>
+                        <p className="text-xs text-slate-500 capitalize">{item.patient.gender}</p>
+                        {item.patient.concernedAbout?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5 max-w-[160px]">
+                            {item.patient.concernedAbout.map((c, idx) => (
+                              <span key={idx} className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">{c}</span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
                       <td className="px-5 py-5 text-sm font-medium text-slate-700">{item.agent}</td>
                       <td className="px-5 py-5">
                         <p className="text-sm font-semibold text-slate-700">{item.hospital}</p>
                         <p className="text-sm text-slate-600">{item.doctor}</p>
                         <p className="text-sm font-extrabold text-slate-800 mt-1">{item.price}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 mt-0.5 capitalize">{item.paymentMode}</p>
                       </td>
                       <td className="px-5 py-5">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${getStatusColor(item.status)}`}>
@@ -465,14 +500,36 @@ const AdminInClinicConsultationPage = () => {
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${getStatusColor(item.status)}`}>{item.status}</span>
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 capitalize">{item.paymentMode}</span>
                     </div>
-                    <p className="font-bold text-slate-800">{item.customer.name} <span className="text-slate-500 font-normal text-sm">Age {item.customer.age}</span></p>
                   </div>
                   <ActionCell item={item} onRefresh={triggerRefresh} />
                 </div>
-                <div className="space-y-0.5 mb-3 pb-3 border-b border-slate-100">
-                  <p className="text-sm text-slate-600 font-medium">{item.customer.phone}</p>
-                  <p className="text-sm text-slate-500 truncate">{item.customer.email}</p>
+
+                <div className="space-y-3 mb-4 pb-4 border-b border-slate-100">
+                   {/* ✅ Patient Info Box */}
+                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Patient Details</p>
+                     <p className="font-semibold text-slate-800 text-sm">
+                       {item.patient.name} <span className="font-normal text-slate-500 text-xs ml-1">Age {item.patient.age} • {item.patient.gender}</span>
+                     </p>
+                     <p className="text-xs text-slate-600 mt-0.5">📞 {item.patient.phone}</p>
+                     {item.patient.concernedAbout?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {item.patient.concernedAbout.map((c, i) => (
+                            <span key={i} className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">{c}</span>
+                          ))}
+                        </div>
+                      )}
+                   </div>
+
+                   {/* ✅ Booked By Info Box */}
+                   <div>
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booked By (Account)</p>
+                     <p className="text-sm font-medium text-slate-700">{item.account.name}</p>
+                     <p className="text-xs text-slate-600">📞 {item.account.phone}</p>
+                     {item.account.city !== "--" && <p className="text-xs text-slate-500">{item.account.city}</p>}
+                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-slate-100">
                   <div><p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Booking Date</p><p className="text-xs text-slate-700 font-medium">{item.bookingDate}</p></div>
                   <div><p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</p><p className="text-sm text-slate-700 font-medium">{item.agent}</p></div>
