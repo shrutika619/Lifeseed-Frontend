@@ -258,7 +258,6 @@ const AdminInClinicConsultationPage = () => {
         }
 
         const res = await adminInclinicService.getAllInClinicBookings(`?${params.toString()}`);
-        console.log(res)
         
         if (res.success && res.data) {
           setMetrics({
@@ -275,7 +274,7 @@ const AdminInClinicConsultationPage = () => {
             return {
               id: b.appointmentId || "--",
               internalBookingId: b.bookingId,
-              patientId: accountData.patientId, // Passed for CRM routing
+              patientId: accountData.patientId || accountData.userId, // Passed for CRM routing
               
               bookingDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
               appointment: b.timeSlot ? b.timeSlot : "--",
@@ -285,6 +284,9 @@ const AdminInClinicConsultationPage = () => {
               status: b.status || "New",
               agent: b.agent || "Self",
               
+              // Original nested BookedBy logic
+              bookedBy: b.bookedBy || {},
+
               // Map Actual Patient
               patient: { 
                 name: patientData.name || "--", 
@@ -433,57 +435,87 @@ const AdminInClinicConsultationPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {bookingData.map((item, i) => (
-                    <tr key={item.internalBookingId || i} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/20 transition-colors">
-                      <td className="px-5 py-5">
-                        <p className="text-sm font-bold text-slate-700 whitespace-nowrap">{item.id}</p>
-                        <p className="text-[11px] text-slate-500 mt-1">{item.bookingDate.split(',')[0]}</p>
-                        <p className="text-[11px] text-slate-500">{item.bookingDate.split(',')[1]}</p>
-                      </td>
-                      
-                      {/* ✅ BOOKED BY COLUMN */}
-                      <td className="px-5 py-5">
-                        <p className="text-sm text-slate-800 font-semibold">{item.account.name}</p>
-                        <p className="text-sm text-slate-600 mt-0.5">📞 {item.account.phone}</p>
-                        {item.account.email !== "--" && <p className="text-xs text-slate-500 truncate max-w-[150px]" title={item.account.email}>{item.account.email}</p>}
-                        {item.account.city !== "--" && <p className="text-xs text-slate-500">{item.account.city}</p>}
-                      </td>
-                      
-                      {/* ✅ PATIENT COLUMN */}
-                      <td className="px-5 py-5">
-                        <p className="text-sm text-slate-800 font-semibold">
-                          {item.patient.name} 
-                          {item.patient.age !== "--" && <span className="font-normal text-slate-500 text-xs ml-1">Age {item.patient.age}</span>}
-                        </p>
-                        <p className="text-sm text-slate-600 mt-0.5">📞 {item.patient.phone}</p>
-                        <p className="text-xs text-slate-500 capitalize">{item.patient.gender}</p>
-                        {item.patient.concernedAbout?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5 max-w-[160px]">
-                            {item.patient.concernedAbout.map((c, idx) => (
-                              <span key={idx} className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">{c}</span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
+                  {bookingData.map((item, i) => {
+                    const bookedByOriginal = item.bookedBy?.original || {};
 
-                      <td className="px-5 py-5 text-sm font-medium text-slate-700">{item.agent}</td>
-                      <td className="px-5 py-5">
-                        <p className="text-sm font-semibold text-slate-700">{item.hospital}</p>
-                        <p className="text-sm text-slate-600">{item.doctor}</p>
-                        <p className="text-sm font-extrabold text-slate-800 mt-1">{item.price}</p>
-                        <p className="text-[10px] font-semibold text-slate-500 mt-0.5 capitalize">{item.paymentMode}</p>
-                      </td>
-                      <td className="px-5 py-5">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${getStatusColor(item.status)}`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-5 text-sm font-semibold text-slate-700 whitespace-nowrap">{item.appointment}</td>
-                      <td className="px-5 py-5">
-                        <ActionCell item={item} onRefresh={triggerRefresh} />
-                      </td>
-                    </tr>
-                  ))}
+                    return (
+                      <tr key={item.internalBookingId || i} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/20 transition-colors">
+                        <td className="px-5 py-5">
+                          <p className="text-sm font-bold text-slate-700 whitespace-nowrap">{item.id}</p>
+                          <p className="text-[11px] text-slate-500 mt-1">{item.bookingDate.split(',')[0]}</p>
+                          <p className="text-[11px] text-slate-500">{item.bookingDate.split(',')[1]}</p>
+                        </td>
+                        
+                        {/* ✅ Updated Booked By Column Logic */}
+                        <td className="px-5 py-5">
+                          <div className="text-sm">
+                            {bookedByOriginal.type === "admin" ? (
+                              <>
+                                <p className="font-semibold text-slate-800">{bookedByOriginal.name || "--"}</p>
+                                <p className="text-slate-500 text-xs mt-0.5">📞 {bookedByOriginal.mobileNo || "--"}</p>
+                                <span className="inline-block mt-1 bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">Admin</span>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-semibold text-slate-800">{item.account.name || "--"}</p>
+                                <p className="text-slate-500 text-xs mt-0.5">📞 {item.account.phone || "--"}</p>
+                                {item.account.email && item.account.email !== "--" && <p className="text-slate-400 text-xs italic">{item.account.email}</p>}
+                                {item.account.city && item.account.city !== "--" && <p className="text-slate-400 text-xs">{item.account.city}</p>}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        
+                        {/* Patient Column */}
+                        <td className="px-5 py-5">
+                          <p className="text-sm text-slate-800 font-semibold">
+                            {item.patient.name} 
+                            {item.patient.age !== "--" && <span className="font-normal text-slate-500 text-xs ml-1">Age {item.patient.age}</span>}
+                          </p>
+                          <p className="text-sm text-slate-600 mt-0.5">📞 {item.patient.phone}</p>
+                          <p className="text-xs text-slate-500 capitalize">{item.patient.gender}</p>
+                          {item.patient.concernedAbout?.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5 max-w-[160px]">
+                              {item.patient.concernedAbout.map((c, idx) => (
+                                <span key={idx} className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">{c}</span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-5 text-sm font-medium text-slate-700">{item.agent}</td>
+                        <td className="px-5 py-5">
+                          <p className="text-sm font-semibold text-slate-700">{item.hospital}</p>
+                          <p className="text-sm text-slate-600">{item.doctor}</p>
+                          <p className="text-sm font-extrabold text-slate-800 mt-1">{item.price}</p>
+                          <p className="text-[10px] font-semibold text-slate-500 mt-0.5 capitalize">{item.paymentMode}</p>
+                        </td>
+                        
+                        {/* ✅ Status Column with Reschedule Check */}
+                        <td className="px-5 py-5">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${getStatusColor(item.status)}`}>
+                              {item.status}
+                            </span>
+                            
+                            {/* Dynamically show rescheduled details */}
+                            {item.bookedBy?.rescheduledBy && (
+                              <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
+                                <span className="font-bold block mb-0.5">Rescheduled By:</span>
+                                {item.bookedBy.rescheduledBy.name}
+                                {item.bookedBy.rescheduledBy.mobileNo && <span className="block mt-0.5">📞 {item.bookedBy.rescheduledBy.mobileNo}</span>}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        
+                        <td className="px-5 py-5 text-sm font-semibold text-slate-700 whitespace-nowrap">{item.appointment}</td>
+                        <td className="px-5 py-5">
+                          <ActionCell item={item} onRefresh={triggerRefresh} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -491,61 +523,90 @@ const AdminInClinicConsultationPage = () => {
 
           {/* MOBILE CARDS */}
           <div className="lg:hidden space-y-4">
-            {bookingData.map((item, i) => (
-              <div key={item.internalBookingId || i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold text-slate-700">{item.id}</span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${getStatusColor(item.status)}`}>{item.status}</span>
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 capitalize">{item.paymentMode}</span>
-                    </div>
-                  </div>
-                  <ActionCell item={item} onRefresh={triggerRefresh} />
-                </div>
-
-                <div className="space-y-3 mb-4 pb-4 border-b border-slate-100">
-                   {/* ✅ Patient Info Box */}
-                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Patient Details</p>
-                     <p className="font-semibold text-slate-800 text-sm">
-                       {item.patient.name} <span className="font-normal text-slate-500 text-xs ml-1">Age {item.patient.age} • {item.patient.gender}</span>
-                     </p>
-                     <p className="text-xs text-slate-600 mt-0.5">📞 {item.patient.phone}</p>
-                     {item.patient.concernedAbout?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {item.patient.concernedAbout.map((c, i) => (
-                            <span key={i} className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">{c}</span>
-                          ))}
+            {bookingData.map((item, i) => {
+              const bookedByOriginal = item.bookedBy?.original || {};
+              
+              return (
+                <div key={item.internalBookingId || i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      
+                      {/* ✅ Status Badges with Reschedule check for Mobile */}
+                      <div className="flex items-start gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-bold text-slate-700 mt-0.5">{item.id}</span>
+                        
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${getStatusColor(item.status)}`}>{item.status}</span>
+                          
+                          {/* Dynamically show rescheduled details */}
+                          {item.bookedBy?.rescheduledBy && (
+                            <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
+                              <span className="font-bold block mb-0.5">Rescheduled By:</span>
+                              {item.bookedBy.rescheduledBy.name}
+                            </div>
+                          )}
                         </div>
-                      )}
-                   </div>
 
-                   {/* ✅ Booked By Info Box */}
-                   <div>
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booked By (Account)</p>
-                     <p className="text-sm font-medium text-slate-700">{item.account.name}</p>
-                     <p className="text-xs text-slate-600">📞 {item.account.phone}</p>
-                     {item.account.city !== "--" && <p className="text-xs text-slate-500">{item.account.city}</p>}
-                   </div>
-                </div>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 capitalize">{item.paymentMode}</span>
+                      </div>
+                      
+                    </div>
+                    <ActionCell item={item} onRefresh={triggerRefresh} />
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-slate-100">
-                  <div><p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Booking Date</p><p className="text-xs text-slate-700 font-medium">{item.bookingDate}</p></div>
-                  <div><p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</p><p className="text-sm text-slate-700 font-medium">{item.agent}</p></div>
+                  <div className="space-y-3 mb-4 pb-4 border-b border-slate-100">
+                     {/* Patient Info */}
+                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Patient Details</p>
+                       <p className="font-semibold text-slate-800 text-sm">
+                         {item.patient.name} <span className="font-normal text-slate-500 text-xs ml-1">Age {item.patient.age} • {item.patient.gender}</span>
+                       </p>
+                       <p className="text-xs text-slate-600 mt-0.5">📞 {item.patient.phone}</p>
+                       {item.patient.concernedAbout?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {item.patient.concernedAbout.map((c, i) => (
+                              <span key={i} className="text-[9px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100">{c}</span>
+                            ))}
+                          </div>
+                        )}
+                     </div>
+
+                     {/* ✅ Updated Booked By Info for Mobile */}
+                     <div>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booked By (Account)</p>
+                       {bookedByOriginal.type === "admin" ? (
+                         <>
+                           <p className="text-sm font-medium text-slate-700">{bookedByOriginal.name || "--"}</p>
+                           <p className="text-xs text-slate-600">📞 {bookedByOriginal.mobileNo || "--"}</p>
+                           <span className="inline-block mt-1 bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">Admin</span>
+                         </>
+                       ) : (
+                         <>
+                           <p className="text-sm font-medium text-slate-700">{item.account.name || "--"}</p>
+                           <p className="text-xs text-slate-600">📞 {item.account.phone || "--"}</p>
+                           {item.account.city !== "--" && <p className="text-xs text-slate-500">{item.account.city}</p>}
+                         </>
+                       )}
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-slate-100">
+                    <div><p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Booking Date</p><p className="text-xs text-slate-700 font-medium">{item.bookingDate}</p></div>
+                    <div><p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</p><p className="text-sm text-slate-700 font-medium">{item.agent}</p></div>
+                  </div>
+                  <div className="mb-3 pb-3 border-b border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Hospital</p>
+                    <p className="text-sm font-bold text-slate-700">{item.hospital}</p>
+                    <p className="text-sm text-slate-600">{item.doctor}</p>
+                    <p className="text-sm font-extrabold text-slate-800 mt-0.5">{item.price}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Appointment</p>
+                    <p className="text-sm font-bold text-slate-700">{item.appointment}</p>
+                  </div>
                 </div>
-                <div className="mb-3 pb-3 border-b border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Hospital</p>
-                  <p className="text-sm font-bold text-slate-700">{item.hospital}</p>
-                  <p className="text-sm text-slate-600">{item.doctor}</p>
-                  <p className="text-sm font-extrabold text-slate-800 mt-0.5">{item.price}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Appointment</p>
-                  <p className="text-sm font-bold text-slate-700">{item.appointment}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
