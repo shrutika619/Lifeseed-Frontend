@@ -6,7 +6,6 @@ import { useSelector } from "react-redux";
 import { Calendar, Clock, MapPin, User, Phone, Mail, Loader2 } from 'lucide-react';
 import { ClinicDoctorService } from "@/app/services/patient/clinicDoctor.service";
 import { bookingService } from "@/app/services/patient/payment.service"; 
-// ✅ Assuming you have a service to get basic user details by ID
 import { getPatientDetailsById } from '@/app/services/admin/leads.service'; 
 import { toast } from 'sonner';
 
@@ -30,8 +29,6 @@ const BookAppointmentPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clinicId = searchParams.get("clinicId"); 
-  
-  // ✅ UPDATED: Extract patientId from URL 
   const urlPatientId = searchParams.get("patientId");
 
   const loggedInUser = useSelector((state) => state.auth?.user);
@@ -60,10 +57,9 @@ const BookAppointmentPage = () => {
   
   const [acceptTerms, setAcceptTerms] = useState(false);
 
-  // ✅ Auto-Fill Form Logic
+  // Auto-Fill Form Logic
   useEffect(() => {
     const autoFillData = async () => {
-      // SCENARIO 1: Admin is booking (patient ID is in URL)
       if (urlPatientId) {
         try {
           const res = await getPatientDetailsById(urlPatientId);
@@ -80,7 +76,6 @@ const BookAppointmentPage = () => {
           console.error("Failed to auto-fill patient data", error);
         }
       } 
-      // SCENARIO 2: Patient is booking for themselves
       else if (loggedInUser) {
         setFormData({
           fullName: loggedInUser.fullName || loggedInUser.name || '',
@@ -172,93 +167,79 @@ const BookAppointmentPage = () => {
   const currentDayAvailability = getAvailabilityForDate(selectedDate);
   const patientLimit = currentDayAvailability?.patientLimit || 1;
 
+  const isSlotInPast = (slotTimeRange) => {
+    try {
+      const startTimeStr = slotTimeRange.split(" - ")[0]; 
+      const now = new Date();
+      const [time, modifier] = startTimeStr.split(" ");
+      let [hours, minutes] = time.split(":").map(Number);
 
-   /**
- * Checks if a slot time (e.g., "2:30 PM - 3:00 PM") is in the past.
- * Returns true if the current time is past the START time of the slot.
- */
-const isSlotInPast = (slotTimeRange) => {
-  try {
-    // 1. Extract the start time (e.g., "2:30 PM")
-    const startTimeStr = slotTimeRange.split(" - ")[0]; 
-    
-    const now = new Date();
-    const [time, modifier] = startTimeStr.split(" ");
-    let [hours, minutes] = time.split(":").map(Number);
+      if (modifier === "PM" && hours !== 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
 
-    // 2. Convert to 24-hour format for comparison
-    if (modifier === "PM" && hours !== 12) hours += 12;
-    if (modifier === "AM" && hours === 12) hours = 0;
+      const slotDate = new Date();
+      slotDate.setHours(hours, minutes, 0, 0);
 
-    const slotDate = new Date();
-    slotDate.setHours(hours, minutes, 0, 0);
+      return now > slotDate;
+    } catch (err) {
+      return false; 
+    }
+  };
 
-    return now > slotDate;
-  } catch (err) {
-    return false; // Fallback to show slot if parsing fails
-  }
-};
-
-  
-  // EXTRACT & SORT: Night -> Morning -> Afternoon -> Evening
   let activeGroups = [];
 
-if (currentDayAvailability?.slotGroups) {
-  // ✅ 1. Determine if the selected date is Today
-  const todayStr = new Date().toISOString().split('T')[0];
-  const isToday = selectedDate === todayStr;
+  if (currentDayAvailability?.slotGroups) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = selectedDate === todayStr;
 
-  // ✅ 2. Filter and Map Groups
-  activeGroups = currentDayAvailability.slotGroups
-    .map(group => {
-      // If it's today, filter individual slots by time
-      const filteredSlots = isToday 
-        ? group.slots.filter(slot => !isSlotInPast(slot.time))
-        : group.slots;
+    activeGroups = currentDayAvailability.slotGroups
+      .map(group => {
+        const filteredSlots = isToday 
+          ? group.slots.filter(slot => !isSlotInPast(slot.time))
+          : group.slots;
 
-      return { ...group, slots: filteredSlots };
-    })
-    // ✅ 3. Only keep groups that still have slots after filtering
-    .filter(g => g.slots && g.slots.length > 0);
+        return { ...group, slots: filteredSlots };
+      })
+      .filter(g => g.slots && g.slots.length > 0);
 
-  // ✅ 4. Sort groups by period
-  const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
-  activeGroups.sort((a, b) => (orderMap[a.period] || 99) - (orderMap[b.period] || 99));
-}
+    const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
+    activeGroups.sort((a, b) => (orderMap[a.period] || 99) - (orderMap[b.period] || 99));
+  }
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ✅ 3. Call Cash Booking API (STRICT PAYLOAD MATCH)
+  // ✅ 3. Call Cash Booking API (EXACT PAYLOAD MATCH)
   const handleBooking = async () => {
-    if (!selectedDoctor || !selectedSlot || !formData.fullName || !formData.contact || !acceptTerms) {
-      toast.error('Please fill all required fields and select a time slot');
+    if (!selectedDoctor || !selectedSlot || !formData.fullName || !formData.contact || !formData.gender || !formData.age || !acceptTerms) {
+      toast.error('Please fill all required fields (Name, Phone, Gender, Age) and select a time slot.');
       return;
     }
 
     const doctor = doctors.find(d => d.id === selectedDoctor);
     const fee = doctor ? doctor.fee : 0;
 
-    // ✅ Priority Logic: URL Param (Admin booking) -> Logged In User -> Guest Walk-in
     const finalPatientId = urlPatientId || loggedInUser?._id || loggedInUser?.id || null;
 
-    // Constructing exact JSON payload format
+    // ✅ Construct exact JSON payload format matching backend requirement
     const payload = {
       bookingData: {
         availabilityId: selectedSlot.availabilityId,
         slotGroupId: selectedSlot.slotGroupId,
         slotId: selectedSlot.slotId,
         doctorId: selectedDoctor,
-        patientName: formData.fullName,
+        
+        // Exact mapping from the form
+        fullName: formData.fullName,
         patientPhone: String(formData.contact),
-        patientEmail: formData.email || "no-email@provided.com",
-        patientGender: formData.gender || "other",
+        gender: formData.gender.toLowerCase(),
+        age: String(formData.age),
       },
       totalAmount: Number(fee)
     };
 
-    // ✅ Attach patientId ONLY if it exists (Admin booking or Logged In Patient)
+    // Attach patientId if it exists
     if (finalPatientId) {
       payload.bookingData.patientUserId = finalPatientId;
     }
@@ -266,10 +247,9 @@ if (currentDayAvailability?.slotGroups) {
     setIsBooking(true);
     try {
       const res = await bookingService.createCashBooking(payload);
-      console.log(res)
+      console.log(res);
       if (res.success) {
         toast.success(res.message || "Booking confirmed!");
-        // Navigate to success page
         router.push(`/confirmbooking?bookingId=${res.bookingId}`);
       } else {
         toast.error(res.message || "Failed to create booking.");
@@ -472,7 +452,7 @@ if (currentDayAvailability?.slotGroups) {
                           key={d.fullDate}
                           onClick={() => {
                             setSelectedDate(d.fullDate);
-                            setSelectedSlot(null); // Reset slot on date change
+                            setSelectedSlot(null); 
                           }}
                           className={`flex flex-col items-center justify-center py-2 sm:py-3 rounded-xl transition-all border ${
                             selectedDate === d.fullDate
@@ -512,7 +492,6 @@ if (currentDayAvailability?.slotGroups) {
                                   key={slot._id || slot.id || slot.time}
                                   disabled={!isBookable}
                                   onClick={() => {
-                                    // ✅ HIGHLY DEFENSIVE ID EXTRACTION
                                     const aId = currentDayAvailability?._id || currentDayAvailability?.id;
                                     const gId = group?._id || group?.id;
                                     const sId = slot?._id || slot?.id;
