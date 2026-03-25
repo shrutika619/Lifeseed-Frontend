@@ -184,9 +184,7 @@ const AssessmentModal = ({ assessment, onClose }) => {
 // --- Main Page Component ---
 const AdminLoginInUserPage = () => {
   const router = useRouter();
-
   const pathname = usePathname();
-  
 
   // States for API Params
   const [searchTerm, setSearchTerm] = useState("");
@@ -210,27 +208,41 @@ const AdminLoginInUserPage = () => {
   // State for Assessment Modal
   const [selectedAssessment, setSelectedAssessment] = useState(null);
 
-  // Fetch Data
-  useEffect(() => {
-    const fetchLeads = async () => {
-      setLoading(true);
-      
-      const params = {};
-      if (selectedDate) params.date = selectedDate;
-      if (searchTerm) params.search = searchTerm;
-      if (selectedStage) params.stage = selectedStage;
+  // ✅ Fetch Data Logic Extracted into a reusable function
+  const fetchLeads = async (isInitialLoad = false) => {
+    if (isInitialLoad) setLoading(true);
+    
+    const params = {};
+    if (selectedDate) params.date = selectedDate;
+    if (searchTerm) params.search = searchTerm;
+    if (selectedStage) params.stage = selectedStage;
 
+    try {
       const response = await getLoginUsersLeads(params);
       
       if (response.success && response.data) {
         setLeads(response.data.leads || []);
         setCounts(response.data.counts || {});
       }
-      setLoading(false);
-    };
+    } catch (error) {
+      console.error("Failed to fetch leads:", error);
+    } finally {
+      if (isInitialLoad) setLoading(false);
+    }
+  };
 
-    const timeoutId = setTimeout(() => { fetchLeads(); }, 500);
-    return () => clearTimeout(timeoutId);
+  // ✅ Auto-refresh logic (Every 15 Seconds)
+  useEffect(() => {
+    // Initial fetch when dependencies change
+    fetchLeads(true);
+
+    // Set up the interval
+    const intervalId = setInterval(() => {
+      fetchLeads(false); // false = Don't show loading spinner on background refresh
+    }, 15000);
+
+    // Clean up interval on unmount or dependency change
+    return () => clearInterval(intervalId);
   }, [searchTerm, selectedDate, selectedStage]);
 
   const formatDate = (isoString) => {

@@ -790,7 +790,7 @@ const CustomerProfilePage = () => {
   const [activities, setActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
-  // ✅ DEBOUNCED SEARCH STATE
+  // DEBOUNCED SEARCH STATE
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -906,7 +906,7 @@ const CustomerProfilePage = () => {
   }, [fetchActivities]);
 
 
-  // ✅ DEBOUNCED SEARCH EFFECT
+  // DEBOUNCED SEARCH EFFECT
   useEffect(() => {
     if (!isNewUser) return;
 
@@ -975,10 +975,16 @@ const CustomerProfilePage = () => {
 
     if (isNewUser) {
       const localActivity = {
-        activityId: `temp_${Date.now()}`, type: payload.type, category: payload.category,
-        notes: payload.notes, scheduledDate: payload.scheduledDate || null,
-        scheduledTime: payload.scheduledTime || "", assignedToId: payload.assignedTo || null,
-        assignedTo: assignToName, status: "Pending", createdBy: customerData?.currentAdmin?.fullName || 'You',
+        activityId: `temp_${Date.now()}`, 
+        type: payload.type, 
+        category: payload.category,
+        notes: payload.notes, 
+        scheduledDate: payload.scheduledDate || null,
+        scheduledTime: payload.scheduledTime || "", 
+        assignedToId: payload.assignedTo || null,
+        assignedTo: assignToName, 
+        status: "Pending", 
+        createdBy: customerData?.currentAdmin?.fullName || 'You',
         showActions: false 
       };
       setActivities([localActivity, ...activities]);
@@ -986,7 +992,7 @@ const CustomerProfilePage = () => {
       resetField('activityNotes'); resetField('activityDate'); resetField('activityTime');
     } else {
       setIsAddingActivity(true);
-      const res = await addCustomerActivity(userId, payload);
+      const res = await adminTicketService.addActivityLog(userId, payload);
       if (res.success) {
         toast.success("Activity added successfully!");
         resetField('activityNotes'); resetField('activityDate'); resetField('activityTime');
@@ -1103,7 +1109,7 @@ const CustomerProfilePage = () => {
     }
   };
 
-  // 5. FINAL SUBMIT
+  // 5. FINAL SUBMIT (✅ Sequential Error Handling & Re-routing)
   const onFinalSubmit = async (data) => {
     if (isNewUser) {
       if (!data.flatNo || !data.street || !data.pincode) {
@@ -1113,10 +1119,24 @@ const CustomerProfilePage = () => {
     
     setIsSaving(true);
     
+    // Helper to strictly validate MongoDB ObjectIds
+    const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
+    
+    // Validate Current Admin ID
+    const currentAdminId = isValidObjectId(customerData?.currentAdmin?._id) 
+      ? customerData.currentAdmin._id 
+      : undefined;
+
     const selectedAdmin = adminList.find(a => a.fullName === data.leadOwner);
-    let leadOwnerId = selectedAdmin ? selectedAdmin._id : data.leadOwner; 
-    if (!selectedAdmin && data.leadOwner === customerData?.currentAdmin?.fullName) {
-      leadOwnerId = customerData.currentAdmin._id; 
+    
+    let leadOwnerId;
+    if (selectedAdmin && isValidObjectId(selectedAdmin._id)) {
+      leadOwnerId = selectedAdmin._id;
+    } else if (data.leadOwner === customerData?.currentAdmin?.fullName) {
+      leadOwnerId = currentAdminId;
+    } else {
+      // Fallback if data.leadOwner is already a valid ID
+      leadOwnerId = isValidObjectId(data.leadOwner) ? data.leadOwner : currentAdminId;
     }
 
     const payload = {
@@ -1133,26 +1153,30 @@ const CustomerProfilePage = () => {
       sendWhatsAppNotification: !!data.sendWhatsApp,
     };
 
-    if (!isNewUser) {
+    if (!isNewUser && leadOwnerId) {
       payload.leadOwner = leadOwnerId;
     }
 
     if (isNewUser) {
-      if (activities.length > 0) {
-        payload.activity = activities.map(act => ({
-          type: act.type, category: act.category, notes: act.notes,
-          scheduledDate: act.scheduledDate, scheduledTime: act.scheduledTime, assignedTo: act.assignedToId
-        }));
-      }
-      
       try {
-        // 1. Create the user profile first
+        // STEP 1: CREATE USER PROFILE
+        if (leadOwnerId) payload.leadOwner = leadOwnerId; // Attach to initial creation if valid
         const res = await createCustomerProfile(payload);
         
         if (res.success) {
-          const generatedUserId = res.data.userId || res.data._id || res.data.leadId;
+          const generatedUserId = res.data.patientId || res.data.userId || res.data._id || res.data.leadId;
           
-          // 2. ✅ Check if address fields are filled, then call createUserAddress
+          if (!generatedUserId) {
+             toast.error("User created but no valid ID returned by server.");
+             setIsSaving(false);
+             return;
+          }
+
+          toast.success("User profile created! Saving additional details...");
+
+          const parallelTasks = [];
+
+          // STEP 2: PREPARE ADDRESS
           const hasAddress = data.flatNo || data.street || data.pincode;
           if (hasAddress) {
             const addressPayload = {
@@ -1163,17 +1187,60 @@ const CustomerProfilePage = () => {
               pinCode: data.pincode || "",
               contactNumber: data.contact || "" 
             };
-            
-            try {
-              await adminAddressService.createUserAddress(generatedUserId, addressPayload);
-            } catch (addrError) {
-              console.error("Failed to save address:", addrError);
-              toast.error("User created, but failed to save initial address.");
+            parallelTasks.push(adminAddressService.createUserAddress(generatedUserId, addressPayload));
+          }
+
+          // STEP 3: PREPARE ACTIVITIES
+          if (activities.length > 0) {
+            for (const act of activities) {
+              
+              let finalAssignedToId = isValidObjectId(act.assignedToId) ? act.assignedToId : undefined;
+              
+              if (!finalAssignedToId) {
+                 const matchedAdmin = adminList.find(a => a.fullName === act.assignedTo);
+                 if (matchedAdmin && isValidObjectId(matchedAdmin._id)) {
+                     finalAssignedToId = matchedAdmin._id;
+                 } else if (act.assignedTo === customerData?.currentAdmin?.fullName) {
+                     finalAssignedToId = currentAdminId;
+                 }
+              }
+
+              if (!finalAssignedToId) {
+                  finalAssignedToId = currentAdminId;
+              }
+
+              const activityPayload = {
+                type: act.type, 
+                category: act.category, 
+                notes: act.notes,
+                scheduledDate: act.scheduledDate || undefined, 
+                scheduledTime: act.scheduledTime || undefined, 
+              };
+
+              // Only attach assignedTo if we successfully resolved a valid MongoDB ObjectId
+              if (finalAssignedToId) {
+                activityPayload.assignedTo = finalAssignedToId;
+              }
+
+              parallelTasks.push(adminTicketService.addActivityLog(generatedUserId, activityPayload));
             }
           }
 
-          toast.success("User created successfully!", { duration: 5000 }); 
-          router.push(`${basePath}/log-in-user/customerprofile?userId=${generatedUserId}`);
+          // Execute background tasks
+          if (parallelTasks.length > 0) {
+            const results = await Promise.allSettled(parallelTasks);
+            const failures = results.filter(r => r.status === 'rejected');
+            if (failures.length > 0) {
+              toast.warning(`User created, but ${failures.length} detail(s) failed to save.`);
+              console.error("Some background tasks failed:", failures);
+            } else {
+              toast.success("All details saved successfully!");
+            }
+          }
+
+          // Reroute to existing user profile
+          router.push(`${basePath}/log-in-user/customerprofile?patientId=${generatedUserId}`);
+          
         } else {
           toast.error(res.message || "Failed to create user.", { duration: 5000 }); 
         }
@@ -1285,7 +1352,7 @@ const CustomerProfilePage = () => {
             <input {...register("age")} placeholder="Enter" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400" />
           </div>
 
-          {/* ✅ CONTACT NUMBER WITH ELEVATED Z-INDEX FOR DROPDOWN */}
+          {/* CONTACT NUMBER */}
           <div className="relative z-30">
             <label className="text-[11px] font-bold text-slate-500 uppercase mb-1 block">
               Contact Number <span className="text-red-500">*</span>
@@ -1296,7 +1363,7 @@ const CustomerProfilePage = () => {
                 type="tel"
                 maxLength={10}
                 autoComplete="off"
-                disabled={!isNewUser} // ✅ Conditionally disabled
+                disabled={!isNewUser}
                 placeholder="Enter 10-digit number"
                 className={`w-full p-2.5 border ${
                   errors.contact ? 'border-red-400' : 'border-slate-200'
@@ -1323,7 +1390,7 @@ const CustomerProfilePage = () => {
                       <button 
                         key={patient.userId}
                         type="button"
-                        onClick={() => router.push(`${basePath}/log-in-user/customerprofile?userId=${patient.userId}`)}
+                        onClick={() => router.push(`${basePath}/log-in-user/customerprofile?patientId=${patient.userId}`)}
                         className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0 text-left group"
                       >
                         <div>

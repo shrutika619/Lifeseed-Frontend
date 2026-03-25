@@ -215,7 +215,7 @@ const AdminInClinicConsultationPage = () => {
   const [bookingData, setBookingData] = useState([]);
   const [metrics, setMetrics] = useState({
     counts: { "New": 0, "Accept": 0, "Rejected": 0, "Complete": 0, "Patient Absent": 0, "Cancelled": 0 },
-    followUpCounts: { "Not Interested": 0, "Sell": 0, "Interested": 0 }
+    followUpCounts: { "Not Interested": 0, "Sell": 0, "Interested": 0, "Not-Interested": 0 }
   });
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -228,100 +228,107 @@ const AdminInClinicConsultationPage = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Server-Side Filtering API Fetch
-  useEffect(() => {
-    const fetchBookings = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
+  // ✅ Extracted Fetch Logic
+  const fetchBookings = async (isInitialLoad = false) => {
+    if (isInitialLoad) setLoading(true);
+    
+    try {
+      const params = new URLSearchParams();
 
-        if (debouncedSearch) {
-          params.append("search", debouncedSearch);
-        }
-
-        const dateMap = {
-          "Today": "today",
-          "Yesterday": "yesterday",
-          "Last 7 Days": "week",
-          "This Month": "month"
-        };
-        if (dateMap[primaryDate]) {
-          params.append("date", dateMap[primaryDate]);
-        }
-
-        if (activeFilter !== "All") {
-          if (["Interested", "Sell", "Not Interested"].includes(activeFilter)) {
-            params.append("followUpStatus", activeFilter);
-          } else {
-            params.append("status", activeFilter);
-          }
-        }
-
-        const res = await adminInclinicService.getAllInClinicBookings(`?${params.toString()}`);
-        
-        if (res.success && res.data) {
-          setMetrics({
-            counts: res.data.counts || {},
-            followUpCounts: res.data.followUpCounts || {}
-          });
-
-          // ✅ SPLIT MAPPING
-          const mappedData = res.data.bookings.map(b => {
-            const bDate = new Date(b.bookingDate);
-            const patientData = b.bookingPatientDetails || {};
-            const accountData = b.patientDetails || {};
-            
-            return {
-              id: b.appointmentId || "--",
-              internalBookingId: b.bookingId,
-              patientId: accountData.patientId || accountData.userId, // Passed for CRM routing
-              
-              bookingDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-              appointment: b.timeSlot ? b.timeSlot : "--",
-              
-              paymentMode: b.paymentMode === "cash" ? "Cash" : b.paymentMode || "Unknown",
-              price: `₹${b.fees}`,
-              status: b.status || "New",
-              agent: b.agent || "Self",
-              
-              // Original nested BookedBy logic
-              bookedBy: b.bookedBy || {},
-
-              // Map Actual Patient
-              patient: { 
-                name: patientData.name || "--", 
-                age: patientData.age || "--", 
-                gender: patientData.gender || "--", 
-                phone: patientData.contact || accountData.loginNumber || "--",
-                concernedAbout: patientData.concernedAbout || []
-              },
-              
-              // Map Account Owner
-              account: {
-                name: accountData.name || "--",
-                phone: accountData.loginNumber || "--",
-                email: accountData.email || "--",
-                city: accountData.city || "--"
-              },
-
-              hospital: b.clinic?.name || "--",
-              doctor: b.doctor?.name || "--",
-            };
-          });
-
-          setBookingData(mappedData);
-        } else {
-          toast.error("Failed to load in-clinic bookings");
-        }
-      } catch (error) {
-        console.error("API Error:", error);
-        toast.error(error.message || "Failed to communicate with server");
-      } finally {
-        setLoading(false);
+      if (debouncedSearch) {
+        params.append("search", debouncedSearch);
       }
-    };
 
-    fetchBookings();
+      const dateMap = {
+        "Today": "today",
+        "Yesterday": "yesterday",
+        "Last 7 Days": "week",
+        "This Month": "month"
+      };
+      if (dateMap[primaryDate]) {
+        params.append("date", dateMap[primaryDate]);
+      }
+
+      if (activeFilter !== "All") {
+        if (["Interested", "Sell", "Not Interested", "Not-Interested"].includes(activeFilter)) {
+          params.append("followUpStatus", activeFilter === "Not-Interested" ? "Not Interested" : activeFilter);
+        } else {
+          params.append("status", activeFilter);
+        }
+      }
+
+      const res = await adminInclinicService.getAllInClinicBookings(`?${params.toString()}`);
+      
+      if (res.success && res.data) {
+        setMetrics({
+          counts: res.data.counts || {},
+          followUpCounts: res.data.followUpCounts || {}
+        });
+
+        // SPLIT MAPPING
+        const mappedData = res.data.bookings.map(b => {
+          const bDate = new Date(b.bookingDate);
+          const patientData = b.bookingPatientDetails || {};
+          const accountData = b.patientDetails || {};
+          
+          return {
+            id: b.appointmentId || "--",
+            internalBookingId: b.bookingId,
+            patientId: accountData.patientId || accountData.userId, 
+            
+            bookingDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+            appointment: b.timeSlot ? b.timeSlot : "--",
+            
+            paymentMode: b.paymentMode === "cash" ? "Cash" : b.paymentMode || "Unknown",
+            price: `₹${b.fees}`,
+            status: b.status || "New",
+            agent: b.agent || "Self",
+            
+            bookedBy: b.bookedBy || {},
+
+            patient: { 
+              name: patientData.name || "--", 
+              age: patientData.age || "--", 
+              gender: patientData.gender || "--", 
+              phone: patientData.contact || accountData.loginNumber || "--",
+              concernedAbout: patientData.concernedAbout || []
+            },
+            
+            account: {
+              name: accountData.name || "--",
+              phone: accountData.loginNumber || "--",
+              email: accountData.email || "--",
+              city: accountData.city || "--"
+            },
+
+            hospital: b.clinic?.name || "--",
+            doctor: b.doctor?.name || "--",
+          };
+        });
+
+        setBookingData(mappedData);
+      } else {
+        toast.error("Failed to load in-clinic bookings");
+      }
+    } catch (error) {
+      console.error("API Error:", error);
+      toast.error(error.message || "Failed to communicate with server");
+    } finally {
+      if (isInitialLoad) setLoading(false);
+    }
+  };
+
+  // ✅ Background Auto-Refresh Hook
+  useEffect(() => {
+    // Initial fetch when dependencies change
+    fetchBookings(true);
+
+    // Set up the interval
+    const intervalId = setInterval(() => {
+      fetchBookings(false); 
+    }, 15000);
+
+    return () => clearInterval(intervalId);
   }, [debouncedSearch, activeFilter, primaryDate, refreshTrigger]); 
 
   const getStatusColor = (status) => {
@@ -374,6 +381,15 @@ const AdminInClinicConsultationPage = () => {
           <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
           
           <StatusBadge count={metrics.followUpCounts["Interested"] || 0} label="Interested" color="bg-blue-50 text-blue-700 border border-blue-200" active={activeFilter==="Interested"} onClick={() => handleFilterClick("Interested")} />
+          
+          <StatusBadge 
+            count={metrics.followUpCounts["Not Interested"] || metrics.followUpCounts["Not-Interested"] || 0} 
+            label="Not Interested" 
+            color="bg-pink-50 text-pink-700 border border-pink-200" 
+            active={activeFilter==="Not-Interested" || activeFilter==="Not Interested"} 
+            onClick={() => handleFilterClick("Not-Interested")} 
+          />
+          
           <StatusBadge count={metrics.followUpCounts["Sell"] || 0} label="Sell" color="bg-green-500 text-white border border-green-600" active={activeFilter==="Sell"} onClick={() => handleFilterClick("Sell")} />
         </div>
       </div>
@@ -408,13 +424,12 @@ const AdminInClinicConsultationPage = () => {
 
       {/* ── DATA RENDERING ── */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-64 flex flex-col items-center justify-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          <p className="text-sm font-medium text-slate-500">Loading Bookings...</p>
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </div>
       ) : bookingData.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-64 flex items-center justify-center">
-          <p className="text-sm font-medium text-slate-500">No bookings match your filters.</p>
+        <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-slate-200">
+          <p className="text-slate-500 font-medium">No bookings match your filters.</p>
         </div>
       ) : (
         <>
@@ -446,7 +461,7 @@ const AdminInClinicConsultationPage = () => {
                           <p className="text-[11px] text-slate-500">{item.bookingDate.split(',')[1]}</p>
                         </td>
                         
-                        {/* ✅ Updated Booked By Column Logic */}
+                        {/* Booked By Column */}
                         <td className="px-5 py-5">
                           <div className="text-sm">
                             {bookedByOriginal.type === "admin" ? (
@@ -491,14 +506,13 @@ const AdminInClinicConsultationPage = () => {
                           <p className="text-[10px] font-semibold text-slate-500 mt-0.5 capitalize">{item.paymentMode}</p>
                         </td>
                         
-                        {/* ✅ Status Column with Reschedule Check */}
+                        {/* Status Column */}
                         <td className="px-5 py-5">
                           <div className="flex flex-col gap-1 items-start">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${getStatusColor(item.status)}`}>
                               {item.status}
                             </span>
                             
-                            {/* Dynamically show rescheduled details */}
                             {item.bookedBy?.rescheduledBy && (
                               <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                                 <span className="font-bold block mb-0.5">Rescheduled By:</span>
@@ -531,14 +545,12 @@ const AdminInClinicConsultationPage = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       
-                      {/* ✅ Status Badges with Reschedule check for Mobile */}
                       <div className="flex items-start gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-bold text-slate-700 mt-0.5">{item.id}</span>
                         
                         <div className="flex flex-col gap-1 items-start">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${getStatusColor(item.status)}`}>{item.status}</span>
                           
-                          {/* Dynamically show rescheduled details */}
                           {item.bookedBy?.rescheduledBy && (
                             <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                               <span className="font-bold block mb-0.5">Rescheduled By:</span>
@@ -571,7 +583,7 @@ const AdminInClinicConsultationPage = () => {
                         )}
                      </div>
 
-                     {/* ✅ Updated Booked By Info for Mobile */}
+                     {/* Booked By Info */}
                      <div>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booked By (Account)</p>
                        {bookedByOriginal.type === "admin" ? (

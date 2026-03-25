@@ -316,7 +316,7 @@ export default function AdminPlaceOrderPage() {
   const searchParams = useSearchParams();
   
   const recordIdParam = searchParams.get("recordId"); 
-  const userIdParam = searchParams.get("userId");
+  const userIdParam = searchParams.get("patientId");
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

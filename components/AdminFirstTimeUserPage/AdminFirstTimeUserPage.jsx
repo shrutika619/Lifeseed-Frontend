@@ -5,13 +5,15 @@ import {
   Search, 
   Filter, 
   MoreVertical, 
-  FileText,
-  Loader2, 
-  ChevronDown,
+  FileText, 
+  ChevronDown, 
+  Plus,
   User,
-  ArrowLeft,
+  Loader2,
   X,
-  CheckCircle2 
+  CheckCircle2,
+  ArrowLeft,
+  ShoppingCart
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getFirstTimeLeads } from "@/app/services/admin/leads.service"; 
@@ -175,26 +177,40 @@ const AdminFirstTimeUserPage = () => {
   
   const [selectedAssessment, setSelectedAssessment] = useState(null);
 
-  // Fetch Data
-  useEffect(() => {
-    const fetchLeads = async () => {
-      setLoading(true);
-      
-      const params = {};
-      if (selectedDate) params.date = selectedDate;
-      if (searchTerm) params.search = searchTerm;
+  // ✅ Fetch Data Logic Extracted into a reusable function
+  const fetchLeads = async (isInitialLoad = false) => {
+    if (isInitialLoad) setLoading(true);
+    
+    const params = {};
+    if (selectedDate) params.date = selectedDate;
+    if (searchTerm) params.search = searchTerm;
 
+    try {
       const response = await getFirstTimeLeads(params);
       
       if (response.success && response.data) {
         setLeads(response.data.leads || []);
         setTotalNew(response.data.totalNew || 0);
       }
-      setLoading(false);
-    };
+    } catch (error) {
+      console.error("Failed to fetch leads:", error);
+    } finally {
+      if (isInitialLoad) setLoading(false);
+    }
+  };
 
-    const timeoutId = setTimeout(() => { fetchLeads(); }, 500);
-    return () => clearTimeout(timeoutId);
+  // ✅ Auto-refresh logic (Every 15 Seconds)
+  useEffect(() => {
+    // Initial fetch when dependencies change
+    fetchLeads(true);
+
+    // Set up the interval
+    const intervalId = setInterval(() => {
+      fetchLeads(false); // false = Don't show loading spinner on background refresh
+    }, 15000);
+
+    // Clean up interval on unmount or dependency change
+    return () => clearInterval(intervalId);
   }, [searchTerm, selectedDate]);
 
   const formatDate = (isoString) => {
@@ -385,7 +401,7 @@ const AdminFirstTimeUserPage = () => {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-gray-400">{lead.customerId}</span>
+                        <span className="text-xs font-bold text-slate-500">{lead.customerId}</span>
                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                           lead.leadUpdate?.action === "Login Fail" 
                           ? "bg-red-50 text-red-500 border border-red-100" 
@@ -457,7 +473,6 @@ const AdminFirstTimeUserPage = () => {
         </>
       )}
 
-      {/* Assessment Modal Render */}
       <AssessmentModal 
         assessment={selectedAssessment} 
         onClose={() => setSelectedAssessment(null)} 

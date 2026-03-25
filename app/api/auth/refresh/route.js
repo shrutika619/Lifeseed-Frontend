@@ -30,10 +30,16 @@ export async function POST() {
 
     // 2. Select Endpoint using Constants
     let refreshEndpoint;
+    // 🛡️ Helper to ensure absolute URL on the server side
+    const getAbsoluteUrl = (endpoint) => {
+        if (endpoint.startsWith("http")) return endpoint;
+        return `${Constants.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL}${endpoint}`;
+    };
+
     if (role === 'super_admin' || role === 'admin') {
-        refreshEndpoint = Constants.urlEndPoints.ADMIN_REFRESH_TOKEN; 
+        refreshEndpoint = getAbsoluteUrl(Constants.urlEndPoints.ADMIN_REFRESH_TOKEN); 
     } else {
-        refreshEndpoint = Constants.urlEndPoints.REFRESH_TOKEN; 
+        refreshEndpoint = getAbsoluteUrl(Constants.urlEndPoints.REFRESH_TOKEN); 
     }
 
     console.log(`🔄 Refreshing for [${role}] via: ${refreshEndpoint}`);
@@ -94,19 +100,19 @@ export async function POST() {
   } catch (error) {
     console.error("❌ Refresh Proxy Error:", error.response?.data || error.message);
     
-    // 🚨 FIX 2: THE MAGIC WIPE
-    // If the backend rejects the refresh token (e.g., invalid signature or expired),
-    // delete the cookies from the user's browser immediately.
-    const cookieStore = await cookies();
-    if(error.response.status = 401){
+    // 🚨 FIX 2: THE MAGIC WIPE (Corrected)
+    // ONLY delete cookies if the backend specifically says the token is invalid/expired (401 or 403).
+    // The previous code had a typo: `if(error.response.status = 401)` which assigned 401 and ALWAYS wiped cookies.
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      const cookieStore = await cookies();
       cookieStore.delete("refreshToken");
       cookieStore.delete("user_role");
-
     }
     
     return NextResponse.json(
       error.response?.data || { message: "Session expired" },
-      { status: error.response?.status || 401 }
+      { status: status || 401 }
     );
   }
 }
