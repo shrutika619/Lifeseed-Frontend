@@ -280,6 +280,7 @@ const ActionCell = ({ item, onCancel, onReschedule, dropUp }) => {
 
 const AdminTeleconsultationPage = () => {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState([]);
@@ -296,8 +297,10 @@ const AdminTeleconsultationPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchBookings = async () => {
-    setLoading(true);
+  // ✅ Extracted logic with isInitialLoad flag
+  const fetchBookings = async (isInitialLoad = false) => {
+    if (isInitialLoad) setLoading(true);
+    
     try {
       const queryFilters = {
         date: selectedTime,
@@ -307,7 +310,6 @@ const AdminTeleconsultationPage = () => {
       };
 
       const res = await adminTeleconsultationService.getAllBookings(queryFilters);
-      console.log(res)
       
       if (res.success && res.data) {
         setBookings(res.data.bookings || []);
@@ -316,22 +318,33 @@ const AdminTeleconsultationPage = () => {
           sell: res.data.sellResponseCounts || {}
         });
       } else {
-        toast.error(res.message || "Failed to fetch bookings");
+        if(isInitialLoad) toast.error(res.message || "Failed to fetch bookings");
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error fetching data");
+      if(isInitialLoad) toast.error("Error fetching data");
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   };
 
+  // ✅ Handle Initial Load & Changes (Includes Debounce for Search)
   useEffect(() => {
     const delay = setTimeout(() => {
-      fetchBookings();
+      fetchBookings(true);
       setCurrentPage(1);
     }, 400);
+    
     return () => clearTimeout(delay);
+  }, [selectedTime, activeConsultFilter, activeSellFilter, searchTerm]);
+
+  // ✅ Auto-refresh logic (Every 15 Seconds)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchBookings(false); // false = Don't show loading spinner on background refresh
+    }, 15000);
+
+    return () => clearInterval(intervalId);
   }, [selectedTime, activeConsultFilter, activeSellFilter, searchTerm]);
 
   const totalPages = Math.ceil(bookings.length / itemsPerPage);
@@ -351,7 +364,7 @@ const AdminTeleconsultationPage = () => {
       const res = await adminTeleconsultationService.cancelBooking(cancelModal.recordId);
       if (res.success) {
         toast.success("Booking Cancelled Successfully");
-        fetchBookings();
+        fetchBookings(true);
         setCancelModal({ isOpen: false, recordId: null });
       } else {
         toast.error(res.message);
@@ -772,23 +785,6 @@ const AdminTeleconsultationPage = () => {
               </div>
             );
           })
-        )}
-
-        {!loading && bookings.length > 0 && (
-          <div className="flex flex-col items-center gap-3 pt-2">
-            <p className="text-xs text-slate-500 font-medium">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, bookings.length)} of {bookings.length}
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={handlePrevPage} disabled={currentPage === 1} className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white disabled:opacity-40">
-                Prev
-              </button>
-              <span className="text-sm font-bold text-slate-700 px-2">{currentPage} / {totalPages}</span>
-              <button onClick={handleNextPage} disabled={currentPage === totalPages} className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white disabled:opacity-40">
-                Next
-              </button>
-            </div>
-          </div>
         )}
       </div>
 
