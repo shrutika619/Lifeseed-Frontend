@@ -16,6 +16,21 @@ export const adminTicketService = {
   },
 
   /**
+   * Add a new activity log / ticket for a specific user.
+   * POST /activity/:userId
+   */
+  addActivityLog: async (userId, activityData) => {
+    try {
+      // Note: Make sure Constants.urlEndPoints.CUSTOMER_ACTIVITY maps to "/activity" 
+      // or adjust the string below to match your actual route prefix.
+      const response = await api.post(`${Constants.urlEndPoints.CUSTOMER_ACTIVITY}/${userId}`, activityData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  /**
    * Update the status of a specific ticket/activity.
    */
   updateTicketStatus: async (userId, activityId, statusData) => {
