@@ -198,7 +198,7 @@ const HospitalDashboard = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [activeTab, setActiveTab] = useState('all');
-  const [primaryDate, setPrimaryDate] = useState(""); 
+  const [primaryDate, setPrimaryDate] = useState(""); // ✅ Default to All Time
   
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -246,117 +246,107 @@ const HospitalDashboard = () => {
   }, []);
 
   // 2. FETCH BOOKINGS
-  const fetchBookings = async (isInitialLoad = false) => {
-    if (isInitialLoad) setLoading(true);
-    try {
-      let queryStr = '?';
-      
-      if (primaryDate) {
-        queryStr += `date=${primaryDate}&`;
-      }
-
-      if (activeTab === 'booked') queryStr += 'status=Accept';
-      else if (activeTab === 'cancelled') queryStr += 'status=Cancelled';
-      else if (activeTab === 'completed') queryStr += 'status=Complete';
-      else if (activeTab === 'absent') queryStr += 'status=Patient Absent';
-      else if (activeTab === 'new') queryStr += 'status=New';
-      
-      else if (activeTab === 'follow-up') queryStr += 'followUpStatus=Interested';
-      else if (activeTab === 'sold') queryStr += 'followUpStatus=Sell';
-      else if (activeTab === 'not-interested') queryStr += 'followUpStatus=Not Interested';
-
-      if (queryStr.endsWith('&') || queryStr.endsWith('?')) {
-        queryStr = queryStr.slice(0, -1);
-      }
-
-      const res = await clinicBookingService.getClinicBookings(queryStr);
-      
-      if (res.success && res.data) {
-        setMetrics({
-          counts: res.data.counts || {},
-          followUpCounts: res.data.followUpCounts || {},
-          total: res.data.total || 0
-        });
-
-        const mappedRequests = res.data.bookings.map(b => {
-          const bDate = new Date(b.bookingDate);
-          const isPrepaid = b.paymentMode?.toLowerCase() !== 'cash' || b.paymentStatus === 'COMPLETED';
-          
-          // ✅ Corrected Mapping based on backend response
-          const patientData = b.bookingPatientDetails || {};
-          const accountData = b.patientDetails || {};
-          const doctorData = b.doctor || {};
-
-          return {
-            id: b.appointmentId || "--",
-            internalBookingId: b.bookingId,
-            patientId: accountData.patientId || accountData.userId,
-            
-            time: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-            type: isPrepaid ? 'Prepaid' : 'Collect CASH',
-            amount: b.fees || 0,
-            orderType: b.notes || null,
-            agent: b.agent || "Self",
-            hospital: b.clinic || "--",
-            
-            bookedBy: b.bookedBy || {},
-
-            // Actual Patient
-            patient: {
-              name: patientData.name || accountData.name || "Unknown",
-              age: patientData.age || accountData.age || "--",
-              gender: patientData.gender || accountData.gender || "Not Specified",
-              initials: (patientData.name || accountData.name || "U").substring(0, 2).toUpperCase(),
-              image: null,
-              phone: patientData.contact || accountData.loginNumber || "--",
-              concernedAbout: patientData.concernedAbout || []
-            },
-            
-            // Account Owner
-            account: {
-              name: accountData.name || "--",
-              phone: accountData.loginNumber || "--",
-              email: accountData.email || "--",
-              city: accountData.city || "--"
-            },
-            
-            slot: b.timeSlot || "Not Scheduled",
-            displayDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-            
-            doctor: {
-              name: doctorData.name || "Unknown Doctor",
-              qualification: [doctorData.underGradDegree, doctorData.postGradDegree].filter(x => x && x !== "--").join(", ") || "Specialist",
-              specialty: doctorData.primarySpecialty || "--",
-              experience: doctorData.experience ? `${doctorData.experience} yrs` : "--",
-              rating: 4,
-              available: true,
-              image: doctorData.profileImage || null
-            },
-            
-            status: b.status?.toLowerCase() || 'pending',
-            paymentStatus: b.paymentStatus
-          };
-        });
-
-        setRequests(mappedRequests);
-      } else {
-        if(isInitialLoad) toast.error(res.message || "Failed to load bookings");
-      }
-    } catch (error) {
-      if(isInitialLoad) toast.error("Error communicating with server.");
-    } finally {
-      if(isInitialLoad) setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchBookings(true);
+    const fetchBookings = async () => {
+      setLoading(true);
+      try {
+        // ✅ Construct Query Safely using URLSearchParams
+        const params = new URLSearchParams();
 
-    const intervalId = setInterval(() => {
-      fetchBookings(false);
-    }, 15000);
+        // If primaryDate has a value (e.g. 'today', 'week', 'month'), append it. 
+        // If it is empty "", this block won't run, sending NO date parameter.
+        if (primaryDate) {
+          params.append("date", primaryDate);
+        }
 
-    return () => clearInterval(intervalId);
+        if (activeTab === 'booked') params.append("status", 'Accept');
+        else if (activeTab === 'cancelled') params.append("status", 'Cancelled');
+        else if (activeTab === 'completed') params.append("status", 'Complete');
+        else if (activeTab === 'absent') params.append("status", 'Patient Absent');
+        else if (activeTab === 'new') params.append("status", 'New');
+        else if (activeTab === 'follow-up') params.append("followUpStatus", 'Interested');
+        else if (activeTab === 'sold') params.append("followUpStatus", 'Sell');
+        else if (activeTab === 'not-interested') params.append("followUpStatus", 'Not Interested');
+
+        // Convert the URLSearchParams object to a string
+        const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+        const res = await clinicBookingService.getClinicBookings(queryStr);
+        
+        if (res.success && res.data) {
+          setMetrics({
+            counts: res.data.counts || {},
+            followUpCounts: res.data.followUpCounts || {},
+            total: res.data.total || 0
+          });
+
+          const mappedRequests = res.data.bookings.map(b => {
+            const bDate = new Date(b.bookingDate);
+            const isPrepaid = b.paymentMode?.toLowerCase() !== 'cash' || b.paymentStatus === 'COMPLETED';
+            
+            const patientData = b.bookingPatientDetails || {};
+            const accountData = b.patientDetails || {};
+            const doctorData = b.doctor || {};
+
+            return {
+              id: b.appointmentId || "--",
+              internalBookingId: b.bookingId,
+              time: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+              type: isPrepaid ? 'Prepaid' : 'Collect CASH',
+              amount: b.fees || 0,
+              orderType: b.notes || null,
+              
+              patient: {
+                name: patientData.name || accountData.name || "Unknown",
+                age: patientData.age || accountData.age || "--",
+                gender: patientData.gender || accountData.gender || "Not Specified",
+                initials: (patientData.name || accountData.name || "U").substring(0, 2).toUpperCase(),
+                image: null,
+                phone: patientData.contact || accountData.loginNumber || "--",
+                concernedAbout: patientData.concernedAbout || []
+              },
+              
+              account: {
+                name: accountData.name || "--",
+                phone: accountData.loginNumber || "--",
+                email: accountData.email || "--",
+                city: accountData.city || "--"
+              },
+
+              agent: b.agent || "Self",
+              hospital: b.clinic || "--",
+              bookedBy: b.bookedBy || {},
+              
+              slot: b.timeSlot || "Not Scheduled",
+              displayDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+              
+              doctor: {
+                name: doctorData.name || "Unknown Doctor",
+                qualification: [doctorData.underGradDegree, doctorData.postGradDegree].filter(x => x && x !== "--").join(", ") || "Specialist",
+                specialty: doctorData.primarySpecialty || "--",
+                experience: doctorData.experience ? `${doctorData.experience} years` : "--",
+                rating: 4,
+                available: true,
+                image: doctorData.profileImage || null
+              },
+              
+              status: b.status?.toLowerCase() || 'pending',
+              paymentStatus: b.paymentStatus
+            };
+          });
+
+          setRequests(mappedRequests);
+        } else {
+          toast.error(res.message || "Failed to load bookings");
+        }
+      } catch (error) {
+        toast.error("Error communicating with server.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookings();
   }, [activeTab, primaryDate, refreshTrigger]);
 
   // 3. TABS
@@ -609,7 +599,7 @@ const HospitalDashboard = () => {
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[13px] text-gray-500 font-medium">
                       <span className="text-blue-600 font-semibold">• {request.id}</span>
                       <span>•</span>
-                      <span className="flex items-center gap-1"><Clock size={13} />{request.time}</span>
+                      <span className="flex items-center gap-1"><Clock size={13} />{request.displayDate}</span>
                       <span>•</span>
                       <span className={`font-bold ${request.type === 'Prepaid' ? 'text-emerald-600' : 'text-orange-500'}`}>
                         {request.type}
@@ -680,14 +670,14 @@ const HospitalDashboard = () => {
                              <p className="text-sm font-semibold text-gray-800">₹{request.amount}</p>
                              <p className={`text-[10px] font-bold uppercase mt-0.5 ${request.type === 'Prepaid' ? 'text-emerald-600' : 'text-orange-500'}`}>{request.type}</p>
                           </div>
-                          {/* <div>
+                          <div>
                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">Agent</p>
                              <p className="text-sm font-semibold text-gray-800">{request.agent}</p>
                           </div>
                           <div>
                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">Hospital</p>
                              <p className="text-sm font-semibold text-gray-800">{request.hospital}</p>
-                          </div> */}
+                          </div>
                         </div>
                       </div>
 
