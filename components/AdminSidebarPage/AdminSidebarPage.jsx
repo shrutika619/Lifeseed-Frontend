@@ -7,7 +7,7 @@ import {
   Building2,
   Video,
   Stethoscope,
-  Settings,
+  Hotel,
   ScrollText,
   Users,
   X,
@@ -26,7 +26,7 @@ const menuItems = [
   { label: "Teleconsultation", icon: Video, path: "teleconsultation", moduleKey: "teleconsultation" },
   { label: "Delivery Manager", icon: Truck, path: "delivery-manager", moduleKey: "delivery_manager" },
   { label: "Clinics", icon: Stethoscope, path: "clinics", moduleKey: "clinic" }, 
-  { label: "Setup", icon: Settings, path: "setup", moduleKey: "setup" }, 
+  { label: "Cities", icon: Hotel, path: "cities", moduleKey: "cities" }, 
   { label: "Audit Logs", icon: ScrollText, path: "auditlogs", moduleKey: "audit_logs" },
   { label: "Team", icon: Users, path: "team", moduleKey: "team" },
 ];
