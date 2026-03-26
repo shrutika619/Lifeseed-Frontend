@@ -1,41 +1,115 @@
 "use client"
-import React, { useState } from 'react'
-
-const initialCities = [
-  { id: 1, name: 'Nagpur',   slug: '/clinic/nagpur',   visible: true },
-  { id: 2, name: 'Pune',     slug: '/clinic/pune',     visible: true },
-  { id: 3, name: 'Kolhapur', slug: '/clinic/kolhapur', visible: true },
-  { id: 4, name: 'Nashik',   slug: '/clinic/nashik',   visible: true },
-]
+import React, { useState, useEffect } from 'react'
+import { adminCityService } from '@/app/services/admin/adminCity.service'
 
 export default function AdminCitiesPage() {
-  const [cities, setCities]         = useState(initialCities)
+  const [cities, setCities]         = useState([])
+  const [loading, setLoading]       = useState(true)
   const [modalOpen, setModalOpen]   = useState(false)
   const [form, setForm]             = useState({ name: '' })
   const [toast, setToast]           = useState(null)
   const [search, setSearch]         = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [activeFilter, setActiveFilter] = useState('All') 
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 2500)
   }
 
-  const handleAdd = () => {
+  // 1. FETCH CITIES
+  const fetchCities = async (signal) => {
+    setLoading(true)
+    try {
+      const res = await adminCityService.getAllCities(signal)
+      if (res.canceled) return
+      
+      if (res.success && res.data) {
+        const mappedData = res.data.map(c => ({
+          id: c._id,
+          name: c.name,
+          slug: `/clinic/${c.name.toLowerCase().replace(/\s+/g, '-')}`,
+          visible: c.isActive
+        }))
+        setCities(mappedData)
+      } else {
+        showToast(res.message || "Failed to load cities", "error")
+      }
+    } catch (error) {
+      if (!error?.canceled) showToast("Error connecting to server", "error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchCities(controller.signal)
+    return () => controller.abort()
+  }, [])
+
+  // 2. ADD NEW CITY
+  const handleAdd = async () => {
     if (!form.name.trim()) { showToast('City name required', 'error'); return }
-    const slug = '/clinic/' + form.name.trim().toLowerCase().replace(/\s+/g, '-')
-    setCities(p => [...p, { id: Date.now(), name: form.name.trim(), slug, visible: true }])
-    showToast('City added')
-    setForm({ name: '' })
-    setModalOpen(false)
+    
+    setIsSubmitting(true)
+    try {
+      const payload = { name: form.name.trim() }
+      const res = await adminCityService.createCity(payload)
+      
+      if (res.success && res.data) {
+        showToast('City added successfully')
+        setForm({ name: '' })
+        setModalOpen(false)
+        fetchCities() 
+      } else {
+        showToast(res.message || "Failed to add city", "error")
+      }
+    } catch (error) {
+      showToast(error.message || "Server Error", "error")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const toggleVisible = (id) => {
-    setCities(p => p.map(c => c.id === id ? { ...c, visible: !c.visible } : c))
+  // 3. TOGGLE VISIBILITY (PUT)
+  const toggleVisible = async (city) => {
+    // Optimistic UI update
+    setCities(p => p.map(c => c.id === city.id ? { ...c, visible: !c.visible } : c))
+    
+    try {
+      // ✅ Included both "name" and "isActive" in the PUT payload
+      const payload = { 
+        name: city.name, 
+        isActive: !city.visible 
+      }
+      
+      const res = await adminCityService.updateCity(city.id, payload)
+      
+      if (res.success) {
+        showToast(`City ${!city.visible ? 'set to visible' : 'is now hidden'}`)
+      } else {
+        // Revert on failure
+        setCities(p => p.map(c => c.id === city.id ? { ...c, visible: city.visible } : c))
+        showToast(res.message || "Update failed", "error")
+      }
+    } catch (error) {
+      // Revert on error
+      setCities(p => p.map(c => c.id === city.id ? { ...c, visible: city.visible } : c))
+      showToast(error.message || "Server Error", "error")
+    }
   }
 
-  const filtered = cities.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = cities.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase())
+    const matchesFilter = 
+      activeFilter === 'All' ? true : 
+      activeFilter === 'Visible' ? c.visible : 
+      !c.visible;
+
+    return matchesSearch && matchesFilter;
+  })
 
   return (
     <div style={s.page}>
@@ -48,15 +122,41 @@ export default function AdminCitiesPage() {
 
       {/* Stats chips */}
       <div style={s.statsRow}>
-        <div style={s.statChip}>
+        <button 
+          onClick={() => setActiveFilter('All')}
+          style={{ 
+            ...s.statChip, 
+            borderColor: activeFilter === 'All' ? '#2563eb' : '#e2e8f0',
+            background: activeFilter === 'All' ? '#eff6ff' : '#fff',
+            color: activeFilter === 'All' ? '#1d4ed8' : '#64748b'
+          }}
+        >
           <span style={{ fontWeight: 700 }}>{cities.length}</span>&nbsp;Total
-        </div>
-        <div style={{ ...s.statChip, borderColor: '#22c55e', color: '#16a34a' }}>
+        </button>
+        
+        <button 
+          onClick={() => setActiveFilter('Visible')}
+          style={{ 
+            ...s.statChip, 
+            borderColor: activeFilter === 'Visible' ? '#16a34a' : '#e2e8f0',
+            background: activeFilter === 'Visible' ? '#f0fdf4' : '#fff',
+            color: activeFilter === 'Visible' ? '#15803d' : '#16a34a'
+          }}
+        >
           <span style={{ fontWeight: 700 }}>{cities.filter(c => c.visible).length}</span>&nbsp;Visible
-        </div>
-        <div style={{ ...s.statChip, borderColor: '#f87171', color: '#dc2626' }}>
+        </button>
+        
+        <button 
+          onClick={() => setActiveFilter('Hidden')}
+          style={{ 
+            ...s.statChip, 
+            borderColor: activeFilter === 'Hidden' ? '#dc2626' : '#e2e8f0',
+            background: activeFilter === 'Hidden' ? '#fef2f2' : '#fff',
+            color: activeFilter === 'Hidden' ? '#b91c1c' : '#dc2626'
+          }}
+        >
           <span style={{ fontWeight: 700 }}>{cities.filter(c => !c.visible).length}</span>&nbsp;Hidden
-        </div>
+        </button>
       </div>
 
       {/* Search */}
@@ -81,36 +181,39 @@ export default function AdminCitiesPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={5} style={s.empty}>No cities found</td></tr>
+            {loading ? (
+              <tr><td colSpan={5} style={s.empty}>Loading cities...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={5} style={s.empty}>No cities found matching your criteria.</td></tr>
+            ) : (
+              filtered.map((city, i) => (
+                <tr key={city.id} style={{ ...s.tr, opacity: city.visible ? 1 : 0.5 }}>
+                  <td style={{ ...s.td, color: '#94a3b8', width: 40 }}>{i + 1}</td>
+                  <td style={{ ...s.td, fontWeight: 600, color: '#0f172a' }}>{city.name}</td>
+                  <td style={s.td}>
+                    <span style={s.slugTag}>{city.slug}</span>
+                  </td>
+                  <td style={s.td}>
+                    {city.visible
+                      ? <span style={{ ...s.badge, background: '#dcfce7', color: '#16a34a' }}>Visible</span>
+                      : <span style={{ ...s.badge, background: '#f1f5f9', color: '#94a3b8' }}>Hidden</span>}
+                  </td>
+                  <td style={s.td}>
+                    <button
+                      style={{
+                        ...s.toggleBtn,
+                        background: city.visible ? '#fef9c3' : '#f0fdf4',
+                        color: city.visible ? '#92400e' : '#15803d',
+                        borderColor: city.visible ? '#fde68a' : '#bbf7d0',
+                      }}
+                      onClick={() => toggleVisible(city)}
+                    >
+                      {city.visible ? ' Hide' : '👁️ Show'}
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
-            {filtered.map((city, i) => (
-              <tr key={city.id} style={{ ...s.tr, opacity: city.visible ? 1 : 0.5 }}>
-                <td style={{ ...s.td, color: '#94a3b8', width: 40 }}>{i + 1}</td>
-                <td style={{ ...s.td, fontWeight: 600, color: '#0f172a' }}>{city.name}</td>
-                <td style={s.td}>
-                  <span style={s.slugTag}>{city.slug}</span>
-                </td>
-                <td style={s.td}>
-                  {city.visible
-                    ? <span style={{ ...s.badge, background: '#dcfce7', color: '#16a34a' }}>Visible</span>
-                    : <span style={{ ...s.badge, background: '#f1f5f9', color: '#94a3b8' }}>Hidden</span>}
-                </td>
-                <td style={s.td}>
-                  <button
-                    style={{
-                      ...s.toggleBtn,
-                      background: city.visible ? '#fef9c3' : '#f0fdf4',
-                      color: city.visible ? '#92400e' : '#15803d',
-                      borderColor: city.visible ? '#fde68a' : '#bbf7d0',
-                    }}
-                    onClick={() => toggleVisible(city.id)}
-                  >
-                    {city.visible ? ' Hide' : '👁️ Show'}
-                  </button>
-                </td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </div>
@@ -131,7 +234,8 @@ export default function AdminCitiesPage() {
                 value={form.name}
                 autoFocus
                 onChange={e => setForm({ name: e.target.value })}
-                onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                onKeyDown={e => e.key === 'Enter' && !isSubmitting && handleAdd()}
+                disabled={isSubmitting}
               />
               {form.name && (
                 <div style={s.slugPreview}>
@@ -139,8 +243,10 @@ export default function AdminCitiesPage() {
                 </div>
               )}
               <div style={s.modalFoot}>
-                <button style={s.cancelBtn} onClick={() => setModalOpen(false)}>Cancel</button>
-                <button style={s.saveBtn} onClick={handleAdd}>Add City</button>
+                <button style={s.cancelBtn} onClick={() => setModalOpen(false)} disabled={isSubmitting}>Cancel</button>
+                <button style={{...s.saveBtn, opacity: isSubmitting ? 0.7 : 1}} onClick={handleAdd} disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : 'Add City'}
+                </button>
               </div>
             </div>
           </div>
@@ -202,10 +308,13 @@ const s = {
     gap: 4,
     border: '1px solid #e2e8f0',
     borderRadius: 20,
-    padding: '5px 14px',
+    padding: '6px 16px',
     fontSize: 13,
     color: '#64748b',
     background: '#fff',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    outline: 'none',
   },
   searchRow: {
     display: 'flex',
@@ -248,6 +357,7 @@ const s = {
   },
   tr: {
     borderBottom: '1px solid #f1f5f9',
+    transition: 'opacity 0.2s ease'
   },
   td: {
     padding: '14px 18px',
@@ -284,7 +394,7 @@ const s = {
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    background: 'none',
+    transition: 'all 0.2s'
   },
   overlay: {
     position: 'fixed',
@@ -383,6 +493,7 @@ const s = {
     color: '#fff',
     cursor: 'pointer',
     fontFamily: 'inherit',
+    transition: 'opacity 0.2s'
   },
   toast: {
     position: 'fixed',
