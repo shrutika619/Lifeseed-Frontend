@@ -16,7 +16,8 @@ import {
   Leaf,
   Loader2,
   AlertCircle,
-  Phone
+  Phone,
+  ArrowLeft
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -151,7 +152,18 @@ const ConfirmBookingContent = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4 font-sans">
-      <div className="max-w-xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="max-w-xl w-full">
+
+        {/* ── TOP BACK BUTTON ── */}
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-2 mb-4 text-indigo-700 font-semibold hover:text-indigo-900 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
+
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
         
         {/* --- CONTENT TO CAPTURE FOR RECEIPT STARTS HERE --- */}
         <div ref={receiptRef} className="p-6 md:p-8 bg-white">
@@ -245,6 +257,15 @@ const ConfirmBookingContent = () => {
         {/* Action Buttons */}
         <div className="px-6 md:px-8 pb-8">
           <div className="flex flex-col sm:flex-row gap-3 mb-8 pb-8 border-b border-gray-100">
+
+            {/* Back Button */}
+            <button
+              onClick={() => window.history.back()}
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-indigo-400 transition-all"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
             
             {type === 'inclinic' && (
               <button 
@@ -335,6 +356,7 @@ const ConfirmBookingContent = () => {
           </div>
         </div>
         
+        </div>
       </div>
     </div>
   );

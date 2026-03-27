@@ -55,7 +55,7 @@ export default function SecondsectionPage() {
   };
 
   const handleBookConsultation = () => {
-    alert("Redirecting to online consultation booking...");
+    window.location.href = "/free-consultation";
   };
 
   return (

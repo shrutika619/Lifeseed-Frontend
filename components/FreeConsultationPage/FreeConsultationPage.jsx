@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Clock, MapPin, X, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, X, Loader2, ArrowLeft } from 'lucide-react';
 import { getAllCities } from '@/app/services/patient/clinic.service';
 import { bookTeleconsultation, getPatientTeleSlots } from '@/app/services/patient/appointment.service';
 import { adminTeleconsultationService } from '@/app/services/admin/adminTeleconsultation.service'; 
@@ -373,6 +373,15 @@ const FreeConsultationPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-md mx-auto">
+          {/* Back Button */}
+          <button 
+            onClick={handleCancelAppointment}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            <span className="font-medium">Back to Booking</span>
+          </button>
+
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             <div className="bg-gradient-to-b from-white to-gray-50 p-8 text-center">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -578,7 +587,7 @@ const FreeConsultationPage = () => {
                 <input 
                   type="text"
                   value={patientContact}
-                  disabled={rescheduleRecordId} // Disabled if just rescheduling
+                  disabled={rescheduleRecordId}
                   onChange={(e) => setPatientContact(e.target.value)}
                   className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-blue-200 focus:border-blue-500 bg-blue-50/30'}`}
                   placeholder="e.g. 8908999995"
