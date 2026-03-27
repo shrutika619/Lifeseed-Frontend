@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
-  Phone,
   MapPin,
   Navigation,
   Loader2,
@@ -17,9 +16,11 @@ import {
   Clock,
   User,
   CreditCard,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from "lucide-react";
-import { getMyBookingsHistory, getMyOrdersHistory, cancelMyBooking, getMyBookingDetails } from "@/app/services/patient/order.service"; 
+import { getMyBookingsHistory, getMyOrdersHistory, cancelMyBooking, getMyBookingDetails, getBookingReceiptHTML } from "@/app/services/patient/order.service"; 
+import { toast } from 'sonner';
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
@@ -56,7 +57,7 @@ const MyOrderPage = () => {
   
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState("");
+  const [toastMsg, setToastMsg] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("booking");
@@ -68,9 +69,10 @@ const MyOrderPage = () => {
   const [detailsData, setDetailsData] = useState(null);
   const [detailsType, setDetailsType] = useState(null); 
   const [isFetchingDetails, setIsFetchingDetails] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(null); // Track which ID is downloading
 
   const showToast = (msg) => {
-    setToast(msg);
+    setToastMsg(msg);
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2500);
   };
@@ -106,7 +108,7 @@ const MyOrderPage = () => {
                 bookedOn: b.bookingDate ? `Booked on ${new Date(b.bookingDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
                 amountPaid: "Prepaid", 
                 rawCreatedAt: b.bookingDate || new Date().toISOString(), 
-                actions: isCancellable ? ["cancel", "callNow", "details"] : ["details"]
+                actions: isCancellable ? ["cancel", "details"] : ["details"] 
               });
             });
           }
@@ -115,8 +117,16 @@ const MyOrderPage = () => {
           if (bookingsRes.data.inClinicBookings && Array.isArray(bookingsRes.data.inClinicBookings.bookings)) {
             bookingsRes.data.inClinicBookings.bookings.forEach(b => {
               const isCancellable = b.inClinicStatus !== 'Cancelled' && b.inClinicStatus !== 'Complete';
+              const isComplete = b.inClinicStatus === 'Complete' || b.inClinicStatus === 'Complete';
               const dName = b.doctor?.name ?? b.doctor ?? b.doctorName?.name ?? b.doctorName ?? "Not Assigned";
               const cName = b.clinic?.name ?? b.clinic ?? "--";
+
+              const actionsList = ["details"];
+              if (isCancellable) {
+                actionsList.unshift("cancel", "directions");
+              }
+              // ✅ ALWAY ALLOW DOWNLOADING RECEIPT FOR IN-CLINIC
+              actionsList.unshift("downloadReceipt");
 
               combined.push({
                 id: b.appointmentId || b.bookingId,
@@ -133,7 +143,7 @@ const MyOrderPage = () => {
                 bookedOn: b.bookingDate ? `Booked on ${new Date(b.bookingDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '--',
                 amountPaid: b.fees > 0 ? `₹${b.fees}` : "Free",
                 rawCreatedAt: b.bookingDate || new Date().toISOString(), 
-                actions: isCancellable ? ["cancel", "directions", "details"] : ["details"]
+                actions: actionsList
               });
             });
           }
@@ -210,6 +220,47 @@ const MyOrderPage = () => {
       showToast("Error fetching details.");
     } finally {
       setIsFetchingDetails(null);
+    }
+  };
+
+  // ✅ Download Receipt Handler ported from ConfirmBookingPage
+  const handleDownloadReceipt = async (bookingId) => {
+    if (!bookingId) {
+      toast.error("Invalid booking ID");
+      return;
+    }
+
+    setIsDownloading(bookingId);
+    const toastId = toast.loading("Generating receipt...");
+
+    try {
+      const res = await getBookingReceiptHTML(bookingId);
+      
+      if (res.success && res.html) {
+        toast.success("Receipt generated successfully", { id: toastId });
+        
+        // Open a new window
+        const printWindow = window.open('', '', 'width=800,height=600');
+        
+        // Inject the raw HTML received from the server
+        printWindow.document.open();
+        printWindow.document.write(res.html);
+        printWindow.document.close();
+        
+        // Wait for content/images to load then print
+        setTimeout(() => {
+          printWindow.print();
+          // Optional: close window after print dialog is closed
+          // printWindow.close(); 
+        }, 500);
+
+      } else {
+        toast.error(res.message || "Could not generate receipt.", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error communicating with server for receipt.", { id: toastId });
+    } finally {
+      setIsDownloading(null);
     }
   };
 
@@ -353,9 +404,9 @@ const MyOrderPage = () => {
                               id: order.recordId,
                               type: order.type === "Teleconsultation" ? "tele" : "inclinic"
                             })}
-                            className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
+                            className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center gap-2"
                           >
-                            Cancel Booking
+                            <X className="w-4 h-4" /> Cancel
                           </button>
                         )}
 
@@ -368,16 +419,6 @@ const MyOrderPage = () => {
                           </button>
                         )}
 
-                        {order.actions?.includes("callNow") && (
-                          <button
-                            onClick={() => showToast("Calling now...")}
-                            className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200 flex items-center justify-center gap-2 transition-colors"
-                          >
-                            <Phone className="w-4 h-4" /> Call Doctor
-                          </button>
-                        )}
-
-                        {/* ✅ LIST VIEW DIRECTIONS (Fallback to Search since link isn't in this API) */}
                         {order.actions?.includes("directions") && (
                           <button
                             onClick={() => {
@@ -394,6 +435,22 @@ const MyOrderPage = () => {
                             className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl bg-slate-800 text-white hover:bg-slate-900 shadow-md flex items-center justify-center gap-2 transition-colors"
                           >
                             <Navigation className="w-4 h-4" /> Directions
+                          </button>
+                        )}
+
+                        {/* ✅ ADDED: DOWNLOAD RECEIPT BUTTON */}
+                        {order.actions?.includes("downloadReceipt") && (
+                          <button
+                            onClick={() => handleDownloadReceipt(order.recordId)}
+                            disabled={isDownloading === order.recordId}
+                            className="flex-1 sm:flex-none text-sm font-bold px-5 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                          >
+                            {isDownloading === order.recordId ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                            Receipt
                           </button>
                         )}
 
@@ -516,7 +573,7 @@ const MyOrderPage = () => {
                         </div>
                       </div>
                       
-                      {/* ✅ MODAL DIRECTIONS (Uses API link if available) */}
+                      {/* ✅ MODAL DIRECTIONS */}
                       <button
                         onClick={() => {
                           if (detailsData.clinic?.googleMapsLink) {
@@ -613,7 +670,7 @@ const MyOrderPage = () => {
         }`}
       >
         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        {toast}
+        {toastMsg}
       </div>
     </div>
   );
