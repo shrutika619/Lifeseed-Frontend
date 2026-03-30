@@ -39,6 +39,35 @@ const sortPeriodsChronologically = (groups) => {
   });
 };
 
+// ✅ HELPER: Check if a time slot string (e.g., "10:30 AM - 11:00 AM") is in the past (for today)
+const isSlotInPast = (slotTimeStr, selectedDateStr) => {
+  const today = new Date();
+  const selectedDate = new Date(selectedDateStr);
+  
+  // If selected date is strictly in the future, slot is not in the past
+  if (selectedDate.setHours(0,0,0,0) > today.setHours(0,0,0,0)) return false;
+
+  // Extract start time (e.g. "10:30 AM")
+  const startTimeStr = slotTimeStr.split(" - ")[0];
+  if (!startTimeStr) return false;
+
+  const match = startTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return false;
+
+  let [_, hours, minutes, period] = match;
+  hours = parseInt(hours, 10);
+  minutes = parseInt(minutes, 10);
+
+  if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+  if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+  const currentTime = new Date();
+  const slotTime = new Date();
+  slotTime.setHours(hours, minutes, 0, 0);
+
+  return slotTime < currentTime;
+};
+
 const FreeConsultationPage = () => {
   const router = useRouter(); 
   const dispatch = useDispatch();
@@ -185,7 +214,7 @@ const FreeConsultationPage = () => {
     fetchCityData();
   }, []);
 
-  // ✅ Extracted fetchSlots so it can be called on error to refresh slots
+  // Fetch Slots
   const fetchSlots = useCallback(async () => {
     if (!selectedDate) return;
     
@@ -329,11 +358,10 @@ const FreeConsultationPage = () => {
             toast.success(`Booking successfully created for ${fullName}`);
         }
       } else {
-        // ✅ CATCH MONGOOSE VERSION ERROR (Concurrency)
         const errorMsg = res.message || "";
         if (errorMsg.includes("VersionError") || errorMsg.includes("No matching document")) {
           toast.error("Slot already full. Please select another time slot.");
-          fetchSlots(); // Refresh slots so the UI shows it's full
+          fetchSlots(); 
         } else {
           toast.error(errorMsg || "Something went wrong. Please try again.");
         }
@@ -341,11 +369,10 @@ const FreeConsultationPage = () => {
 
     } catch (error) {
       console.error(error);
-      // ✅ CATCH THROWN VERSION ERROR 
       const errorStr = String(error?.message || error?.error || error);
       if (errorStr.includes("VersionError") || errorStr.includes("No matching document")) {
         toast.error("Slot already full. Please select another time slot.");
-        fetchSlots(); // Refresh slots so the UI shows it's full
+        fetchSlots(); 
       } else {
         toast.error(error?.message || "Failed to communicate with server.");
       }
@@ -711,7 +738,9 @@ const FreeConsultationPage = () => {
                       <div className="grid grid-cols-3 gap-2">
                         {group.slots.map((slot) => {
                           const isFull = slot.bookedCount >= patientLimit;
-                          const isBookable = slot.isAvailable && !isFull;
+                          // ✅ ADDED PAST SLOT CHECK
+                          const isPast = isSlotInPast(slot.time, selectedDate); 
+                          const isBookable = slot.isAvailable && !isFull && !isPast;
                           const isSelected = selectedSlot?._id === slot._id;
 
                           return (
@@ -733,8 +762,13 @@ const FreeConsultationPage = () => {
                               `}
                             >
                               <span className="font-medium whitespace-nowrap text-xs">{slot.time}</span>
-                              {isFull && (
+                              
+                              {/* Display Full OR Passed badge based on the condition */}
+                              {isFull && !isPast && (
                                 <span className="text-[10px] text-red-500 font-bold mt-0.5 leading-none">Full</span>
+                              )}
+                              {isPast && (
+                                <span className="text-[10px] text-gray-400 font-bold mt-0.5 leading-none">Passed</span>
                               )}
                             </button>
                           );
