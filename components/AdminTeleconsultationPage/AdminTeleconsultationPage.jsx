@@ -29,6 +29,7 @@ import {
   CalendarClock,
   Monitor,
   ShoppingCart,
+  RefreshCw // ✅ Imported Refresh Icon
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminTeleconsultationService } from "@/app/services/admin/adminTeleconsultation.service";
@@ -283,6 +284,7 @@ const AdminTeleconsultationPage = () => {
   const pathname = usePathname();
 
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // ✅ Added state for refresh spin
   const [bookings, setBookings] = useState([]);
   const [counts, setCounts] = useState({ consult: {}, sell: {} });
 
@@ -300,6 +302,7 @@ const AdminTeleconsultationPage = () => {
   // ✅ Extracted logic with isInitialLoad flag
   const fetchBookings = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
+    else setIsRefreshing(true);
     
     try {
       const queryFilters = {
@@ -325,6 +328,7 @@ const AdminTeleconsultationPage = () => {
       if(isInitialLoad) toast.error("Error fetching data");
     } finally {
       if (isInitialLoad) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -392,7 +396,7 @@ const AdminTeleconsultationPage = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans pb-24">
+    <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans pb-24 relative">
       
       <ConfirmCancelModal 
         isOpen={cancelModal.isOpen} 
@@ -411,18 +415,30 @@ const AdminTeleconsultationPage = () => {
           Back
         </button>
 
-        <div className="relative w-full sm:w-auto">
-          <select
-            value={selectedTime}
-            onChange={(e) => setSelectedTime(e.target.value)}
-            className="w-full sm:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        <div className="flex items-center gap-3">
+          <div className="relative w-full sm:w-auto">
+            <select
+              value={selectedTime}
+              onChange={(e) => setSelectedTime(e.target.value)}
+              className="w-full sm:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* ✅ REFRESH BUTTON */}
+          <button 
+            onClick={() => fetchBookings(true)}
+            disabled={isRefreshing || loading}
+            className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-colors text-slate-600 disabled:opacity-50"
+            title="Refresh Data"
           >
-            <option value="">All Time</option>
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -463,6 +479,7 @@ const AdminTeleconsultationPage = () => {
           >
             <Filter className="w-5 h-5 text-slate-500" />
           </button>
+          
           <div className="relative flex-1 lg:max-w-md">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -494,7 +511,15 @@ const AdminTeleconsultationPage = () => {
       </div>
 
       {/* ─────────── DESKTOP TABLE ─────────── */}
-      <div className="hidden lg:flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="hidden lg:flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+        
+        {/* Show tiny overlay if refreshing in background */}
+        {isRefreshing && (
+           <div className="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden z-10">
+             <div className="h-full bg-blue-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+           </div>
+        )}
+
         <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -691,11 +716,11 @@ const AdminTeleconsultationPage = () => {
 
             return (
               <div key={item.recordId || idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     
                     <div className="flex items-start gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold text-slate-600 mt-0.5">{item.bookingId}</span>
+                      <span className="text-xs font-bold text-slate-700 mt-0.5">{item.bookingId}</span>
                       
                       <div className="flex flex-col gap-1 items-start">
                         <span className={`w-fit px-2 py-0.5 rounded-md text-[10px] font-bold border ${getConsultStyle(item.consultationStatus)}`}>
@@ -714,7 +739,7 @@ const AdminTeleconsultationPage = () => {
                         {item.sellResponse}
                       </span>
                     </div>
-
+                    
                   </div>
                   <ActionCell 
                     item={item} 
@@ -751,7 +776,7 @@ const AdminTeleconsultationPage = () => {
                        <>
                          <p className="text-sm font-medium text-slate-700">{account.name || "--"}</p>
                          <p className="text-xs text-slate-600">📞 {account.loginNumber || "--"}</p>
-                         {account.city && account.city !== "--" && <p className="text-xs text-slate-500">{account.city}</p>}
+                         {account.city !== "--" && <p className="text-xs text-slate-500">{account.city}</p>}
                        </>
                      )}
                    </div>

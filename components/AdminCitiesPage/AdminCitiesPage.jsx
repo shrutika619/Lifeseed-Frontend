@@ -1,12 +1,19 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { adminCityService } from '@/app/services/admin/adminCity.service'
+import { RefreshCw, Edit2 } from 'lucide-react' // ✅ Added Icons
 
 export default function AdminCitiesPage() {
   const [cities, setCities]         = useState([])
   const [loading, setLoading]       = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false) // ✅ Refresh state
+  
+  // Modal States
   const [modalOpen, setModalOpen]   = useState(false)
+  const [editMode, setEditMode]     = useState(false) // ✅ Track if editing
+  const [activeCityId, setActiveCityId] = useState(null) // ✅ Track which city is being edited
   const [form, setForm]             = useState({ name: '' })
+  
   const [toast, setToast]           = useState(null)
   const [search, setSearch]         = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -19,8 +26,10 @@ export default function AdminCitiesPage() {
   }
 
   // 1. FETCH CITIES
-  const fetchCities = async (signal) => {
-    setLoading(true)
+  const fetchCities = async (isInitialLoad = false, signal) => {
+    if (isInitialLoad) setLoading(true);
+    else setIsRefreshing(true);
+
     try {
       const res = await adminCityService.getAllCities(signal)
       if (res.canceled) return
@@ -34,37 +43,49 @@ export default function AdminCitiesPage() {
         }))
         setCities(mappedData)
       } else {
-        showToast(res.message || "Failed to load cities", "error")
+        if (isInitialLoad) showToast(res.message || "Failed to load cities", "error")
       }
     } catch (error) {
-      if (!error?.canceled) showToast("Error connecting to server", "error")
+      if (!error?.canceled && isInitialLoad) showToast("Error connecting to server", "error")
     } finally {
-      setLoading(false)
+      if (isInitialLoad) setLoading(false);
+      setIsRefreshing(false);
     }
   }
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchCities(controller.signal)
+    fetchCities(true, controller.signal)
     return () => controller.abort()
   }, [])
 
-  // 2. ADD NEW CITY
-  const handleAdd = async () => {
+  // 2. ADD / EDIT CITY
+  const handleSave = async () => {
     if (!form.name.trim()) { showToast('City name required', 'error'); return }
     
     setIsSubmitting(true)
     try {
       const payload = { name: form.name.trim() }
-      const res = await adminCityService.createCity(payload)
-      
-      if (res.success && res.data) {
-        showToast('City added successfully')
-        setForm({ name: '' })
-        setModalOpen(false)
-        fetchCities() 
+      let res;
+
+      if (editMode && activeCityId) {
+        // ✅ Currently, the API expects 'isActive' for updates based on the toggle logic.
+        // If your backend requires preserving the current visibility status when updating the name,
+        // we must find the current city state.
+        const currentCity = cities.find(c => c.id === activeCityId);
+        payload.isActive = currentCity ? currentCity.visible : true;
+        
+        res = await adminCityService.updateCity(activeCityId, payload);
       } else {
-        showToast(res.message || "Failed to add city", "error")
+        res = await adminCityService.createCity(payload);
+      }
+      
+      if (res.success) {
+        showToast(editMode ? 'City updated successfully' : 'City added successfully')
+        closeModal()
+        fetchCities(false) 
+      } else {
+        showToast(res.message || "Failed to save city", "error")
       }
     } catch (error) {
       showToast(error.message || "Server Error", "error")
@@ -101,6 +122,30 @@ export default function AdminCitiesPage() {
     }
   }
 
+  // ✅ HELPER: Open modal in Add mode
+  const openAddModal = () => {
+    setEditMode(false)
+    setActiveCityId(null)
+    setForm({ name: '' })
+    setModalOpen(true)
+  }
+
+  // ✅ HELPER: Open modal in Edit mode
+  const openEditModal = (city) => {
+    setEditMode(true)
+    setActiveCityId(city.id)
+    setForm({ name: city.name })
+    setModalOpen(true)
+  }
+
+  // ✅ HELPER: Close modal and reset
+  const closeModal = () => {
+    setModalOpen(false)
+    setForm({ name: '' })
+    setEditMode(false)
+    setActiveCityId(null)
+  }
+
   const filtered = cities.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase())
     const matchesFilter = 
@@ -116,8 +161,21 @@ export default function AdminCitiesPage() {
 
       {/* Top bar */}
       <div style={s.topBar}>
-        <span style={s.pageTitle}>Cities</span>
-        <button style={s.addBtn} onClick={() => setModalOpen(true)}>+ Add City</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={s.pageTitle}>Cities</span>
+          
+          {/* ✅ REFRESH BUTTON */}
+          <button 
+            onClick={() => fetchCities(false)}
+            disabled={isRefreshing || loading}
+            style={s.refreshBtn}
+            title="Refresh Data"
+          >
+            <RefreshCw size={16} className={isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+          </button>
+        </div>
+        
+        <button style={s.addBtn} onClick={openAddModal}>+ Add City</button>
       </div>
 
       {/* Stats chips */}
@@ -176,7 +234,7 @@ export default function AdminCitiesPage() {
           <thead>
             <tr style={{ background: '#f8fafc' }}>
               {['#', 'City Name', 'Slug', 'Status', 'Action'].map(h => (
-                <th key={h} style={s.th}>{h}</th>
+                <th key={h} style={{ ...s.th, textAlign: h === 'Action' ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -198,18 +256,32 @@ export default function AdminCitiesPage() {
                       ? <span style={{ ...s.badge, background: '#dcfce7', color: '#16a34a' }}>Visible</span>
                       : <span style={{ ...s.badge, background: '#f1f5f9', color: '#94a3b8' }}>Hidden</span>}
                   </td>
-                  <td style={s.td}>
-                    <button
-                      style={{
-                        ...s.toggleBtn,
-                        background: city.visible ? '#fef9c3' : '#f0fdf4',
-                        color: city.visible ? '#92400e' : '#15803d',
-                        borderColor: city.visible ? '#fde68a' : '#bbf7d0',
-                      }}
-                      onClick={() => toggleVisible(city)}
-                    >
-                      {city.visible ? ' Hide' : '👁️ Show'}
-                    </button>
+                  <td style={{ ...s.td, textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      
+                      {/* ✅ EDIT BUTTON */}
+                      <button
+                        style={s.editBtn}
+                        onClick={() => openEditModal(city)}
+                        title="Edit City"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+
+                      {/* TOGGLE VISIBILITY BUTTON */}
+                      <button
+                        style={{
+                          ...s.toggleBtn,
+                          background: city.visible ? '#fef9c3' : '#f0fdf4',
+                          color: city.visible ? '#92400e' : '#15803d',
+                          borderColor: city.visible ? '#fde68a' : '#bbf7d0',
+                        }}
+                        onClick={() => toggleVisible(city)}
+                        title={city.visible ? "Hide City" : "Show City"}
+                      >
+                        {city.visible ? ' Hide' : '👁️ Show'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -218,13 +290,13 @@ export default function AdminCitiesPage() {
         </table>
       </div>
 
-      {/* Add City Modal */}
+      {/* Add / Edit City Modal */}
       {modalOpen && (
-        <div style={s.overlay} onClick={() => setModalOpen(false)}>
+        <div style={s.overlay} onClick={closeModal}>
           <div style={s.modal} onClick={e => e.stopPropagation()}>
             <div style={s.modalHead}>
-              <span style={s.modalTitle}>Add City</span>
-              <button style={s.closeBtn} onClick={() => setModalOpen(false)}>✕</button>
+              <span style={s.modalTitle}>{editMode ? 'Edit City' : 'Add City'}</span>
+              <button style={s.closeBtn} onClick={closeModal}>✕</button>
             </div>
             <div style={s.modalBody}>
               <label style={s.label}>City Name <span style={{ color: '#ef4444' }}>*</span></label>
@@ -234,7 +306,7 @@ export default function AdminCitiesPage() {
                 value={form.name}
                 autoFocus
                 onChange={e => setForm({ name: e.target.value })}
-                onKeyDown={e => e.key === 'Enter' && !isSubmitting && handleAdd()}
+                onKeyDown={e => e.key === 'Enter' && !isSubmitting && handleSave()}
                 disabled={isSubmitting}
               />
               {form.name && (
@@ -243,9 +315,9 @@ export default function AdminCitiesPage() {
                 </div>
               )}
               <div style={s.modalFoot}>
-                <button style={s.cancelBtn} onClick={() => setModalOpen(false)} disabled={isSubmitting}>Cancel</button>
-                <button style={{...s.saveBtn, opacity: isSubmitting ? 0.7 : 1}} onClick={handleAdd} disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Add City'}
+                <button style={s.cancelBtn} onClick={closeModal} disabled={isSubmitting}>Cancel</button>
+                <button style={{...s.saveBtn, opacity: isSubmitting ? 0.7 : 1}} onClick={handleSave} disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : (editMode ? 'Save Changes' : 'Add City')}
                 </button>
               </div>
             </div>
@@ -285,6 +357,17 @@ const s = {
     fontSize: 22,
     fontWeight: 700,
     color: '#0f172a',
+  },
+  refreshBtn: {
+    background: '#fff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 8,
+    padding: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
   },
   addBtn: {
     background: '#2563eb',
@@ -346,7 +429,6 @@ const s = {
     borderCollapse: 'collapse',
   },
   th: {
-    textAlign: 'left',
     padding: '12px 18px',
     fontSize: 11,
     fontWeight: 600,
@@ -385,6 +467,18 @@ const s = {
     padding: '3px 10px',
     fontSize: 12,
     fontWeight: 600,
+  },
+  editBtn: {
+    border: '1px solid #cbd5e1',
+    background: '#f8fafc',
+    color: '#475569',
+    borderRadius: 7,
+    padding: '5px 10px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
   },
   toggleBtn: {
     border: '1px solid',

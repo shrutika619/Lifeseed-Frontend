@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   Search, Filter, ChevronDown, Plus, Bell,
   Phone, User, MoreVertical, Calendar, Download,
-  FileText, MapPin, X, PhoneCall, ArrowLeft, Loader2
+  FileText, MapPin, X, PhoneCall, ArrowLeft, Loader2,
+  RefreshCw // ✅ Imported Refresh Icon
 } from "lucide-react";
 import { useRouter , usePathname} from "next/navigation";
 import { toast } from "sonner";
@@ -212,6 +213,7 @@ const AdminInClinicConsultationPage = () => {
   
   // API Data States
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // ✅ Added state for refresh spin
   const [bookingData, setBookingData] = useState([]);
   const [metrics, setMetrics] = useState({
     counts: { "New": 0, "Accept": 0, "Rejected": 0, "Complete": 0, "Patient Absent": 0, "Cancelled": 0 },
@@ -231,6 +233,7 @@ const AdminInClinicConsultationPage = () => {
   // ✅ Extracted Fetch Logic
   const fetchBookings = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
+    else setIsRefreshing(true);
     
     try {
       const params = new URLSearchParams();
@@ -282,6 +285,7 @@ const AdminInClinicConsultationPage = () => {
             paymentMode: b.paymentMode === "cash" ? "Cash" : b.paymentMode || "Unknown",
             price: `₹${b.fees}`,
             status: b.status || "New",
+            sellStatus: b.followUpStatus || "--", // ✅ Added Sell Status mapping
             agent: b.agent || "Self",
             
             bookedBy: b.bookedBy || {},
@@ -315,6 +319,7 @@ const AdminInClinicConsultationPage = () => {
       toast.error(error.message || "Failed to communicate with server");
     } finally {
       if (isInitialLoad) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -341,6 +346,16 @@ const AdminInClinicConsultationPage = () => {
     }
   };
 
+  const getSellStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'sell': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      case 'interested': return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'not interested': 
+      case 'not-interested': return 'text-rose-600 bg-rose-50 border-rose-200';
+      default: return 'text-slate-500 bg-slate-100 border-slate-200';
+    }
+  };
+
   const handleFilterClick = (filterName) => {
     setActiveFilter(prev => prev === filterName ? "All" : filterName);
   };
@@ -348,7 +363,7 @@ const AdminInClinicConsultationPage = () => {
   const triggerRefresh = () => setRefreshTrigger(prev => prev + 1);
 
   return (
-    <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans">
+    <div className="p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-700 font-sans relative">
 
       {/* Row 1 */}
       <div className="flex flex-col xl:flex-row xl:flex-wrap items-start xl:items-center gap-3 mb-6">
@@ -361,14 +376,26 @@ const AdminInClinicConsultationPage = () => {
           Back
         </button>
 
-        <div className="relative w-full xl:w-auto">
-          <select value={primaryDate} onChange={(e) => setPrimaryDate(e.target.value)} className="w-full xl:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-            <option>All Time</option>
-            <option>Today</option>
-            <option>Last 7 Days</option>
-            <option>This Month</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <div className="flex items-center gap-3">
+          <div className="relative w-full xl:w-auto">
+            <select value={primaryDate} onChange={(e) => setPrimaryDate(e.target.value)} className="w-full xl:w-auto appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+              <option>All Time</option>
+              <option>Today</option>
+              <option>Last 7 Days</option>
+              <option>This Month</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* ✅ REFRESH BUTTON */}
+          <button 
+            onClick={() => fetchBookings(true)}
+            disabled={isRefreshing || loading}
+            className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-colors text-slate-600 disabled:opacity-50 hidden xl:block"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -398,6 +425,17 @@ const AdminInClinicConsultationPage = () => {
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 mb-6">
         <div className="flex items-center gap-2 w-full lg:flex-1">
           <button className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50"><Filter className="w-5 h-5 text-slate-500" /></button>
+          
+          {/* ✅ REFRESH BUTTON (MOBILE VISIBLE) */}
+          <button 
+            onClick={() => fetchBookings(true)}
+            disabled={isRefreshing || loading}
+            className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-colors text-slate-600 disabled:opacity-50 xl:hidden"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
+
           <div className="relative flex-1 lg:max-w-md">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -434,7 +472,15 @@ const AdminInClinicConsultationPage = () => {
       ) : (
         <>
           {/* DESKTOP TABLE */}
-          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+            
+            {/* Show tiny overlay if refreshing in background */}
+            {isRefreshing && (
+               <div className="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden">
+                 <div className="h-full bg-blue-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+               </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -445,6 +491,8 @@ const AdminInClinicConsultationPage = () => {
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Agent</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hospital</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    {/* ✅ ADDED SELL STATUS COLUMN */}
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Sell Status</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Appointment</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
                   </tr>
@@ -522,6 +570,13 @@ const AdminInClinicConsultationPage = () => {
                             )}
                           </div>
                         </td>
+
+                        {/* ✅ ADDED SELL STATUS CELL */}
+                        <td className="px-5 py-5 text-center">
+                           <span className={`inline-block border px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${getSellStatusColor(item.sellStatus)}`}>
+                              {item.sellStatus}
+                           </span>
+                        </td>
                         
                         <td className="px-5 py-5 text-sm font-semibold text-slate-700 whitespace-nowrap">{item.appointment}</td>
                         <td className="px-5 py-5">
@@ -558,6 +613,11 @@ const AdminInClinicConsultationPage = () => {
                             </div>
                           )}
                         </div>
+
+                        {/* ✅ SELL STATUS ON MOBILE */}
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${getSellStatusColor(item.sellStatus)}`}>
+                           {item.sellStatus}
+                        </span>
 
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 capitalize">{item.paymentMode}</span>
                       </div>

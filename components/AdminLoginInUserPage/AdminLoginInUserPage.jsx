@@ -13,7 +13,8 @@ import {
   X,
   CheckCircle2,
   ArrowLeft,
-  ShoppingCart
+  ShoppingCart,
+  RefreshCw // ✅ Imported Refresh Icon
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getLoginUsersLeads } from "@/app/services/admin/leads.service"; 
@@ -204,6 +205,7 @@ const AdminLoginInUserPage = () => {
     Regular: 0
   });
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // ✅ Added state for refresh spin
   
   // State for Assessment Modal
   const [selectedAssessment, setSelectedAssessment] = useState(null);
@@ -211,6 +213,7 @@ const AdminLoginInUserPage = () => {
   // ✅ Fetch Data Logic Extracted into a reusable function
   const fetchLeads = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
+    else setIsRefreshing(true);
     
     const params = {};
     if (selectedDate) params.date = selectedDate;
@@ -228,6 +231,7 @@ const AdminLoginInUserPage = () => {
       console.error("Failed to fetch leads:", error);
     } finally {
       if (isInitialLoad) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -272,19 +276,31 @@ const AdminLoginInUserPage = () => {
           Back
         </button>
 
-        <div className="relative">
-                    <select 
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                    >
-                      <option value="">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="week">This Week</option>
-                      <option value="month">This Month</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <select 
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="appearance-none bg-white border border-gray-200 px-3 py-2 pr-9 rounded-lg text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* ✅ REFRESH BUTTON */}
+          <button 
+            onClick={() => fetchLeads(true)}
+            disabled={isRefreshing || loading}
+            className="p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-gray-600 disabled:opacity-50"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
+        </div>
 
 
         {/* Dynamic Clickable Badge Counts */}
@@ -375,7 +391,15 @@ const AdminLoginInUserPage = () => {
       ) : (
         <>
           {/* --- Desktop Table View --- */}
-          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+            
+            {/* Show tiny overlay if refreshing in background */}
+            {isRefreshing && (
+               <div className="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden">
+                 <div className="h-full bg-blue-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+               </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -553,16 +577,16 @@ const AdminLoginInUserPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Assigned To</span>
-                      <span className="text-xs text-slate-700 font-medium">{user.assignTo}</span>
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Assigned To</span>
+                        <span className="text-xs text-slate-700 font-medium">{user.assignTo}</span>
+                      </div>
                     </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Next Call</span>
-                      <p className="text-xs text-slate-600 font-medium">{nextCallDateTime.date}</p>
-                      <p className="text-xs text-slate-500">{nextCallDateTime.time}</p>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Next Call</span>
+                      <span className="text-xs text-slate-600 font-medium">{nextCallDateTime.date}</span>
                     </div>
                   </div>
                 </div>

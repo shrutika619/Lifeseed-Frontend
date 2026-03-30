@@ -13,7 +13,8 @@ import {
   X,
   CheckCircle2,
   ArrowLeft,
-  ShoppingCart
+  ShoppingCart,
+  RefreshCw // ✅ Imported Refresh Icon
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getFirstTimeLeads } from "@/app/services/admin/leads.service"; 
@@ -174,12 +175,14 @@ const AdminFirstTimeUserPage = () => {
   const [leads, setLeads] = useState([]);
   const [totalNew, setTotalNew] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // ✅ Added state for refresh spin
   
   const [selectedAssessment, setSelectedAssessment] = useState(null);
 
-  // ✅ Fetch Data Logic Extracted into a reusable function
+  // ✅ Fetch Data Logic
   const fetchLeads = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
+    else setIsRefreshing(true);
     
     const params = {};
     if (selectedDate) params.date = selectedDate;
@@ -196,6 +199,7 @@ const AdminFirstTimeUserPage = () => {
       console.error("Failed to fetch leads:", error);
     } finally {
       if (isInitialLoad) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -206,7 +210,7 @@ const AdminFirstTimeUserPage = () => {
 
     // Set up the interval
     const intervalId = setInterval(() => {
-      fetchLeads(false); // false = Don't show loading spinner on background refresh
+      fetchLeads(false); // false = Don't show full loading spinner, just background refresh
     }, 15000);
 
     // Clean up interval on unmount or dependency change
@@ -251,6 +255,16 @@ const AdminFirstTimeUserPage = () => {
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* ✅ REFRESH BUTTON */}
+          <button 
+            onClick={() => fetchLeads(true)}
+            disabled={isRefreshing || loading}
+            className="p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-gray-600 disabled:opacity-50"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
         </div>
 
         <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md border border-blue-100 flex items-center gap-2">
@@ -290,7 +304,15 @@ const AdminFirstTimeUserPage = () => {
       ) : (
         <>
           {/* --- Desktop Table View --- */}
-          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+            
+            {/* Show tiny overlay if refreshing in background */}
+            {isRefreshing && (
+               <div className="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden">
+                 <div className="h-full bg-blue-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
+               </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>

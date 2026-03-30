@@ -71,7 +71,7 @@ export default function TimeSlotManagement() {
   const router = useRouter(); 
 
   const [loading, setLoading] = useState(true);
-  const [maxBookings, setMaxBookings] = useState(1);
+  const [maxBookings, setMaxBookings] = useState(3);
   const [timeDuration, setTimeDuration] = useState(30);
   
   const [durationOptions, setDurationOptions] = useState([]);
@@ -85,7 +85,7 @@ export default function TimeSlotManagement() {
   const [doctors, setDoctors] = useState(initialDoctors);
   const [saved, setSaved] = useState(false);
 
-  // ✅ ADAPTER: Converts complex API nested structure into the flat structure the UI expects
+  // ✅ ADAPTER: Safely handles both 'slots' (standard) and 'times' (legacy) arrays
   const adaptApiDataToComponentState = (apiAvailability) => {
     const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
     const periods = ["morning", "afternoon", "evening", "night"];
@@ -96,16 +96,19 @@ export default function TimeSlotManagement() {
       const apiDay = apiAvailability[day];
       
       periods.forEach(period => {
-        // Look inside sessions if they exist
-        const sessionData = apiDay?.sessions?.[period];
+        // Backend sessions usually have slots directly, or nested inside 'sessions'
+        let sessionData = apiDay?.[period] || apiDay?.sessions?.[period];
+        
+        // Support both "slots" and "times" to prevent breaking on mixed legacy data
+        let timeArray = sessionData?.slots || sessionData?.times || [];
         
         newAvail[day][period] = {
           enabled: sessionData?.enabled || false,
-          times: sessionData?.slots?.map(s => ({
+          times: timeArray.map(s => ({
             start: s.start,
             end: s.end,
-            enabled: s.enabled !== false // Default to true if not explicitly false
-          })) || []
+            enabled: s.enabled !== false 
+          }))
         };
       });
     });
@@ -116,7 +119,6 @@ export default function TimeSlotManagement() {
   const buildDefaultGrid = async (duration) => {
     try {
       const res = await AdminTeleconsultationSlotsService.getTimeSlotsByDuration(duration);
-      // The getTimeSlotsByDuration probably returns the 'sessions' object directly
       const sessions = res.data.sessions || res.data; 
 
       const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
@@ -153,6 +155,7 @@ export default function TimeSlotManagement() {
           AdminTeleconsultationSlotsService.getDurationOptions().catch(() => ({ success: false }))
         ]);
         console.log(availRes)
+        
         let initialDuration = 30;
 
         if (durationRes.success && durationRes.data) {
@@ -163,17 +166,15 @@ export default function TimeSlotManagement() {
         if (availRes.success && availRes.data) {
           const apiData = availRes.data;
           initialDuration = apiData.slotDuration || initialDuration;
-          setMaxBookings(apiData.patientLimit || 1);
+          setMaxBookings(apiData.patientLimit || 3);
           setTimeDuration(initialDuration);
           
           if (apiData.availability) {
-            // ✅ Transform the raw API data before setting state
             setAvailabilityData(adaptApiDataToComponentState(apiData.availability));
           } else {
             await buildDefaultGrid(initialDuration);
           }
         } else {
-           // Fallback if API fails
            await buildDefaultGrid(initialDuration);
         }
       } catch (error) {
@@ -326,22 +327,20 @@ export default function TimeSlotManagement() {
 
   const handleSave = async () => {
     try {
-      // ✅ REVERSE ADAPTER: Convert flat UI state back to complex nested API format before saving
       const apiReadyAvailability = {};
       const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
       const periods = ["morning", "afternoon", "evening", "night"];
 
       days.forEach(day => {
-        apiReadyAvailability[day] = {
-          enabled: true, // Master toggle for the day
-          sessions: {}
-        };
+        apiReadyAvailability[day] = {};
         
         periods.forEach(period => {
           const uiPeriodData = availabilityData[day][period];
-          apiReadyAvailability[day].sessions[period] = {
+          
+          apiReadyAvailability[day][period] = {
             enabled: uiPeriodData?.times?.some(t => t.enabled) || false,
-            slots: uiPeriodData?.times?.map(t => ({
+            // ✅ EXACT MATCH: Mapped to "times" as requested
+            times: uiPeriodData?.times?.map(t => ({
               start: t.start,
               end: t.end,
               enabled: t.enabled
@@ -351,8 +350,8 @@ export default function TimeSlotManagement() {
       });
 
       const payload = {
-        patientLimit: maxBookings,
         slotDuration: timeDuration,
+        patientLimit: maxBookings,
         availability: apiReadyAvailability
       };
 
