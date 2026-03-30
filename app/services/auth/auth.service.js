@@ -23,6 +23,16 @@ export const sendLoginOtp = async (mobileNo) => {
     };
   } catch (error) {
     console.error("Send OTP error:", error);
+
+    // ✅ Explicitly handle 400 Bad Request
+    if (error.response?.status === 400) {
+      return {
+        success: false,
+        isWarning: true, // Custom flag you can check in the UI
+        message: error.response?.data?.message || "Invalid request. Please check the details provided."
+      };
+    }
+
     return {
       success: false,
       message: error.response?.data?.message || "Failed to send OTP"
@@ -48,6 +58,17 @@ export const verifyLoginOtp = async (mobileNo, otp) => {
 
   } catch (error) {
     console.error("Verify OTP error:", error);
+
+    // ✅ Explicitly handle 400 Bad Request
+    if (error.response?.status === 400) {
+      // Throw a structured object so the UI catch block knows it's a 400
+      throw {
+        success: false,
+        isWarning: true, // Custom flag
+        message: error.response?.data?.message || "Invalid OTP or request data."
+      };
+    }
+
     throw error.response?.data || error;
   }
 };
@@ -71,6 +92,16 @@ export const adminLogin = async (email, password) => {
     return { success: false, message: response.data.message || "Login failed" };
   } catch (error) {
     console.error("Admin login error:", error);
+
+    // ✅ Explicitly handle 400 Bad Request
+    if (error.response?.status === 400) {
+      return {
+        success: false,
+        isWarning: true, // Custom flag
+        message: error.response?.data?.message || "Invalid credentials format."
+      };
+    }
+
     return {
       success: false,
       message: error.response?.data?.message || "Invalid credentials. Access Denied."
@@ -94,6 +125,16 @@ export const logoutUser = async () => {
     return { success: true, data: response.data };
   } catch (error) {
     console.error("Logout error:", error);
+
+    // ✅ Explicitly handle 400 Bad Request
+    if (error.response?.status === 400) {
+      return {
+        success: false,
+        isWarning: true, // Custom flag
+        message: error.response?.data?.message || "Bad request during logout."
+      };
+    }
+
     return {
       success: false,
       message: error.response?.data?.message || "Failed to logout completely",

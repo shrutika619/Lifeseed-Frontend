@@ -2,6 +2,7 @@
 import React from 'react';
 import { Star, Phone, CalendarCheck } from 'lucide-react';
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux"; // ✅ Added to check auth state
 
 // Reusable component for the rating stars
 const StarRating = ({ rating, count }) => {
@@ -29,15 +30,18 @@ const StarRating = ({ rating, count }) => {
 };
 
 // Main Hero Section Component
-const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ Accept Data Prop
+const HerosectionClinincseedetailsPage = ({ data }) => {
 
   const router = useRouter();
+  
+  // ✅ Access auth state to determine if user needs to login first
+  const isAuthenticated = useSelector((state) => !!state.auth?.accessToken);
   
   // Safe Data Extraction
   const clinic = data?.clinic || {};
   
   // Fallbacks to keep design intact if data is missing
-  const clinicName = `MEN 10 Clinic ${clinic.areaName}`;
+  const clinicName = `MEN 10 Clinic ${clinic.areaName || ""}`;
   const areaName = clinic.areaName ? `${clinic.areaName} Branch` : "MEN's Sexual Health Clinic";
   const partnerName = clinic.clinicName ;
   
@@ -58,12 +62,25 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ Accept Data Prop
     const { morning, afternoon, evening } = todaySchedule.sections || {};
     let slots = [];
     
-    // Format matches your design style
     if (morning?.enabled) slots.push(`morning ${morning.start}-${morning.end}`);
     if (afternoon?.enabled) slots.push(`afternoon ${afternoon.start}-${afternoon.end}`);
     if (evening?.enabled) slots.push(`evening ${evening.start}-${evening.end}`);
     
     return slots.length > 0 ? slots.join(", ") : "Open (See details below)";
+  };
+
+  // ✅ NEW HANDLER: Safely pass the full path including the clinic ID
+  const handleBookClick = () => {
+    const targetPath = clinic?._id 
+      ? `/bookappointment?clinicId=${clinic._id}` 
+      : "/bookappointment";
+
+    if (isAuthenticated) {
+      router.push(targetPath);
+    } else {
+      // Encode the target path so the login page receives the entire string safely
+      router.push(`/login?from=${encodeURIComponent(targetPath)}`);
+    }
   };
 
   return (
@@ -101,9 +118,9 @@ const HerosectionClinincseedetailsPage = ({ data }) => { // ✅ Accept Data Prop
             {/* Buttons */}
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 pt-6">
               
-              {/* --------- BOOK BUTTON WITH ROUTE + CLINIC ID --------- */}
+              {/* --------- UPDATED BOOK BUTTON --------- */}
               <button
-                onClick={() => router.push(clinic?._id ? `/bookappointment?clinicId=${clinic._id}` : "/bookappointment")}
+                onClick={handleBookClick}
                 className="flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/50"
               >
                 <CalendarCheck className="w-5 h-5 mr-2" />

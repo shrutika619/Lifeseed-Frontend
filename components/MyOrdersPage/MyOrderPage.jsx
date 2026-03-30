@@ -17,12 +17,13 @@ import {
   User,
   CreditCard,
   ArrowLeft,
-  Download
+  Download,
+  Phone
 } from "lucide-react";
 import { getMyBookingsHistory, getMyOrdersHistory, cancelMyBooking, getMyBookingDetails, getBookingReceiptHTML } from "@/app/services/patient/order.service"; 
 import { toast } from 'sonner';
 
-// ─── Status Badge ──────────────────────────────────────────────────────────────
+// ─── Status Badge ────
 const StatusBadge = ({ status }) => {
   const normalizedStatus = status?.toLowerCase() || '';
   

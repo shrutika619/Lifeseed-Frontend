@@ -1,7 +1,6 @@
 import axios from "axios";
 import { Constants } from "@/app/utils/constants";
 
-
 export const getAllClinics = async (cityId) => {
     if (!cityId) {
         return { 
@@ -19,7 +18,7 @@ export const getAllClinics = async (cityId) => {
         if (response.data && response.data.success) {
             return {
                 success: true,
-                clinics: response.data.data.clinics,
+                clinics: response.data.data.filteredClinics || [], 
                 total: response.data.data.total,
                 message: response.data.message
             };

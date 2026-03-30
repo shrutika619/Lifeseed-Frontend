@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useDispatch } from "react-redux";
@@ -13,7 +13,30 @@ const LoginPage = () => {
   const dispatch = useDispatch();
   
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("from") || "/";
+
+  // ✅ ROBUST REDIRECT LOGIC: Capture "from" AND any other dangling parameters (like clinicId)
+  const [redirectPath, setRedirectPath] = useState("/");
+
+  useEffect(() => {
+    let basePath = searchParams.get("from") || "/";
+    const additionalParams = new URLSearchParams();
+    
+    // Loop through all parameters in the URL
+    searchParams.forEach((value, key) => {
+      // If it's not the "from" parameter, it belongs to the destination URL
+      if (key !== "from") {
+        additionalParams.append(key, value);
+      }
+    });
+    
+    const queryString = additionalParams.toString();
+    if (queryString) {
+      // Safely append to the path, checking if a '?' already exists
+      basePath += (basePath.includes("?") ? "&" : "?") + queryString;
+    }
+    
+    setRedirectPath(basePath);
+  }, [searchParams]);
 
   // State
   const [phone, setPhone] = useState("");
@@ -62,7 +85,7 @@ const LoginPage = () => {
     
     try {
       const data = await verifyLoginOtp(phone, finalOtp);
-      // ✅ Extract User & Role
+      // Extract User & Role
       const { accessToken, user, isNewUser } = data;
       
       if (!accessToken) throw new Error("Login failed - no access token");
@@ -79,7 +102,6 @@ const LoginPage = () => {
       const exemptedRoles = ["clinic_admin", "doctor", "super_admin", "admin"];
 
       if (exemptedRoles.includes(userRole)) {
-        // console.log(`User is ${userRole} -> Skipping profile check`);
         router.push(redirectPath);
         return; // Stop execution here
       }
