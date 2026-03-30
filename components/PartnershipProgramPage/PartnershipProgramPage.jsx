@@ -109,7 +109,7 @@ export default function ClinicAuth() {
     setLoading(true);
     try {
       const res = await sendClinicOtp(phone);
-      console.log("OTP Sent:", res); 
+      // console.log("OTP Sent:", res); 
       toast.success(res.message || "OTP sent successfully");
       setStep(2);
     } catch (err) {
@@ -121,7 +121,7 @@ export default function ClinicAuth() {
   
           // If you also store the accessToken in cookies, delete it here:
         cookieStore.delete("accessToken"); 
-        console.log("cookies cleared");
+        // console.log("cookies cleared");
         setTimeout(() => router.push("/login"), 1500);
         return;
       }

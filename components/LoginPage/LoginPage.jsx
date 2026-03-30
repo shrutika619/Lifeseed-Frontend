@@ -79,7 +79,7 @@ const LoginPage = () => {
       const exemptedRoles = ["clinic_admin", "doctor", "super_admin", "admin"];
 
       if (exemptedRoles.includes(userRole)) {
-        console.log(`User is ${userRole} -> Skipping profile check`);
+        // console.log(`User is ${userRole} -> Skipping profile check`);
         router.push(redirectPath);
         return; // Stop execution here
       }

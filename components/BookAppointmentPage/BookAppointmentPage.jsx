@@ -247,7 +247,7 @@ const BookAppointmentPage = () => {
     setIsBooking(true);
     try {
       const res = await bookingService.createCashBooking(payload);
-      console.log(res);
+      // console.log(res);
       if (res.success) {
         toast.success(res.message || "Booking confirmed!");
         router.push(`/confirmbooking?bookingId=${res.bookingId}`);

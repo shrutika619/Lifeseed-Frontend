@@ -38,7 +38,7 @@ export default function HerosectionCity({ cityName }) {
         // 2. Fetch clinics ONLY for that specific city ID
         const clinicResult = await getAllClinics(targetCity._id);
 
-        console.log(clinicResult)
+        // console.log(clinicResult)
 
         if (clinicResult.success) {
           setClinics(clinicResult.clinics);

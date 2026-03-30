@@ -63,17 +63,17 @@ const TeamRolePage = () => {
     
     const enabledPermissions = permissions.filter(p => p.enabled).map(p => p.name);
     
-    console.log('Saving permissions for:', teamMember);
-    console.log('Enabled permissions:', enabledPermissions);
+    // console.log('Saving permissions for:', teamMember);
+    // console.log('Enabled permissions:', enabledPermissions);
     
     try {
       // Mock API call - replace with actual API endpoint
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       alert(`Permissions saved successfully for ${teamMember}!\n\nEnabled: ${enabledPermissions.join(', ')}`);
-      console.log('Save successful!');
+      // console.log('Save successful!');
     } catch (error) {
-      console.error('Error saving permissions:', error);
+      // console.error('Error saving permissions:', error);
       alert('Failed to save permissions. Please try again.');
     } finally {
       setIsSaving(false);

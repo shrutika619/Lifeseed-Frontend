@@ -45,7 +45,6 @@ export const getAllCities = async () => {
     try {
         // 1. Debug the URL first
         const url = Constants.urlEndPoints.GET_CLINICS_city;
-        console.log("Fetching Cities from:", url); // Check your console
 
         if (!url) throw new Error("URL Constant is undefined!");
 

@@ -39,7 +39,6 @@ export const getMyBookingDetails = async (recordId, type) => {
     const queryType = type || "tele"; 
   try {
     const response = await api.get(`${Constants.urlEndPoints.PATIENT_BOOKINGS}/${recordId}?type=${queryType}`);
-    console.log(response)
     return response.data; 
     
   } catch (error) {

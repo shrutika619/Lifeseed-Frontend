@@ -47,7 +47,7 @@ export default function AdminClinicsPage() {
     setLoading(true);
     
     const result = await getAllClinics(signal);
-    console.log(result);
+    // console.log(result);
     
     if (result.canceled) return; 
 
@@ -129,7 +129,7 @@ export default function AdminClinicsPage() {
 
     try {
       const result = await getClinicById(clinic.dbId);
-      console.log(result);
+      // console.log(result);
       if (result.success) {
         // Based on backend returning { clinic, doctors }
         const doctors = result.data?.doctors || [];

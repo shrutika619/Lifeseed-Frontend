@@ -42,8 +42,6 @@ export async function POST() {
         refreshEndpoint = getAbsoluteUrl(Constants.urlEndPoints.REFRESH_TOKEN); 
     }
 
-    console.log(`🔄 Refreshing for [${role}] via: ${refreshEndpoint}`);
-
     // 3. Call Backend
     const response = await axios.post(
       refreshEndpoint, 

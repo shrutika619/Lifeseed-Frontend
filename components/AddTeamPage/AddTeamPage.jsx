@@ -74,7 +74,6 @@ function AddTeamPage() {
     if (!validate()) return;
 
     setIsSubmitting(true);
-    console.log("Submitting Data:", formData);
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500));
