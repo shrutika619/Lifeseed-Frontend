@@ -116,6 +116,7 @@ const ConfirmCancelModal = ({ isOpen, onClose, onConfirm, loading }) => {
 ───────────────────────────────────────────── */
 
 const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
+  const router = useRouter(); // ✅ Added router here
   const pathname = usePathname();
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
@@ -174,7 +175,15 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
     },
     {
       icon: Calendar, label: "Reschedule", color: "text-orange-600", bg: "hover:bg-orange-50",
-      href: `/free-consultation?admin_booking=true&rescheduleRecordId=${item.recordId}&patientId=${patientId}`,
+      // ✅ Added logic to prevent double rescheduling
+      onClick: () => {
+        if (item.consultationStatus === 'Reschedule' || item.consultationStatus === 'Rescheduled') {
+          toast.warning("This appointment has already been rescheduled once.");
+        } else {
+          router.push(`/free-consultation?admin_booking=true&rescheduleRecordId=${item.recordId}&patientId=${patientId}`);
+        }
+        onClose();
+      },
       hide: item.consultationStatus === 'Cancelled' || item.consultationStatus === 'Complete'
     },
     {
@@ -201,7 +210,7 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
   return (
     <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white rounded-xl shadow-xl border border-slate-100 z-[60] min-w-[185px] py-1`}>
       {actions.filter(a => !a.hide).map(({ icon: Icon, label, color, bg, onClick, href }) =>
-        href ? (
+        href && !onClick ? (
           <a key={label} href={href} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors`}>
             <Icon className="w-4 h-4 shrink-0" />
             {label}
@@ -284,7 +293,7 @@ const AdminTeleconsultationPage = () => {
   const pathname = usePathname();
 
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // ✅ Added state for refresh spin
+  const [isRefreshing, setIsRefreshing] = useState(false); 
   const [bookings, setBookings] = useState([]);
   const [counts, setCounts] = useState({ consult: {}, sell: {} });
 
@@ -299,7 +308,6 @@ const AdminTeleconsultationPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // ✅ Extracted logic with isInitialLoad flag
   const fetchBookings = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
     else setIsRefreshing(true);
@@ -332,7 +340,6 @@ const AdminTeleconsultationPage = () => {
     }
   };
 
-  // ✅ Handle Initial Load & Changes (Includes Debounce for Search)
   useEffect(() => {
     const delay = setTimeout(() => {
       fetchBookings(true);
@@ -342,10 +349,9 @@ const AdminTeleconsultationPage = () => {
     return () => clearTimeout(delay);
   }, [selectedTime, activeConsultFilter, activeSellFilter, searchTerm]);
 
-  // ✅ Auto-refresh logic (Every 15 Seconds)
   useEffect(() => {
     const intervalId = setInterval(() => {
-      fetchBookings(false); // false = Don't show loading spinner on background refresh
+      fetchBookings(false);
     }, 15000);
 
     return () => clearInterval(intervalId);
@@ -430,7 +436,6 @@ const AdminTeleconsultationPage = () => {
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* ✅ REFRESH BUTTON */}
           <button 
             onClick={() => fetchBookings(true)}
             disabled={isRefreshing || loading}
@@ -837,7 +842,8 @@ const getConsultStyle = (status) => {
     case "New":              return "bg-blue-50 text-blue-600 border-blue-100";
     case "Pending/Upcoming": return "bg-orange-50 text-orange-600 border-orange-100";
     case "Cancelled":        return "bg-red-50 text-red-600 border-red-100";
-    case "Reschedule":       return "bg-purple-50 text-purple-600 border-purple-100";
+    case "Reschedule":       
+    case "Rescheduled":      return "bg-purple-50 text-purple-600 border-purple-100"; // Added Rescheduled
     default:                 return "bg-slate-50 text-slate-500 border-slate-100";
   }
 };
