@@ -26,6 +26,9 @@ const HospitalDashboardTimeTablePage = () => {
   
   // ✅ NEW: State for Slot Duration (Defaults to 30)
   const [slotDuration, setSlotDuration] = useState(30);
+  
+  // ✅ NEW: State for Patient Limit (Defaults to 1, or whatever your clinic standard is)
+  const [patientLimit, setPatientLimit] = useState(2); 
 
   // Fetch master time slots
   const { allSlots, isLoadingSlots } = useTimeSlot();
@@ -64,9 +67,13 @@ const HospitalDashboardTimeTablePage = () => {
         if (response.success && response.data?.clinic) {
           setClinicId(response.data.clinic._id);
 
-          // ✅ Set existing slot duration from backend
+          // ✅ Set existing slot duration and limit from backend
           if (response.data.clinic.slotDuration) {
             setSlotDuration(response.data.clinic.slotDuration);
+          }
+          // Assuming your backend sends patientLimit in the clinic profile
+          if (response.data.clinic.patientLimit) {
+            setPatientLimit(response.data.clinic.patientLimit);
           }
 
           const existingTimings = response.data.clinic.timings;
@@ -215,8 +222,8 @@ const HospitalDashboardTimeTablePage = () => {
     });
 
     try {
-      // ✅ Now passing slotDuration to the API
-      const response = await updateClinicTimings(clinicId, timingsArray, slotDuration);
+      // ✅ Now passing patientLimit as the 4th argument
+      const response = await updateClinicTimings(clinicId, timingsArray, slotDuration, patientLimit);
       
       if (response.success) {
         toast.success(response.message || "Hospital timings saved successfully!");

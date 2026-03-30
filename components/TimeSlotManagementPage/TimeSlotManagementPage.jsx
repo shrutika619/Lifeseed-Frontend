@@ -152,7 +152,7 @@ export default function TimeSlotManagement() {
           AdminTeleconsultationSlotsService.getAvailability().catch(() => ({ success: false })),
           AdminTeleconsultationSlotsService.getDurationOptions().catch(() => ({ success: false }))
         ]);
-        
+        console.log(availRes)
         let initialDuration = 30;
 
         if (durationRes.success && durationRes.data) {
