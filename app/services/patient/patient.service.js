@@ -5,12 +5,27 @@ export const getPatientProfile = async () => {
   try {
     const response = await api.get(Constants.urlEndPoints.GET_PATIENT_PROFILE);
     
+    const profileData = response.data.data || response.data;
+
+    // ✅ Handle case where backend returns 200 OK, but profile is completely empty
+    if (!profileData || Object.keys(profileData).length === 0) {
+      console.warn("Profile is empty. User needs to setup profile.");
+      return {
+        success: false,
+        isNotFound: true,
+        data: null,
+        message: "New user - Profile not setup yet"
+      };
+    }
+
     return {
       success: true,
-      data: response.data.data || response.data
+      data: profileData
     };
   } catch (error) {
+    // ✅ Gracefully handle 404 as a WARNING, not an ERROR, since it's expected for new users
     if (error.response?.status === 404) {
+      console.warn("Profile not found (404) - Expected for new users.");
       return {
         success: false,
         isNotFound: true, 
@@ -19,6 +34,7 @@ export const getPatientProfile = async () => {
       };
     }
 
+    // Only log actual unexpected errors as errors
     console.error("Get profile error:", error);
     
     return {
