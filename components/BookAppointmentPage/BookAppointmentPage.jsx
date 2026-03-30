@@ -54,6 +54,14 @@ const BookAppointmentPage = () => {
     age: '',
     gender: ''
   });
+
+  // ✅ NEW: Validation errors state
+  const [formErrors, setFormErrors] = useState({
+    fullName: '',
+    contact: '',
+    age: '',
+    gender: ''
+  });
   
   const [acceptTerms, setAcceptTerms] = useState(false);
 
@@ -154,7 +162,6 @@ const BookAppointmentPage = () => {
     fetchAvailability();
   }, [selectedDoctor, visibleDates]);
 
-  // SAFELY EXTRACT AVAILABILITY BY SPLITTING ISO STRING
   const getAvailabilityForDate = (targetDateStr) => {
     return availabilityData.find(a => {
       if (!a.date) return false;
@@ -207,13 +214,72 @@ const BookAppointmentPage = () => {
   }
 
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear error on change
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
-  // ✅ 3. Call Cash Booking API (EXACT PAYLOAD MATCH)
+  // ✅ NEW: Validate single field on blur
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    validateField(name, value);
+  };
+
+  // ✅ NEW: Field-wise validators
+  const validateField = (name, value) => {
+    let error = '';
+    if (name === 'fullName') {
+      if (!value.trim()) error = 'Full name is required';
+      else if (value.trim().length < 2) error = 'Name must be at least 2 characters';
+    }
+    if (name === 'contact') {
+      if (!value.trim()) error = 'Contact number is required';
+      else if (!/^[6-9]\d{9}$/.test(value)) error = 'Enter a valid 10-digit mobile number';
+    }
+    if (name === 'age') {
+      if (!value) error = 'Age is required';
+      else if (Number(value) < 1 || Number(value) > 120) error = 'Enter a valid age (1-120)';
+    }
+    if (name === 'gender') {
+      if (!value) error = 'Please select gender';
+    }
+    setFormErrors(prev => ({ ...prev, [name]: error }));
+    return error;
+  };
+
+  // ✅ NEW: Validate all required fields
+  const validateForm = () => {
+    const errors = {
+      fullName: validateField('fullName', formData.fullName),
+      contact: validateField('contact', formData.contact),
+      age: validateField('age', formData.age),
+      gender: validateField('gender', formData.gender),
+    };
+    // Return true only if no errors
+    return !Object.values(errors).some(e => e);
+  };
+
+  // ✅ 3. Call Cash Booking API
   const handleBooking = async () => {
-    if (!selectedDoctor || !selectedSlot || !formData.fullName || !formData.contact || !formData.gender || !formData.age || !acceptTerms) {
-      toast.error('Please fill all required fields (Name, Phone, Gender, Age) and select a time slot.');
+    const isFormValid = validateForm();
+
+    if (!isFormValid) {
+      toast.error('Please fix the errors in the form.');
+      return;
+    }
+    if (!selectedDoctor) {
+      toast.error('Please select a doctor.');
+      return;
+    }
+    if (!selectedSlot) {
+      toast.error('Please select a time slot.');
+      return;
+    }
+    if (!acceptTerms) {
+      toast.error('Please accept the Terms & Conditions.');
       return;
     }
 
@@ -222,15 +288,12 @@ const BookAppointmentPage = () => {
 
     const finalPatientId = urlPatientId || loggedInUser?._id || loggedInUser?.id || null;
 
-    // ✅ Construct exact JSON payload format matching backend requirement
     const payload = {
       bookingData: {
         availabilityId: selectedSlot.availabilityId,
         slotGroupId: selectedSlot.slotGroupId,
         slotId: selectedSlot.slotId,
         doctorId: selectedDoctor,
-        
-        // Exact mapping from the form
         fullName: formData.fullName,
         patientPhone: String(formData.contact),
         gender: formData.gender.toLowerCase(),
@@ -239,7 +302,6 @@ const BookAppointmentPage = () => {
       totalAmount: Number(fee)
     };
 
-    // Attach patientId if it exists
     if (finalPatientId) {
       payload.bookingData.patientUserId = finalPatientId;
     }
@@ -247,7 +309,6 @@ const BookAppointmentPage = () => {
     setIsBooking(true);
     try {
       const res = await bookingService.createCashBooking(payload);
-      // console.log(res);
       if (res.success) {
         toast.success(res.message || "Booking confirmed!");
         router.push(`/confirmbooking?bookingId=${res.bookingId}`);
@@ -307,13 +368,11 @@ const BookAppointmentPage = () => {
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 sm:gap-5 flex-1 min-w-0">
-                          
                           <img 
                             src={doctor.image} 
                             alt={doctor.name} 
                             className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-full object-cover flex-shrink-0 bg-gray-100 border border-gray-100 shadow-sm" 
                           />
-                          
                           <div className="min-w-0 flex-1 flex flex-col justify-center">
                             <h3 className="font-bold text-[#0f172a] text-[17px] sm:text-[20px] leading-tight mb-1 truncate">
                               {doctor.name}
@@ -325,15 +384,12 @@ const BookAppointmentPage = () => {
                               {doctor.experience}
                             </p>
                           </div>
-
                         </div>
-                        
                         <div className="text-right flex-shrink-0 flex flex-col justify-center self-start sm:self-center mt-1 sm:mt-0">
                           <p className="text-[22px] sm:text-[26px] font-extrabold text-[#0f172a] leading-none mb-1 tracking-tight">₹{doctor.fee}</p>
                           <p className="text-[13px] sm:text-[14px] text-[#64748b] font-medium">per session</p>
                         </div>
                       </div>
-
                     </div>
                   ))
                 ) : (
@@ -349,59 +405,117 @@ const BookAppointmentPage = () => {
               <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">Your Details</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 ml-0 sm:ml-[40px]">
-                <input
-                  type="text"
-                  name="fullName"
-                  placeholder="Full Name"
-                  value={formData.fullName}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
-                />
-                <input
-                  type="tel"
-                  name="contact"
-                  placeholder="Contact No"
-                  value={formData.contact}
-                  onChange={handleInputChange}
-                  maxLength={10}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
-                />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Email ID (Optional)"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
-                />
-                <input
-                  type="number"
-                  name="age"
-                  placeholder="Age"
-                  value={formData.age}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
-                />
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent bg-white text-sm sm:text-base appearance-none ${
-                    formData.gender === '' ? 'text-gray-400' : 'text-gray-900'
-                  }`}
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                    backgroundPosition: `right 0.5rem center`,
-                    backgroundRepeat: `no-repeat`,
-                    backgroundSize: `1.5em 1.5em`,
-                    paddingRight: `2.5rem`
-                  }}
-                >
-                  <option value="" disabled className="text-gray-400">Gender</option>
-                  <option value="male" className="text-gray-900">Male</option>
-                  <option value="female" className="text-gray-900">Female</option>
-                  <option value="other" className="text-gray-900">Other</option>
-                </select>
+
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    placeholder="Full Name"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    className={`w-full px-3 py-2 sm:px-4 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400 ${
+                      formErrors.fullName ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {formErrors.fullName && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>
+                  )}
+                </div>
+
+                {/* Contact */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    Contact No <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="contact"
+                    placeholder="Contact No"
+                    value={formData.contact}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    maxLength={10}
+                    className={`w-full px-3 py-2 sm:px-4 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400 ${
+                      formErrors.contact ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {formErrors.contact && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.contact}</p>
+                  )}
+                </div>
+
+                {/* Email (Optional - no star, no validation) */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    Email ID <span className="text-gray-400 text-xs font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Email ID (Optional)"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400"
+                  />
+                </div>
+
+                {/* Age */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    Age <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="age"
+                    placeholder="Age"
+                    value={formData.age}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    className={`w-full px-3 py-2 sm:px-4 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm sm:text-base placeholder-gray-400 ${
+                      formErrors.age ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {formErrors.age && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.age}</p>
+                  )}
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    Gender <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    className={`w-full px-3 py-2 sm:px-4 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent bg-white text-sm sm:text-base appearance-none ${
+                      formData.gender === '' ? 'text-gray-400' : 'text-gray-900'
+                    } ${formErrors.gender ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: `right 0.5rem center`,
+                      backgroundRepeat: `no-repeat`,
+                      backgroundSize: `1.5em 1.5em`,
+                      paddingRight: `2.5rem`
+                    }}
+                  >
+                    <option value="" disabled className="text-gray-400">Gender</option>
+                    <option value="male" className="text-gray-900">Male</option>
+                    <option value="female" className="text-gray-900">Female</option>
+                    <option value="other" className="text-gray-900">Other</option>
+                  </select>
+                  {formErrors.gender && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.gender}</p>
+                  )}
+                </div>
+
               </div>
             </div>
 
@@ -426,7 +540,7 @@ const BookAppointmentPage = () => {
                 </div>
               ) : (
                 <div className="ml-0 sm:ml-[40px]">
-                  {/* ALWAYS SHOW 7-DAY SLIDER */}
+                  {/* 7-DAY SLIDER */}
                   <div className="mb-6 sm:mb-8">
                     <div className="flex items-center justify-between mb-4 px-1">
                       <button 
@@ -467,7 +581,7 @@ const BookAppointmentPage = () => {
                     </div>
                   </div>
 
-                  {/* DYNAMIC TIME SLOTS */}
+                  {/* TIME SLOTS */}
                   <div className="space-y-4 sm:space-y-5">
                     {activeGroups.length === 0 ? (
                        <div className="text-center py-8 text-red-500 bg-red-50 rounded-xl border border-dashed border-red-200">
@@ -484,7 +598,6 @@ const BookAppointmentPage = () => {
                             {group.slots.map((slot) => {
                               const isFull = slot.bookedCount >= patientLimit;
                               const isBookable = slot.isAvailable && !isFull;
-                              
                               const isSelected = selectedSlot?.time === slot.time;
 
                               return (
@@ -541,7 +654,6 @@ const BookAppointmentPage = () => {
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-4 sm:p-5 md:p-6 lg:sticky lg:top-6">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Booking Summary</h2>
 
-              {/* Doctor Summary */}
               {selectedDoctor && doctors.length > 0 ? (
                 <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b">
                   <div className="flex items-center gap-2 sm:gap-3 mb-2">
@@ -566,7 +678,6 @@ const BookAppointmentPage = () => {
                 </div>
               )}
 
-              {/* Details */}
               <div className="space-y-2 sm:space-y-3 mb-3 sm:mb-4">
                 <div className="flex justify-between text-xs sm:text-sm gap-2">
                   <span className="text-gray-600">Date:</span>
@@ -584,7 +695,6 @@ const BookAppointmentPage = () => {
                 </div>
               </div>
 
-              {/* Total */}
               <div className="border-t pt-3 sm:pt-4 mb-3 sm:mb-4">
                 <div className="flex justify-between items-center">
                   <span className="text-base sm:text-lg font-bold text-gray-900">Total:</span>
@@ -594,7 +704,6 @@ const BookAppointmentPage = () => {
                 </div>
               </div>
 
-              {/* Terms */}
               <div className="mb-3 sm:mb-4">
                 <p className="text-xs text-indigo-600 mb-2 sm:mb-3">
                   Limited slots available. Book now to secure your consultation!
@@ -612,7 +721,6 @@ const BookAppointmentPage = () => {
                 </label>
               </div>
 
-              {/* CONFIRM BUTTON */}
               <button
                 onClick={handleBooking}
                 className="w-full bg-indigo-600 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-sm sm:text-base shadow-sm flex items-center justify-center gap-2"
@@ -625,7 +733,6 @@ const BookAppointmentPage = () => {
           </div>
 
         </div>
-
       </div>
     </div>
   );

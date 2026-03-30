@@ -24,16 +24,11 @@ const HospitalDashboardTimeTablePage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [clinicId, setClinicId] = useState(null);
   
-  // ✅ NEW: State for Slot Duration (Defaults to 30)
   const [slotDuration, setSlotDuration] = useState(30);
-  
-  // ✅ NEW: State for Patient Limit (Defaults to 1, or whatever your clinic standard is)
   const [patientLimit, setPatientLimit] = useState(2); 
 
-  // Fetch master time slots
   const { allSlots, isLoadingSlots } = useTimeSlot();
 
-  // Base default state
   const [timings, setTimings] = useState({
     monday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
     tuesday: { morning: { enabled: true, start: '10:00 AM', end: '12:00 PM' }, afternoon: { enabled: true, start: '02:00 PM', end: '05:00 PM' }, evening: { enabled: false, start: '06:00 PM', end: '09:00 PM' }, isClosed: false },
@@ -67,11 +62,9 @@ const HospitalDashboardTimeTablePage = () => {
         if (response.success && response.data?.clinic) {
           setClinicId(response.data.clinic._id);
 
-          // ✅ Set existing slot duration and limit from backend
           if (response.data.clinic.slotDuration) {
             setSlotDuration(response.data.clinic.slotDuration);
           }
-          // Assuming your backend sends patientLimit in the clinic profile
           if (response.data.clinic.patientLimit) {
             setPatientLimit(response.data.clinic.patientLimit);
           }
@@ -171,7 +164,6 @@ const HospitalDashboardTimeTablePage = () => {
     return true;
   };
 
-  // ✅ HELPER: Formats "9:30 AM" into "09:30 AM" to pass backend Regex
   const formatTimeForBackend = (timeStr) => {
     if (!timeStr) return "";
     const [time, period] = timeStr.split(" ");
@@ -194,7 +186,6 @@ const HospitalDashboardTimeTablePage = () => {
 
     setIsSaving(true);
     
-    // FORMAT EXACTLY AS BACKEND EXPECTS
     const timingsArray = Object.keys(timings).map(day => {
       const dayData = timings[day];
       const isClosed = dayData.isClosed;
@@ -222,16 +213,14 @@ const HospitalDashboardTimeTablePage = () => {
     });
 
     try {
-      // ✅ Now passing patientLimit as the 4th argument
       const response = await updateClinicTimings(clinicId, timingsArray, slotDuration, patientLimit);
       
       if (response.success) {
         toast.success(response.message || "Hospital timings saved successfully!");
         
-        // ✅ SMART WARNINGS: Display backend warnings if they exist (e.g. telling them to update doctors)
         if (response.data?.warnings && response.data.warnings.length > 0) {
           response.data.warnings.forEach(warningMsg => {
-            toast.warning(warningMsg, { duration: 8000 }); // Show warning for 8 seconds
+            toast.warning(warningMsg, { duration: 8000 });
           });
         }
       } else {
@@ -248,7 +237,6 @@ const HospitalDashboardTimeTablePage = () => {
     const dropdownId = `${session}-${field}`;
     const isOpen = openDropdown === dropdownId;
 
-    // STRICT TIME BOUNDARIES
     const sessionSlots = allSlots.filter((time) => {
       const mins = timeToMinutes(time);
       
@@ -263,24 +251,24 @@ const HospitalDashboardTimeTablePage = () => {
         <button
           type="button"
           onClick={() => setOpenDropdown(isOpen ? null : dropdownId)}
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none text-gray-900 font-medium bg-white flex items-center justify-between transition-colors ${
+          className={`w-full px-3 py-2.5 sm:px-4 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none text-gray-900 font-medium bg-white flex items-center justify-between transition-colors text-sm sm:text-base ${
             isOpen ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-300 hover:border-gray-400'
           }`}
         >
           <span>{value}</span>
-          <ChevronDown size={20} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown size={18} className={`text-gray-500 transition-transform flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
         </button>
 
         {isOpen && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
-            <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+            <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
               {sessionSlots.map((time) => (
                 <button
                   key={time}
                   type="button"
                   onClick={() => handleTimeChange(session, field, time)}
-                  className={`w-full px-4 py-2.5 text-left transition-colors ${
+                  className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
                     value === time ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
@@ -305,28 +293,29 @@ const HospitalDashboardTimeTablePage = () => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
+        <div className="px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
             <button onClick={() => window.history.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <ArrowLeft size={22} className="text-gray-700" />
+              <ArrowLeft size={20} className="text-gray-700" />
             </button>
-            <h1 className="text-xl font-bold text-gray-900">Time Table</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Time Table</h1>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      <main className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-8">
           
           {/* Header & Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Hospital Timing</h2>
+          <div className="flex flex-col gap-4 mb-6">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Hospital Timing</h2>
             
-            <div className="flex flex-wrap items-center gap-6">
-              {/* ✅ NEW: Slot Duration Dropdown */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+
+              {/* Slot Duration */}
               <div className="flex items-center gap-2">
-                <Clock size={16} className="text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Slot Duration:</span>
+                <Clock size={15} className="text-gray-500 flex-shrink-0" />
+                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Slot Duration:</span>
                 <select
                   value={slotDuration}
                   onChange={(e) => setSlotDuration(Number(e.target.value))}
@@ -338,9 +327,11 @@ const HospitalDashboardTimeTablePage = () => {
                 </select>
               </div>
 
-              {/* Mark Day as Closed Toggle */}
-              <div className="flex items-center gap-3 border-l pl-6 border-gray-200">
-                <span className="text-sm font-medium text-gray-700">Closed on {activeDay}?</span>
+              {/* Closed Toggle */}
+              <div className="flex items-center gap-3 sm:border-l sm:pl-6 sm:border-gray-200">
+                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  Closed on <span className="capitalize">{activeDay}</span>?
+                </span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -354,13 +345,13 @@ const HospitalDashboardTimeTablePage = () => {
             </div>
           </div>
 
-          {/* Days Tabs */}
-          <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
+          {/* Days Tabs — wrap on mobile so all 7 fit */}
+          <div className="grid grid-cols-7 gap-1 mb-6 sm:mb-8">
             {days.map(day => (
               <button
                 key={day.id}
                 onClick={() => setActiveDay(day.id)}
-                className={`px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all duration-200 ${
+                className={`py-2 rounded-lg font-medium transition-all duration-200 text-xs sm:text-sm text-center ${
                   activeDay === day.id
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -372,11 +363,11 @@ const HospitalDashboardTimeTablePage = () => {
           </div>
 
           {!timings[activeDay].isClosed ? (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {sessions.map((session) => (
-                <div key={session} className="space-y-4">
+                <div key={session} className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-gray-900 capitalize">{session}</h3>
+                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 capitalize">{session}</h3>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
@@ -389,7 +380,7 @@ const HospitalDashboardTimeTablePage = () => {
                   </div>
 
                   {timings[activeDay][session].enabled && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
                       <TimeDropdown session={session} field="start" value={timings[activeDay][session].start} />
                       <TimeDropdown session={session} field="end" value={timings[activeDay][session].end} />
                     </div>
@@ -398,8 +389,10 @@ const HospitalDashboardTimeTablePage = () => {
               ))}
             </div>
           ) : (
-            <div className="py-12 bg-red-50 rounded-xl border border-red-100 text-center">
-              <h3 className="text-red-600 font-semibold text-lg">Hospital is marked as Closed on {activeDay}s</h3>
+            <div className="py-10 sm:py-12 bg-red-50 rounded-xl border border-red-100 text-center px-4">
+              <h3 className="text-red-600 font-semibold text-base sm:text-lg capitalize">
+                Hospital is marked as Closed on {activeDay}s
+              </h3>
               <p className="text-red-500 text-sm mt-1">No appointments can be booked on this day.</p>
             </div>
           )}
@@ -407,7 +400,7 @@ const HospitalDashboardTimeTablePage = () => {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full mt-6 sm:mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 sm:py-4 rounded-lg transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 text-sm sm:text-base"
           >
             {isSaving && <Loader2 size={18} className="animate-spin" />}
             {isSaving ? "Saving..." : "Save Timings"}

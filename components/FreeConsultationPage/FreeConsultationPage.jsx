@@ -108,6 +108,9 @@ const FreeConsultationPage = () => {
   
   const initialConcern = searchParams.get('concern');
   const [concern, setConcern] = useState(initialConcern ? [initialConcern] : []);
+
+  // ✅ NEW: Form validation errors state
+  const [formErrors, setFormErrors] = useState({});
   
   const isAdminBooking = searchParams.get('admin_booking') === 'true'; 
   const rescheduleRecordId = searchParams.get('rescheduleRecordId'); 
@@ -253,7 +256,35 @@ const FreeConsultationPage = () => {
       setConcern(concern.filter(c => c !== item));
     } else {
       setConcern([...concern, item]);
+      // ✅ Clear concern error when user selects one
+      setFormErrors(prev => ({ ...prev, concern: '' }));
     }
+  };
+
+  // ✅ NEW: Validate form fields and return errors object
+  const validateForm = () => {
+    const errors = {};
+
+    if (isAdminOrSuperAdmin && !rescheduleRecordId && !patientContact) {
+      errors.patientContact = 'Patient Username / Contact is required.';
+    }
+
+    if (!rescheduleRecordId) {
+      if (!fullName.trim()) errors.fullName = 'Full Name is required.';
+      if (!age) {
+        errors.age = 'Age is required.';
+      } else if (isNaN(age) || Number(age) <= 0 || Number(age) > 120) {
+        errors.age = 'Please enter a valid age.';
+      }
+      if (!gender) errors.gender = 'Gender is required.';
+      if (!concern || concern.length === 0) errors.concern = 'Please select at least one concern.';
+    }
+
+    if (!selectedSlot || !activeGroupId || !topLevelAvailabilityId) {
+      errors.slot = 'Please select a valid time slot.';
+    }
+
+    return errors;
   };
 
   // BOOKING / RESCHEDULING HANDLER
@@ -263,29 +294,17 @@ const FreeConsultationPage = () => {
       return;
     }
 
-    if (!selectedSlot || !activeGroupId || !topLevelAvailabilityId) {
-      toast.error("Please select a valid time slot."); 
+    // ✅ Run validation
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      // Show slot error via toast since it's on different section
+      if (errors.slot) toast.error(errors.slot);
       return;
     }
 
-    if (!rescheduleRecordId) {
-      if (isAdminOrSuperAdmin && !patientContact) {
-        toast.error("Please enter the Patient Username/Contact.");
-        return;
-      }
-
-      const missingFields = [];
-      if (!fullName) missingFields.push("Full Name");
-      if (!age) missingFields.push("Age");
-      if (!gender) missingFields.push("Gender");
-      if (!concern || concern.length === 0) missingFields.push("Concern");
-
-      if (missingFields.length > 0) {
-        toast.error(`Missing required details: ${missingFields.join(", ")}`); 
-        return;
-      }
-    }
-
+    // Clear all errors if validation passes
+    setFormErrors({});
     setIsBooking(true);
 
     try {
@@ -388,6 +407,7 @@ const FreeConsultationPage = () => {
     setSelectedDate(availableDates[0].fullDate);
     setSelectedSlot(null);
     setActiveGroupId(null);
+    setFormErrors({});
   };
 
   const handleTabClick = (tab) => {
@@ -608,62 +628,126 @@ const FreeConsultationPage = () => {
 
             <h2 className="text-lg font-semibold text-gray-800 mb-4">{isAdminBooking ? "Patient Details" : "Your Details"}</h2>
             
+            {/* ✅ Admin Contact Field with star */}
             {isAdminOrSuperAdmin && (
               <div className="mb-4">
-                <label className="block text-sm text-gray-600 mb-2">Patient Username / Contact <span className="text-red-500">*</span></label>
+                <label className="block text-sm text-gray-600 mb-2">
+                  Patient Username / Contact <span className="text-red-500">*</span>
+                </label>
                 <input 
                   type="text"
                   value={patientContact}
                   disabled={rescheduleRecordId}
-                  onChange={(e) => setPatientContact(e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-blue-200 focus:border-blue-500 bg-blue-50/30'}`}
+                  onChange={(e) => {
+                    setPatientContact(e.target.value);
+                    setFormErrors(prev => ({ ...prev, patientContact: '' }));
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                    formErrors.patientContact
+                      ? 'border-red-400 bg-red-50'
+                      : rescheduleRecordId
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'border-blue-200 focus:border-blue-500 bg-blue-50/30'
+                  }`}
                   placeholder="e.g. 8908999995"
                 />
+                {formErrors.patientContact && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.patientContact}</p>
+                )}
               </div>
             )}
 
+            {/* ✅ Full Name with star */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-600 mb-2">Full Name</label>
+              <label className="block text-sm text-gray-600 mb-2">
+                Full Name {!rescheduleRecordId && <span className="text-red-500">*</span>}
+              </label>
               <input 
                 type="text"
                 value={fullName}
                 disabled={rescheduleRecordId}
-                onChange={(e) => setFullName(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500'}`}
+                onChange={(e) => {
+                  setFullName(e.target.value);
+                  setFormErrors(prev => ({ ...prev, fullName: '' }));
+                }}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                  formErrors.fullName
+                    ? 'border-red-400 bg-red-50'
+                    : rescheduleRecordId
+                      ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'border-gray-300 focus:border-blue-500'
+                }`}
                 placeholder="Enter patient name"
               />
+              {formErrors.fullName && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
+              {/* ✅ Age with star */}
               <div>
-                <label className="block text-sm text-gray-600 mb-2">Age</label>
+                <label className="block text-sm text-gray-600 mb-2">
+                  Age {!rescheduleRecordId && <span className="text-red-500">*</span>}
+                </label>
                 <input 
                   type="number"
                   value={age}
                   disabled={rescheduleRecordId}
-                  onChange={(e) => setAge(e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500'}`}
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                    setFormErrors(prev => ({ ...prev, age: '' }));
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                    formErrors.age
+                      ? 'border-red-400 bg-red-50'
+                      : rescheduleRecordId
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'border-gray-300 focus:border-blue-500'
+                  }`}
                   placeholder="Age"
                 />
+                {formErrors.age && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.age}</p>
+                )}
               </div>
+
+              {/* ✅ Gender with star */}
               <div>
-                <label className="block text-sm text-gray-600 mb-2">Gender</label>
+                <label className="block text-sm text-gray-600 mb-2">
+                  Gender {!rescheduleRecordId && <span className="text-red-500">*</span>}
+                </label>
                 <select 
                   value={gender}
                   disabled={rescheduleRecordId}
-                  onChange={(e) => setGender(e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${rescheduleRecordId ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:border-blue-500 bg-pink-50'}`}
+                  onChange={(e) => {
+                    setGender(e.target.value);
+                    setFormErrors(prev => ({ ...prev, gender: '' }));
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                    formErrors.gender
+                      ? 'border-red-400 bg-red-50'
+                      : rescheduleRecordId
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'border-gray-300 focus:border-blue-500 bg-pink-50'
+                  }`}
                 >
                   <option value="">Gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </select>
+                {formErrors.gender && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.gender}</p>
+                )}
               </div>
             </div>
 
+            {/* ✅ Concern with star */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-600 mb-2">What are you concerned about?</label>
+              <label className="block text-sm text-gray-600 mb-2">
+                What are you concerned about? {!rescheduleRecordId && <span className="text-red-500">*</span>}
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 {concerns.map((item) => {
                   const isSelected = concern.includes(item);
@@ -678,7 +762,9 @@ const FreeConsultationPage = () => {
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                           : rescheduleRecordId
                             ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                            : formErrors.concern
+                              ? 'bg-white text-gray-700 border-red-300 hover:border-blue-300 hover:bg-blue-50'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
                       }`}
                     >
                       {item}
@@ -686,6 +772,9 @@ const FreeConsultationPage = () => {
                   );
                 })}
               </div>
+              {formErrors.concern && (
+                <p className="text-red-500 text-xs mt-2">{formErrors.concern}</p>
+              )}
             </div>
           </div>
 
@@ -750,6 +839,7 @@ const FreeConsultationPage = () => {
                               onClick={() => {
                                 setSelectedSlot(slot);
                                 setActiveGroupId(group._id); 
+                                setFormErrors(prev => ({ ...prev, slot: '' }));
                               }}
                               className={`
                                 py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
