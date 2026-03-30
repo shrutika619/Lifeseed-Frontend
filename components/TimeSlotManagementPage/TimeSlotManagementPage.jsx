@@ -2,9 +2,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation"; 
 import toast from "react-hot-toast";
-import { AdminTeleconsultationSlotsService } from "@/app/services/admin/adminTeleconsultationSlots.service"; // ✅ IMPORT NEW SERVICE
+import { AdminTeleconsultationSlotsService } from "@/app/services/admin/adminTeleconsultationSlots.service";
 
-// Original mock doctors (unchanged)
 const initialDoctors = [
   {
     id: 1,
@@ -79,20 +78,46 @@ export default function TimeSlotManagement() {
   const [availabilityData, setAvailabilityData] = useState(null);
   const [selectedDay, setSelectedDay] = useState("monday");
   
-  // Modal States for Slot Disabling
   const [warningModal, setWarningModal] = useState(null);
   const [isForceDisabling, setIsForceDisabling] = useState(false);
-  
-  // Custom Alert State for Save Responses
   const [customAlert, setCustomAlert] = useState(null);
 
   const [doctors, setDoctors] = useState(initialDoctors);
   const [saved, setSaved] = useState(false);
 
+  // ✅ ADAPTER: Converts complex API nested structure into the flat structure the UI expects
+  const adaptApiDataToComponentState = (apiAvailability) => {
+    const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const periods = ["morning", "afternoon", "evening", "night"];
+    const newAvail = {};
+
+    days.forEach(day => {
+      newAvail[day] = {};
+      const apiDay = apiAvailability[day];
+      
+      periods.forEach(period => {
+        // Look inside sessions if they exist
+        const sessionData = apiDay?.sessions?.[period];
+        
+        newAvail[day][period] = {
+          enabled: sessionData?.enabled || false,
+          times: sessionData?.slots?.map(s => ({
+            start: s.start,
+            end: s.end,
+            enabled: s.enabled !== false // Default to true if not explicitly false
+          })) || []
+        };
+      });
+    });
+
+    return newAvail;
+  };
+
   const buildDefaultGrid = async (duration) => {
     try {
       const res = await AdminTeleconsultationSlotsService.getTimeSlotsByDuration(duration);
-      const sessions = res.data.sessions;
+      // The getTimeSlotsByDuration probably returns the 'sessions' object directly
+      const sessions = res.data.sessions || res.data; 
 
       const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
       const newAvail = {};
@@ -105,7 +130,7 @@ export default function TimeSlotManagement() {
           
           newAvail[day][period] = {
             enabled: !isWeekend, 
-            times: sessionData ? sessionData.slots.map(s => ({
+            times: sessionData?.slots ? sessionData.slots.map(s => ({
               start: s.start,
               end: s.end,
               enabled: !isWeekend 
@@ -124,15 +149,15 @@ export default function TimeSlotManagement() {
     const fetchInitialData = async () => {
       try {
         const [availRes, durationRes] = await Promise.all([
-          AdminTeleconsultationSlotsService.getAvailability(),
-          AdminTeleconsultationSlotsService.getDurationOptions()
+          AdminTeleconsultationSlotsService.getAvailability().catch(() => ({ success: false })),
+          AdminTeleconsultationSlotsService.getDurationOptions().catch(() => ({ success: false }))
         ]);
         
         let initialDuration = 30;
 
         if (durationRes.success && durationRes.data) {
-          setDurationOptions(durationRes.data.options);
-          initialDuration = durationRes.data.currentDuration;
+          setDurationOptions(durationRes.data.options || []);
+          initialDuration = durationRes.data.currentDuration || 30;
         }
 
         if (availRes.success && availRes.data) {
@@ -142,10 +167,14 @@ export default function TimeSlotManagement() {
           setTimeDuration(initialDuration);
           
           if (apiData.availability) {
-            setAvailabilityData(apiData.availability);
+            // ✅ Transform the raw API data before setting state
+            setAvailabilityData(adaptApiDataToComponentState(apiData.availability));
           } else {
             await buildDefaultGrid(initialDuration);
           }
+        } else {
+           // Fallback if API fails
+           await buildDefaultGrid(initialDuration);
         }
       } catch (error) {
         console.error("Error fetching initial data:", error);
@@ -297,14 +326,37 @@ export default function TimeSlotManagement() {
 
   const handleSave = async () => {
     try {
+      // ✅ REVERSE ADAPTER: Convert flat UI state back to complex nested API format before saving
+      const apiReadyAvailability = {};
+      const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      const periods = ["morning", "afternoon", "evening", "night"];
+
+      days.forEach(day => {
+        apiReadyAvailability[day] = {
+          enabled: true, // Master toggle for the day
+          sessions: {}
+        };
+        
+        periods.forEach(period => {
+          const uiPeriodData = availabilityData[day][period];
+          apiReadyAvailability[day].sessions[period] = {
+            enabled: uiPeriodData?.times?.some(t => t.enabled) || false,
+            slots: uiPeriodData?.times?.map(t => ({
+              start: t.start,
+              end: t.end,
+              enabled: t.enabled
+            })) || []
+          };
+        });
+      });
+
       const payload = {
         patientLimit: maxBookings,
         slotDuration: timeDuration,
-        availability: availabilityData
+        availability: apiReadyAvailability
       };
 
       const res = await AdminTeleconsultationSlotsService.saveAvailability(payload);
-      
       if (res.success) {
         setSaved(true);
         toast.success("Teleconsultation slots saved successfully!"); 
@@ -363,7 +415,6 @@ export default function TimeSlotManagement() {
 
   return (
     <div style={styles.page}>
-      {/* TIME SLOT MANAGEMENT */}
       <section style={styles.card}>
         <h1 style={styles.title}>Time Slot Management</h1>
         <p style={styles.subtitle}>
