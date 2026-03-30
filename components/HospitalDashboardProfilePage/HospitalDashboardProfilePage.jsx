@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 // ✅ IMPORT YOUR API SERVICES
 import { getMeClinicProfile, updateClinicProfile } from "@/app/services/clinic/hospitalProfile.service";
+import { getAllCities } from "@/app/services/patient/clinic.service";
 
 /* ── ICONS ── */
 const EditIcon = () => (
@@ -69,50 +70,138 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
   </svg>
 );
+const LinkIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+  </svg>
+);
+const InfoIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+);
+const CityIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+);
+const UserIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const ImageIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+    <polyline points="21 15 16 10 5 21"/>
+  </svg>
+);
 
 export default function ClinicProfileDesktop() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  
+  const [cities, setCities] = useState([]);
+
   const [data, setData] = useState({
+    // Basic
     name: "MEN10 SEXUAL HEALTH CLINIC",
     branch: "",
     role: "Administrator",
+    // Contact
     email: "",
     phone: "",
     location: "",
+    googleMapsLink: "",
+    // Info
+    hospitalInfo: "",
+    hospitalDescription: "",
+    city: "",
+    // Owner Details
+    ownerName: "",
+    ownerContactNumber: "",
+    // Contact Person
+    contactPersonName: "",
+    contactPersonEmail: "",
+    // Attendant
+    attendantName: "",
+    attendantNumber: "",
+    // Stats (read-only)
     workingHours: "Mon - Fri: 9:00 AM - 6:00 PM",
     doctors: "8 Specialist Doctors",
     appointments: "1,234",
     patients: "892",
     rating: "4.8",
   });
-  
+
   const [temp, setTemp] = useState(data);
 
-  // ✅ FETCH CLINIC DATA ON MOUNT
+  // Photo files (only for editing)
+  const [ownerProfilePhoto, setOwnerProfilePhoto] = useState(null);
+  const [hospitalInteriorPhoto, setHospitalInteriorPhoto] = useState(null);
+  const [hospitalFrontPhoto, setHospitalFrontPhoto] = useState(null);
+  const [doctorClaimPhoto, setDoctorClaimPhoto] = useState(null);
+
+  // Existing photo URLs (from API)
+  const [photoUrls, setPhotoUrls] = useState({
+    ownerProfilePhoto: "",
+    hospitalFrontPhoto: "",
+    hospitalInteriorPhoto: "",
+    doctorClaimPhoto: "",
+  });
+
+  /* ── FETCH CITIES ── */
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const res = await getAllCities();
+        if (res.success && res.data) setCities(res.data);
+      } catch (e) {
+        console.error("Failed to fetch cities", e);
+      }
+    };
+    fetchCities();
+  }, []);
+
+  /* ── FETCH CLINIC DATA ON MOUNT ── */
   useEffect(() => {
     const fetchClinicData = async () => {
       setIsLoading(true);
       try {
         const response = await getMeClinicProfile();
-        
         if (response.success && response.data) {
           const clinic = response.data.clinic;
-          
-          setData(prev => ({
-            ...prev,
+          const updated = {
+            ...data,
             name: clinic.clinicName || "MEN10 CLINIC",
             branch: clinic.areaName || "",
             email: clinic.clinicEmail || "",
             phone: clinic.officeCallingNo || "",
             location: clinic.fulladdress || "",
-            // Mock data overrides:
-            doctors: response.data.totalDoctors,
-            appointments: clinic.appointmentsCount || prev.appointments,
-            patients: clinic.patientsCount || prev.patients,
-          }));
+            googleMapsLink: clinic.googleMapsLink || "",
+            hospitalInfo: clinic.clinicInfo || "",
+            hospitalDescription: clinic.clinicDescription || "",
+            city: clinic.city?._id || clinic.city || "",
+            ownerName: clinic.ownerName || "",
+            ownerContactNumber: clinic.ownerContactNo || "",
+            contactPersonName: clinic.contactPersonName || "",
+            contactPersonEmail: clinic.contactPersonEmail || "",
+            attendantName: clinic.attendantName || "",
+            attendantNumber: clinic.attendantNumber || "",
+            doctors: response.data.totalDoctors ?? data.doctors,
+            appointments: clinic.appointmentsCount || data.appointments,
+            patients: clinic.patientsCount || data.patients,
+          };
+          setData(updated);
+          setTemp(updated);
+          setPhotoUrls({
+            ownerProfilePhoto: clinic.ownerProfilePhoto || "",
+            hospitalFrontPhoto: clinic.clinicfrontPhoto || "",
+            hospitalInteriorPhoto: clinic.clinicinteriorPhoto || "",
+            doctorClaimPhoto: clinic.doctorCabinPhoto || "",
+          });
         } else {
           toast.error(response.message || "Failed to load clinic details");
         }
@@ -122,38 +211,54 @@ export default function ClinicProfileDesktop() {
         setIsLoading(false);
       }
     };
-
     fetchClinicData();
   }, []);
 
-
   const onChange = (e) => setTemp(p => ({ ...p, [e.target.name]: e.target.value }));
-  
-  const onEdit = () => { 
-    setTemp(data); 
-    setIsEditing(true); 
+
+  const handlePhoneInput = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setTemp(p => ({ ...p, [e.target.name]: digitsOnly }));
   };
-  
+
+  const onEdit = () => { setTemp(data); setIsEditing(true); };
   const onCancel = () => setIsEditing(false);
-  
-  // ✅ SAVE DATA API CALL
+
+  /* ── SAVE ── */
   const onSave = async () => {
     setIsSaving(true);
-    
-    // Create FormData since your backend router uses multer upload.fields
     const formData = new FormData();
     formData.append("clinicName", temp.name);
     formData.append("areaName", temp.branch);
     formData.append("clinicEmail", temp.email);
     formData.append("officeCallingNo", temp.phone);
     formData.append("fulladdress", temp.location);
+    formData.append("googleMapsLink", temp.googleMapsLink);
+    formData.append("clinicInfo", temp.hospitalInfo);
+    formData.append("clinicDescription", temp.hospitalDescription);
+    formData.append("city", temp.city);
+    formData.append("ownerName", temp.ownerName);
+    formData.append("ownerContactNo", temp.ownerContactNumber);
+    formData.append("contactPersonName", temp.contactPersonName);
+    formData.append("contactPersonEmail", temp.contactPersonEmail);
+    formData.append("attendantName", temp.attendantName);
+    formData.append("attendantNumber", temp.attendantNumber);
+
+    if (ownerProfilePhoto) formData.append("ownerProfilePhoto", ownerProfilePhoto);
+    if (hospitalFrontPhoto) formData.append("clinicfrontPhoto", hospitalFrontPhoto);
+    if (hospitalInteriorPhoto) formData.append("clinicinteriorPhoto", hospitalInteriorPhoto);
+    if (doctorClaimPhoto) formData.append("doctorCabinPhoto", doctorClaimPhoto);
 
     try {
       const response = await updateClinicProfile(formData);
-      
       if (response.success) {
-        setData(temp); // Update local state with new changes
+        setData(temp);
         setIsEditing(false);
+        // Reset file inputs
+        setOwnerProfilePhoto(null);
+        setHospitalFrontPhoto(null);
+        setHospitalInteriorPhoto(null);
+        setDoctorClaimPhoto(null);
         toast.success("Profile updated successfully!");
       } else {
         toast.error(response.message || "Failed to update profile");
@@ -164,15 +269,12 @@ export default function ClinicProfileDesktop() {
       setIsSaving(false);
     }
   };
-  
-  // Actionable Back Function
+
   const onBack = () => {
     if (isEditing) {
-        if (confirm("You have unsaved changes. Are you sure you want to leave?")) {
-            window.history.back();
-        }
+      if (confirm("You have unsaved changes. Are you sure you want to leave?")) window.history.back();
     } else {
-        window.history.back();
+      window.history.back();
     }
   };
 
@@ -185,6 +287,12 @@ export default function ClinicProfileDesktop() {
       </div>
     );
   }
+
+  /* ── CITY NAME HELPER ── */
+  const getCityName = (cityId) => {
+    const found = cities.find(c => c._id === cityId);
+    return found ? found.name : cityId || "Not Provided";
+  };
 
   return (
     <>
@@ -228,7 +336,7 @@ export default function ClinicProfileDesktop() {
           cursor: pointer; font-family: inherit; transition: all 0.15s;
         }
         .cpd-btn-edit:hover { background: #fef9c3; border-color: #d1d5db; }
-        
+
         .cpd-btn-save {
           display: inline-flex; align-items: center; gap: 7px;
           background: #2563eb; border: none;
@@ -238,7 +346,7 @@ export default function ClinicProfileDesktop() {
         }
         .cpd-btn-save:hover { background: #1d4ed8; }
         .cpd-btn-save:disabled { background: #93c5fd; cursor: not-allowed; }
-        
+
         .cpd-btn-cancel {
           display: inline-flex; align-items: center; gap: 6px;
           background: #fff; border: 1.5px solid #d1d5db;
@@ -250,9 +358,7 @@ export default function ClinicProfileDesktop() {
         .cpd-btn-group { display: flex; gap: 8px; }
 
         /* ── PAGE CONTENT ── */
-        .cpd-content {
-          padding: 28px 32px 48px;
-        }
+        .cpd-content { padding: 28px 32px 48px; }
         .cpd-page-title { font-size: 1.2rem; font-weight: 700; color: #111827; margin-bottom: 2px; }
         .cpd-page-sub { font-size: 0.8rem; color: #9ca3af; margin-bottom: 24px; }
 
@@ -287,7 +393,9 @@ export default function ClinicProfileDesktop() {
           display: flex; align-items: center; justify-content: center;
           font-size: 1.5rem; font-weight: 700; color: #fff;
           border: 3px solid #e5e7eb; margin-bottom: 14px;
+          overflow: hidden;
         }
+        .cpd-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .cpd-name { font-size: 0.9rem; font-weight: 700; color: #111827; line-height: 1.35; }
         .cpd-branch { font-size: 0.9rem; font-weight: 700; color: #111827; margin-bottom: 3px; }
         .cpd-role { font-size: 0.76rem; color: #9ca3af; margin-bottom: 10px; }
@@ -328,11 +436,15 @@ export default function ClinicProfileDesktop() {
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0; margin-top: 1px;
         }
-        .ic-v { background: #ede9fe; }
-        .ic-g { background: #dcfce7; }
-        .ic-y { background: #fef3c7; }
-        .ic-r { background: #fee2e2; }
-        .ic-p { background: #f3e8ff; }
+        .ic-v  { background: #ede9fe; }
+        .ic-g  { background: #dcfce7; }
+        .ic-y  { background: #fef3c7; }
+        .ic-r  { background: #fee2e2; }
+        .ic-p  { background: #f3e8ff; }
+        .ic-b  { background: #e0f2fe; }
+        .ic-em { background: #d1fae5; }
+        .ic-pi { background: #ffe4e6; }
+        .ic-pu { background: #ede9fe; }
 
         .cpd-lbl { font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
         .cpd-val { font-size: 0.83rem; color: #111827; font-weight: 500; line-height: 1.5; word-break: break-word; }
@@ -353,11 +465,34 @@ export default function ClinicProfileDesktop() {
           transition: border-color 0.15s, box-shadow 0.15s;
         }
         .cpd-textarea:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,0.08); }
+        .cpd-select {
+          width: 100%; font-size: 0.83rem; color: #111827;
+          border: 1.5px solid #6366f1; border-radius: 7px;
+          padding: 5px 9px; outline: none; font-family: inherit; background: #fafafa;
+          transition: border-color 0.15s, box-shadow 0.15s;
+          cursor: pointer;
+        }
+        .cpd-select:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,0.08); }
+
+        /* ── FILE INPUT ── */
+        .cpd-file-wrap { width: 100%; }
+        .cpd-file-label {
+          display: flex; align-items: center; gap: 8px;
+          padding: 6px 10px; border-radius: 7px;
+          border: 1.5px dashed #a5b4fc; background: #f5f3ff;
+          cursor: pointer; transition: all 0.15s;
+        }
+        .cpd-file-label:hover { background: #ede9fe; border-color: #818cf8; }
+        .cpd-file-label span { font-size: 0.78rem; color: #6366f1; font-weight: 500; }
+        .cpd-file-input { display: none; }
+        .cpd-file-name { font-size: 0.74rem; color: #16a34a; margin-top: 4px; font-weight: 500; }
+        .cpd-photo-thumb {
+          width: 40px; height: 40px; border-radius: 6px;
+          object-fit: cover; border: 1px solid #e5e7eb; margin-top: 4px;
+        }
 
         /* ── STATS ── */
-        .cpd-stats {
-          display: grid; grid-template-columns: repeat(3, 1fr);
-        }
+        .cpd-stats { display: grid; grid-template-columns: repeat(3, 1fr); }
         .cpd-stat {
           padding: 20px 16px;
           border-right: 1px solid #f3f4f6;
@@ -419,11 +554,13 @@ export default function ClinicProfileDesktop() {
             {/* ── LEFT COLUMN ── */}
             <div>
 
-              {/* Profile */}
+              {/* Profile Card */}
               <div className="cpd-card">
                 <div className="cpd-profile">
                   <div className="cpd-avatar">
-                    {cur.name.substring(0, 2).toUpperCase()}
+                    {photoUrls.ownerProfilePhoto
+                      ? <img src={photoUrls.ownerProfilePhoto} alt="owner" />
+                      : cur.name.substring(0, 2).toUpperCase()}
                   </div>
                   {isEditing ? (
                     <>
@@ -461,17 +598,69 @@ export default function ClinicProfileDesktop() {
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Phone</div>
                     {isEditing
-                      ? <input type="tel" className="cpd-input" name="phone" value={cur.phone} onChange={onChange} />
+                      ? <input type="tel" className="cpd-input" name="phone" value={cur.phone} onChange={handlePhoneInput} maxLength={10} inputMode="numeric" />
                       : <div className="cpd-val">{data.phone || "Not Provided"}</div>}
                   </div>
                 </div>
                 <div className="cpd-row">
                   <div className="cpd-icon ic-y"><LocIcon /></div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div className="cpd-lbl">Location</div>
+                    <div className="cpd-lbl">Full Address</div>
                     {isEditing
                       ? <textarea className="cpd-textarea" name="location" value={cur.location} onChange={onChange} />
                       : <div className="cpd-val">{data.location || "Not Provided"}</div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-b"><LinkIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Google Maps Link</div>
+                    {isEditing
+                      ? <input type="url" className="cpd-input" name="googleMapsLink" value={cur.googleMapsLink} onChange={onChange} placeholder="https://maps.google.com/..." />
+                      : <div className="cpd-val">
+                          {data.googleMapsLink
+                            ? <a href={data.googleMapsLink} target="_blank" rel="noreferrer" style={{color:"#2563eb",textDecoration:"underline"}}>View on Map</a>
+                            : "Not Provided"}
+                        </div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-pu"><CityIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">City</div>
+                    {isEditing
+                      ? (
+                        <select className="cpd-select" name="city" value={cur.city} onChange={onChange}>
+                          <option value="">Select a City</option>
+                          {cities.map(city => (
+                            <option key={city._id} value={city._id}>{city.name}</option>
+                          ))}
+                        </select>
+                      )
+                      : <div className="cpd-val">{getCityName(data.city) || "Not Provided"}</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Owner Details */}
+              <div className="cpd-card">
+                <div className="cpd-sec-title">Owner Details</div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-pi"><UserIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Owner Name</div>
+                    {isEditing
+                      ? <input className="cpd-input" name="ownerName" value={cur.ownerName} onChange={onChange} placeholder="Owner full name" />
+                      : <div className="cpd-val">{data.ownerName || "Not Provided"}</div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-g"><PhoneIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Owner Contact Number</div>
+                    {isEditing
+                      ? <input type="tel" className="cpd-input" name="ownerContactNumber" value={cur.ownerContactNumber} onChange={handlePhoneInput} maxLength={10} inputMode="numeric" />
+                      : <div className="cpd-val">{data.ownerContactNumber || "Not Provided"}</div>}
                   </div>
                 </div>
               </div>
@@ -503,6 +692,29 @@ export default function ClinicProfileDesktop() {
                 </div>
               </div>
 
+              {/* Hospital Info */}
+              <div className="cpd-card">
+                <div className="cpd-sec-title">Hospital Information</div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-em"><InfoIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Hospital Info</div>
+                    {isEditing
+                      ? <input className="cpd-input" name="hospitalInfo" value={cur.hospitalInfo} onChange={onChange} placeholder="e.g., Multi-specialty hospital" />
+                      : <div className="cpd-val">{data.hospitalInfo || "Not Provided"}</div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-b"><InfoIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Hospital Description</div>
+                    {isEditing
+                      ? <textarea className="cpd-textarea" name="hospitalDescription" value={cur.hospitalDescription} onChange={onChange} rows={3} style={{minHeight:"70px"}} />
+                      : <div className="cpd-val">{data.hospitalDescription || "Not Provided"}</div>}
+                  </div>
+                </div>
+              </div>
+
               {/* Professional Details */}
               <div className="cpd-card">
                 <div className="cpd-sec-title">Professional Details</div>
@@ -510,16 +722,171 @@ export default function ClinicProfileDesktop() {
                   <div className="cpd-icon ic-r"><ClockIcon /></div>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Working Hours</div>
-                      <div className="cpd-val">{data.workingHours}</div>
+                    <div className="cpd-val">{data.workingHours}</div>
                   </div>
                 </div>
                 <div className="cpd-row">
                   <div className="cpd-icon ic-p"><DocIcon /></div>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="cpd-lbl">Doctors</div>
-                      <div className="cpd-val">{data.doctors} Doctor</div>
+                    <div className="cpd-val">{data.doctors} Doctor</div>
                   </div>
                 </div>
+              </div>
+
+              {/* Contact Person & Attendant */}
+              <div className="cpd-card">
+                <div className="cpd-sec-title">Contact Person & Attendant</div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-pi"><UserIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Contact Person Name</div>
+                    {isEditing
+                      ? <input className="cpd-input" name="contactPersonName" value={cur.contactPersonName} onChange={onChange} placeholder="Contact person name" />
+                      : <div className="cpd-val">{data.contactPersonName || "Not Provided"}</div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-v"><MailIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Contact Person Email</div>
+                    {isEditing
+                      ? <input type="email" className="cpd-input" name="contactPersonEmail" value={cur.contactPersonEmail} onChange={onChange} placeholder="person@hospital.com" />
+                      : <div className="cpd-val">{data.contactPersonEmail || "Not Provided"}</div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-em"><UserIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Attendant Name</div>
+                    {isEditing
+                      ? <input className="cpd-input" name="attendantName" value={cur.attendantName} onChange={onChange} placeholder="Attendant name" />
+                      : <div className="cpd-val">{data.attendantName || "Not Provided"}</div>}
+                  </div>
+                </div>
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-g"><PhoneIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Attendant Number</div>
+                    {isEditing
+                      ? <input type="tel" className="cpd-input" name="attendantNumber" value={cur.attendantNumber} onChange={handlePhoneInput} maxLength={10} inputMode="numeric" />
+                      : <div className="cpd-val">{data.attendantNumber || "Not Provided"}</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Photos */}
+              <div className="cpd-card">
+                <div className="cpd-sec-title">Photos & Media</div>
+
+                {/* Owner Profile Photo */}
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-pu"><ImageIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Owner Profile Photo</div>
+                    {isEditing ? (
+                      <div className="cpd-file-wrap">
+                        <label className="cpd-file-label">
+                          <ImageIcon />
+                          <span>{ownerProfilePhoto ? ownerProfilePhoto.name : "Choose photo..."}</span>
+                          <input type="file" accept="image/*" className="cpd-file-input"
+                            onChange={e => { if(e.target.files[0]) setOwnerProfilePhoto(e.target.files[0]); }} />
+                        </label>
+                        {ownerProfilePhoto && <div className="cpd-file-name">✓ {ownerProfilePhoto.name}</div>}
+                        {!ownerProfilePhoto && photoUrls.ownerProfilePhoto &&
+                          <img src={photoUrls.ownerProfilePhoto} alt="owner" className="cpd-photo-thumb" />}
+                      </div>
+                    ) : (
+                      <div className="cpd-val">
+                        {photoUrls.ownerProfilePhoto
+                          ? <img src={photoUrls.ownerProfilePhoto} alt="owner" className="cpd-photo-thumb" />
+                          : "Not Uploaded"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hospital Front Photo */}
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-y"><ImageIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Hospital Front Photo</div>
+                    {isEditing ? (
+                      <div className="cpd-file-wrap">
+                        <label className="cpd-file-label">
+                          <ImageIcon />
+                          <span>{hospitalFrontPhoto ? hospitalFrontPhoto.name : "Choose photo..."}</span>
+                          <input type="file" accept="image/*" className="cpd-file-input"
+                            onChange={e => { if(e.target.files[0]) setHospitalFrontPhoto(e.target.files[0]); }} />
+                        </label>
+                        {hospitalFrontPhoto && <div className="cpd-file-name">✓ {hospitalFrontPhoto.name}</div>}
+                        {!hospitalFrontPhoto && photoUrls.hospitalFrontPhoto &&
+                          <img src={photoUrls.hospitalFrontPhoto} alt="front" className="cpd-photo-thumb" />}
+                      </div>
+                    ) : (
+                      <div className="cpd-val">
+                        {photoUrls.hospitalFrontPhoto
+                          ? <img src={photoUrls.hospitalFrontPhoto} alt="front" className="cpd-photo-thumb" />
+                          : "Not Uploaded"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hospital Interior Photo */}
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-g"><ImageIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Hospital Interior Photo</div>
+                    {isEditing ? (
+                      <div className="cpd-file-wrap">
+                        <label className="cpd-file-label">
+                          <ImageIcon />
+                          <span>{hospitalInteriorPhoto ? hospitalInteriorPhoto.name : "Choose photo..."}</span>
+                          <input type="file" accept="image/*" className="cpd-file-input"
+                            onChange={e => { if(e.target.files[0]) setHospitalInteriorPhoto(e.target.files[0]); }} />
+                        </label>
+                        {hospitalInteriorPhoto && <div className="cpd-file-name">✓ {hospitalInteriorPhoto.name}</div>}
+                        {!hospitalInteriorPhoto && photoUrls.hospitalInteriorPhoto &&
+                          <img src={photoUrls.hospitalInteriorPhoto} alt="interior" className="cpd-photo-thumb" />}
+                      </div>
+                    ) : (
+                      <div className="cpd-val">
+                        {photoUrls.hospitalInteriorPhoto
+                          ? <img src={photoUrls.hospitalInteriorPhoto} alt="interior" className="cpd-photo-thumb" />
+                          : "Not Uploaded"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Doctor Cabin Photo */}
+                <div className="cpd-row">
+                  <div className="cpd-icon ic-p"><ImageIcon /></div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="cpd-lbl">Doctor's Cabin Photo</div>
+                    {isEditing ? (
+                      <div className="cpd-file-wrap">
+                        <label className="cpd-file-label">
+                          <ImageIcon />
+                          <span>{doctorClaimPhoto ? doctorClaimPhoto.name : "Choose photo..."}</span>
+                          <input type="file" accept="image/*" className="cpd-file-input"
+                            onChange={e => { if(e.target.files[0]) setDoctorClaimPhoto(e.target.files[0]); }} />
+                        </label>
+                        {doctorClaimPhoto && <div className="cpd-file-name">✓ {doctorClaimPhoto.name}</div>}
+                        {!doctorClaimPhoto && photoUrls.doctorClaimPhoto &&
+                          <img src={photoUrls.doctorClaimPhoto} alt="cabin" className="cpd-photo-thumb" />}
+                      </div>
+                    ) : (
+                      <div className="cpd-val">
+                        {photoUrls.doctorClaimPhoto
+                          ? <img src={photoUrls.doctorClaimPhoto} alt="cabin" className="cpd-photo-thumb" />
+                          : "Not Uploaded"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
 
             </div>

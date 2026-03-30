@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, MoreVertical, ArrowLeft, Loader2, Edit2, User } from "lucide-react";
+import { Search, Filter, MoreVertical, ArrowLeft, Loader2, Edit2, User, Trash2 } from "lucide-react"; // Trash2 icon add kiya
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -44,7 +44,6 @@ const DoctorsPage = () => {
     const fetchDoctorsList = async () => {
       setIsLoading(true);
       
-      // ✅ USING YOUR ORIGINAL WORKING API CALL
       const result = await getDoctors(controller.signal);
       
       if (result.canceled) return;
@@ -57,14 +56,12 @@ const DoctorsPage = () => {
           const degrees = [doc.underGraduationDegree?.name || doc.underGraduationDegree, doc.postGraduationDegree?.name || doc.postGraduationDegree].filter(Boolean);
           const qualificationString = degrees.length > 0 ? degrees.join(", ") : "MBBS";
 
-          // 1. Calculate Active Days
           const activeDays = doc.timings 
             ? doc.timings
                 .filter(t => !t.isOff && t.slots && t.slots.length > 0)
                 .map(t => ({ day: t.day, active: true })) 
-            : (Array.isArray(doc.days) ? doc.days : []); // Fallback to old format if timings array is missing
+            : (Array.isArray(doc.days) ? doc.days : []);
 
-          // 2. Dynamically calculate TODAY'S Shift
           let todaysTime = "Off Today";
           if (doc.timings) {
              const todaySchedule = doc.timings.find(t => t.day === currentDayName && !t.isOff && t.slots?.length > 0);
@@ -74,7 +71,6 @@ const DoctorsPage = () => {
                todaysTime = `${firstSlot.start} - ${lastSlot.end}`;
              }
           } else {
-             // Fallback if backend doesn't have nested slots yet
              todaysTime = doc.todayTiming || "09:00 AM - 05:00 PM";
           }
 
@@ -101,7 +97,6 @@ const DoctorsPage = () => {
     return () => controller.abort();
   }, []);
 
-  // Extract unique specialties for the filter dropdown
   const uniqueSpecialties = ["All", ...new Set(doctors.map(d => d.specialty))];
 
   const filteredDoctors = doctors.filter((doc) => {
@@ -114,14 +109,12 @@ const DoctorsPage = () => {
     setDoctors((prev) => prev.map((doc) => (doc.id === id ? { ...doc, available: !doc.available } : doc)));
     setUpdatingId(id);
 
-    // ✅ USING YOUR ORIGINAL TOGGLE SERVICE
     const result = await toggleDoctorStatus(id, !currentStatus);
 
     if (result.success) {
       toast.success(result.message || "Status updated");
     } else {
       toast.error(result.message || "Failed to update status");
-      // Revert UI on failure
       setDoctors((prev) => prev.map((doc) => (doc.id === id ? { ...doc, available: currentStatus } : doc)));
     }
     
@@ -133,6 +126,17 @@ const DoctorsPage = () => {
   const handleEditDoctor = (id) => {
     setOpenMenuId(null);
     router.push(`/hospitaldashboard/add-doctors?id=${id}`);
+  };
+
+  // ✅ New Delete Function
+  const handleDeleteDoctor = async (id) => {
+    if (window.confirm("Are you sure you want to delete this doctor?")) {
+      setOpenMenuId(null);
+      // Yahan apni delete API call add karein
+      // Agar API success ho toh state update karein:
+      // setDoctors(prev => prev.filter(doc => doc.id !== id));
+      toast.info("Delete functionality clicked for ID: " + id);
+    }
   };
 
   return (
@@ -159,7 +163,6 @@ const DoctorsPage = () => {
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search doctor by name..." className="ml-2 w-full text-sm outline-none bg-transparent placeholder-gray-400 text-gray-700" />
             </div>
             
-            {/* Filter Dropdown Container */}
             <div className="relative" ref={filterRef}>
               <button 
                 onClick={() => setIsFilterOpen(!isFilterOpen)} 
@@ -169,7 +172,6 @@ const DoctorsPage = () => {
                 {selectedSpecialty !== "All" && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>}
               </button>
 
-              {/* The filter menu dropdown */}
               {isFilterOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-2">
                   <p className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Filter by Specialty</p>
@@ -223,9 +225,13 @@ const DoctorsPage = () => {
                           <MoreVertical className="w-5 h-5" />
                         </button>
                         {openMenuId === doc.id && (
-                          <div className="absolute right-0 top-full mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                          <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                             <button onClick={() => handleEditDoctor(doc.id)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors">
                               <Edit2 className="w-4 h-4" /> Edit
+                            </button>
+                            {/* Mobile Delete Option */}
+                            <button onClick={() => handleDeleteDoctor(doc.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
+                              <Trash2 className="w-4 h-4" /> Delete
                             </button>
                           </div>
                         )}
@@ -261,9 +267,13 @@ const DoctorsPage = () => {
                       <MoreVertical className="w-5 h-5" />
                     </button>
                     {openMenuId === doc.id && (
-                      <div className="absolute right-0 top-full mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                      <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                         <button onClick={() => handleEditDoctor(doc.id)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors">
                           <Edit2 className="w-4 h-4" /> Edit
+                        </button>
+                        {/* Desktop Delete Option */}
+                        <button onClick={() => handleDeleteDoctor(doc.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-gray-50">
+                          <Trash2 className="w-4 h-4" /> Delete
                         </button>
                       </div>
                     )}
