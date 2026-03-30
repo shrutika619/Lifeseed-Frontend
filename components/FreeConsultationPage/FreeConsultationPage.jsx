@@ -41,16 +41,18 @@ const sortPeriodsChronologically = (groups) => {
 
 // ✅ HELPER: Check if a time slot string (e.g., "10:30 AM - 11:00 AM") is in the past (for today)
 const isSlotInPast = (slotTimeStr, selectedDateStr) => {
+  if (!slotTimeStr || !selectedDateStr) return false;
+
   const today = new Date();
   const selectedDate = new Date(selectedDateStr);
   
   // If selected date is strictly in the future, slot is not in the past
   if (selectedDate.setHours(0,0,0,0) > today.setHours(0,0,0,0)) return false;
+  // If selected date is strictly in the past, slot is definitely in the past
+  if (selectedDate.setHours(0,0,0,0) < today.setHours(0,0,0,0)) return true;
 
-  // Extract start time (e.g. "10:30 AM")
-  const startTimeStr = slotTimeStr.split(" - ")[0];
-  if (!startTimeStr) return false;
-
+  // Otherwise, it's today. Extract start time (e.g. "10:30 AM")
+  const startTimeStr = slotTimeStr.split("-")[0].trim();
   const match = startTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!match) return false;
 
@@ -827,7 +829,6 @@ const FreeConsultationPage = () => {
                       <div className="grid grid-cols-3 gap-2">
                         {group.slots.map((slot) => {
                           const isFull = slot.bookedCount >= patientLimit;
-                          // ✅ ADDED PAST SLOT CHECK
                           const isPast = isSlotInPast(slot.time, selectedDate); 
                           const isBookable = slot.isAvailable && !isFull && !isPast;
                           const isSelected = selectedSlot?._id === slot._id;

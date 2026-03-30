@@ -1,8 +1,13 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, Phone, CalendarCheck } from 'lucide-react';
-import { useRouter } from "next/navigation";
-import { useSelector } from "react-redux"; // ✅ Added to check auth state
+import { useRouter, useSearchParams } from "next/navigation"; 
+
+import { useSelector,  } from "react-redux";
+import { 
+  selectUser, 
+  selectIsAuthenticated
+} from "@/redux/slices/authSlice";
 
 // Reusable component for the rating stars
 const StarRating = ({ rating, count }) => {
@@ -31,14 +36,28 @@ const StarRating = ({ rating, count }) => {
 
 // Main Hero Section Component
 const HerosectionClinincseedetailsPage = ({ data }) => {
-
   const router = useRouter();
+  const searchParams = useSearchParams(); 
   
-  // ✅ Access auth state to determine if user needs to login first
-  const isAuthenticated = useSelector((state) => !!state.auth?.accessToken);
+  const user = useSelector(selectUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   
-  // Safe Data Extraction
+  // Track the resolved Clinic ID
+  const [resolvedClinicId, setResolvedClinicId] = useState(null);
+
   const clinic = data?.clinic || {};
+  
+  // ✅ Resolve the clinic ID reliably after mount
+  useEffect(() => {
+    const idFromProp = clinic._id;
+    const idFromUrl = searchParams.get('id');
+    console.log(idFromUrl)
+    if (idFromProp) {
+      setResolvedClinicId(idFromProp);
+    } else if (idFromUrl) {
+      setResolvedClinicId(idFromUrl);
+    }
+  }, [clinic._id, searchParams]);
   
   // Fallbacks to keep design intact if data is missing
   const clinicName = `MEN 10 Clinic ${clinic.areaName || ""}`;
@@ -69,17 +88,21 @@ const HerosectionClinincseedetailsPage = ({ data }) => {
     return slots.length > 0 ? slots.join(", ") : "Open (See details below)";
   };
 
-  // ✅ NEW HANDLER: Safely pass the full path including the clinic ID
-  const handleBookClick = () => {
-    const targetPath = clinic?._id 
-      ? `/bookappointment?clinicId=${clinic._id}` 
+  const handleBookClick = (e) => {
+    e.preventDefault(); 
+
+    // ✅ Ensure we use the resolved ID
+    const targetPath = resolvedClinicId 
+      ? `/bookappointment?clinicId=${resolvedClinicId}` 
       : "/bookappointment";
+
+    console.log(targetPath);
 
     if (isAuthenticated) {
       router.push(targetPath);
     } else {
-      // Encode the target path so the login page receives the entire string safely
-      router.push(`/login?from=${encodeURIComponent(targetPath)}`);
+      const loginPath = `/login?from=${encodeURIComponent(targetPath)}`;
+      router.push(loginPath);
     }
   };
 

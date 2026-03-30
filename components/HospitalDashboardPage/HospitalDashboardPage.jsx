@@ -272,7 +272,7 @@ const HospitalDashboard = () => {
         const queryStr = params.toString() ? `?${params.toString()}` : '';
 
         const res = await clinicBookingService.getClinicBookings(queryStr);
-        
+        console.log(res)
         if (res.success && res.data) {
           setMetrics({
             counts: res.data.counts || {},
