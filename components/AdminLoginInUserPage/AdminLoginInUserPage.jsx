@@ -235,7 +235,7 @@ const AdminLoginInUserPage = () => {
     }
   };
 
-  // ✅ Auto-refresh logic (Every 15 Seconds)
+  // ✅ Auto-refresh logic (Every 30 Seconds)
   useEffect(() => {
     // Initial fetch when dependencies change
     fetchLeads(true);
@@ -243,7 +243,7 @@ const AdminLoginInUserPage = () => {
     // Set up the interval
     const intervalId = setInterval(() => {
       fetchLeads(false); // false = Don't show loading spinner on background refresh
-    }, 15000);
+    }, 30000);
 
     // Clean up interval on unmount or dependency change
     return () => clearInterval(intervalId);

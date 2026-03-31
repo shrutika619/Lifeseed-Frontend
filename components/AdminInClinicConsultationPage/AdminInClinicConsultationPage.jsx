@@ -7,10 +7,12 @@ import {
   Search, Filter, ChevronDown, Plus, Bell,
   Phone, User, MoreVertical, Calendar, Download,
   FileText, MapPin, X, PhoneCall, ArrowLeft, Loader2,
-  RefreshCw // ✅ Imported Refresh Icon
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminInclinicService } from "@/app/services/admin/adminInclinic.service"; 
+// ✅ Imported the receipt fetcher 
+import { getBookingReceiptHTML } from "@/app/services/patient/order.service"; 
 
 /* ── CALL MODAL ── */
 const CallModal = ({ patient, onClose }) => {
@@ -101,27 +103,42 @@ const CancelModal = ({ item, onClose, onRefresh }) => {
 /* ── THREE-DOT DROPDOWN ── */
 const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
   const router = useRouter();
+  const [isDownloading, setIsDownloading] = useState(false);
   
-  const handleDownload = () => {
-    const content = [
-      `Request ID: ${item.id}`,
-      `Patient: ${item.patient.name}, Age ${item.patient.age}`,
-      `Phone: ${item.patient.phone}`,
-      `Email: ${item.account.email}`,
-      `Agent: ${item.agent}`,
-      `Hospital: ${item.hospital}`,
-      `Doctor: ${item.doctor}`,
-      `Price: ${item.price}`,
-      `Payment: ${item.paymentMode}`,
-      `Status: ${item.status}`,
-      `Appointment: ${item.appointment}`,
-    ].join("\n");
-    const blob = new Blob([content], { type: "text/plain" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = `booking-${item.id.replace("#","")}.txt`; a.click();
-    URL.revokeObjectURL(url);
-    onClose();
+  // ✅ HTML RECEIPT DOWNLOAD LOGIC
+  const handleDownload = async () => {
+    if (!item.recordId) {
+      toast.error("Invalid booking ID");
+      return;
+    }
+
+    setIsDownloading(true);
+    const toastId = toast.loading("Generating receipt...");
+
+    try {
+      const res = await getBookingReceiptHTML(item.recordId);
+      
+      if (res.success && res.html) {
+        toast.success("Receipt generated successfully", { id: toastId });
+        
+        const printWindow = window.open('', '', 'width=800,height=600');
+        printWindow.document.open();
+        printWindow.document.write(res.html);
+        printWindow.document.close();
+        
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+
+      } else {
+        toast.error(res.message || "Could not generate receipt.", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error communicating with server for receipt.", { id: toastId });
+    } finally {
+      setIsDownloading(false);
+      onClose(); 
+    }
   };
 
   const profileHref = item.patientId 
@@ -129,20 +146,79 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
     : `/super-admin/in-clinic-consultation/customerprofile`;
 
   const actions = [
-    { icon: X,         label: "Cancel",        color: "text-red-600",     bg: "hover:bg-red-50",     onClick: () => { onOpenCancel(); onClose(); } },
-    { icon: PhoneCall, label: "Call Clinic",    color: "text-slate-600",   bg: "hover:bg-slate-50",   onClick: () => { window.location.href = "tel:+911800000000"; onClose(); } },
-    { icon: FileText,  label: "Profile & CRM", color: "text-indigo-600",  bg: "hover:bg-indigo-50",  onClick: () => { router.push(profileHref); onClose(); } },
-    { icon: Calendar,  label: "Reschedule",    color: "text-orange-600",  bg: "hover:bg-orange-50",  onClick: () => { alert(`Reschedule ${item.id}`); onClose(); } },
-    { icon: Phone,     label: "Call Patient",  color: "text-blue-600",    bg: "hover:bg-blue-50",    onClick: () => { window.location.href = `tel:${item.patient.phone}`; onClose(); } },
-    { icon: Download,  label: "Download",      color: "text-emerald-600", bg: "hover:bg-emerald-50", onClick: handleDownload },
-    { icon: FileText,  label: "Ticket",        color: "text-cyan-600",    bg: "hover:bg-cyan-50",    onClick: () => { alert(`Ticket raised for ${item.id}`); onClose(); } },
+    { 
+      icon: X,         
+      label: "Cancel",        
+      color: "text-red-600",     
+      bg: "hover:bg-red-50",     
+      onClick: () => { onOpenCancel(); onClose(); },
+      hide: item.status === 'Cancelled' || item.status === 'Complete'
+    },
+    { 
+      icon: PhoneCall, 
+      label: "Call Clinic",    
+      color: "text-slate-600",   
+      bg: "hover:bg-slate-50",   
+      onClick: () => { window.location.href = "tel:+911800000000"; onClose(); } 
+    },
+    { 
+      icon: FileText,  
+      label: "Profile & CRM", 
+      color: "text-indigo-600",  
+      bg: "hover:bg-indigo-50",  
+      onClick: () => { router.push(profileHref); onClose(); } 
+    },
+    { 
+      icon: Calendar,  
+      label: "Reschedule",    
+      color: "text-orange-600",  
+      bg: "hover:bg-orange-50",  
+      onClick: () => { 
+        if (item.status === 'Reschedule' || item.status === 'Rescheduled') {
+          toast.warning("This appointment has already been rescheduled once.");
+        } else {
+          router.push(`/free-consultation?admin_booking=true&rescheduleRecordId=${item.recordId}&patientId=${item.patientId}`);
+        }
+        onClose(); 
+      },
+      hide: item.status === 'Cancelled' || item.status === 'Complete'
+    },
+    { 
+      icon: Phone,     
+      label: "Call Patient",  
+      color: "text-blue-600",    
+      bg: "hover:bg-blue-50",    
+      onClick: () => { window.location.href = `tel:${item.patient.phone}`; onClose(); } 
+    },
+    { 
+      icon: Download,  
+      label: isDownloading ? "Downloading..." : "Download",      
+      color: "text-emerald-600", 
+      bg: "hover:bg-emerald-50", 
+      onClick: handleDownload,
+      disabled: isDownloading,
+      hide: item.status !== 'Complete' // ✅ ONLY SHOW IF COMPLETE
+    },
+    { 
+      icon: FileText,  
+      label: "Ticket",        
+      color: "text-cyan-600",    
+      bg: "hover:bg-cyan-50",    
+      onClick: () => { alert(`Ticket raised for ${item.id}`); onClose(); } 
+    },
   ];
 
   return (
     <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 z-40 min-w-[185px] py-1">
-      {actions.map(({ icon: Icon, label, color, bg, onClick }) => (
-         <button key={label} onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors`}>
-           <Icon className="w-4 h-4 shrink-0" />{label}
+      {actions.filter(a => !a.hide).map(({ icon: Icon, label, color, bg, onClick, disabled }) => (
+         <button 
+           key={label} 
+           onClick={onClick} 
+           disabled={disabled}
+           className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${color} ${bg} transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+         >
+           {disabled ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Icon className="w-4 h-4 shrink-0" />}
+           {label}
          </button>
       ))}
     </div>
@@ -214,7 +290,7 @@ const AdminInClinicConsultationPage = () => {
   
   // API Data States
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // ✅ Added state for refresh spin
+  const [isRefreshing, setIsRefreshing] = useState(false); 
   const [bookingData, setBookingData] = useState([]);
   const [metrics, setMetrics] = useState({
     counts: { "New": 0, "Accept": 0, "Rejected": 0, "Complete": 0, "Patient Absent": 0, "Cancelled": 0 },
@@ -231,7 +307,6 @@ const AdminInClinicConsultationPage = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // ✅ Extracted Fetch Logic
   const fetchBookings = async (isInitialLoad = false) => {
     if (isInitialLoad) setLoading(true);
     else setIsRefreshing(true);
@@ -262,14 +337,13 @@ const AdminInClinicConsultationPage = () => {
       }
 
       const res = await adminInclinicService.getAllInClinicBookings(`?${params.toString()}`);
-      console.log(res)
+      
       if (res.success && res.data) {
         setMetrics({
           counts: res.data.counts || {},
           followUpCounts: res.data.followUpCounts || {}
         });
 
-        // SPLIT MAPPING
         const mappedData = res.data.bookings.map(b => {
           const bDate = new Date(b.bookingDate);
           const patientData = b.bookingPatientDetails || {};
@@ -279,6 +353,7 @@ const AdminInClinicConsultationPage = () => {
             id: b.appointmentId || "--",
             internalBookingId: b.bookingId,
             patientId: accountData.patientId || accountData.userId, 
+            recordId: b.bookingId, // needed for download
             
             bookingDate: `${bDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
             appointment: b.timeSlot ? b.timeSlot : "--",
@@ -290,7 +365,7 @@ const AdminInClinicConsultationPage = () => {
             agent: b.agent || "Self",
             
             bookedBy: b.bookedBy || {},
-            cancelledBy: b.cancelledBy || null, // ✅ Added cancelledBy extraction
+            cancelledBy: b.cancelledBy || null, 
 
             patient: { 
               name: patientData.name || "--", 
@@ -325,15 +400,12 @@ const AdminInClinicConsultationPage = () => {
     }
   };
 
-  // ✅ Background Auto-Refresh Hook
   useEffect(() => {
-    // Initial fetch when dependencies change
     fetchBookings(true);
 
-    // Set up the interval
     const intervalId = setInterval(() => {
       fetchBookings(false); 
-    }, 15000);
+    }, 30000);
 
     return () => clearInterval(intervalId);
   }, [debouncedSearch, activeFilter, primaryDate, refreshTrigger]); 
@@ -389,7 +461,6 @@ const AdminInClinicConsultationPage = () => {
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* ✅ REFRESH BUTTON */}
           <button 
             onClick={() => fetchBookings(true)}
             disabled={isRefreshing || loading}
@@ -428,7 +499,6 @@ const AdminInClinicConsultationPage = () => {
         <div className="flex items-center gap-2 w-full lg:flex-1">
           <button className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50"><Filter className="w-5 h-5 text-slate-500" /></button>
           
-          {/* ✅ REFRESH BUTTON (MOBILE VISIBLE) */}
           <button 
             onClick={() => fetchBookings(true)}
             disabled={isRefreshing || loading}
@@ -476,7 +546,6 @@ const AdminInClinicConsultationPage = () => {
           {/* DESKTOP TABLE */}
           <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
             
-            {/* Show tiny overlay if refreshing in background */}
             {isRefreshing && (
                <div className="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden">
                  <div className="h-full bg-blue-500 animate-[pulse_1s_ease-in-out_infinite]"></div>
@@ -510,7 +579,6 @@ const AdminInClinicConsultationPage = () => {
                           <p className="text-[11px] text-slate-500">{item.bookingDate.split(',')[1]}</p>
                         </td>
                         
-                        {/* Booked By Column */}
                         <td className="px-5 py-5">
                           <div className="text-sm">
                             {bookedByOriginal.type === "admin" ? (
@@ -523,14 +591,13 @@ const AdminInClinicConsultationPage = () => {
                               <>
                                 <p className="font-semibold text-slate-800">{item.account.name || "--"}</p>
                                 <p className="text-slate-500 text-xs mt-0.5">📞 {item.account.phone || "--"}</p>
-                                {item.account.email && item.account.email !== "--" && <p className="text-slate-400 text-xs italic">{item.account.email}</p>}
-                                {item.account.city && item.account.city !== "--" && <p className="text-slate-400 text-xs">{item.account.city}</p>}
+                                {item.account.email && item.account.email !== '--' && <p className="text-slate-400 text-xs italic">{item.account.email}</p>}
+                                {item.account.city && item.account.city !== '--' && <p className="text-slate-400 text-xs">{item.account.city}</p>}
                               </>
                             )}
                           </div>
                         </td>
                         
-                        {/* Patient Column */}
                         <td className="px-5 py-5">
                           <p className="text-sm text-slate-800 font-semibold">
                             {item.patient.name} 
@@ -555,14 +622,12 @@ const AdminInClinicConsultationPage = () => {
                           <p className="text-[10px] font-semibold text-slate-500 mt-0.5 capitalize">{item.paymentMode}</p>
                         </td>
                         
-                        {/* Status Column */}
                         <td className="px-5 py-5">
                           <div className="flex flex-col gap-1 items-start">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${getStatusColor(item.status)}`}>
                               {item.status}
                             </span>
                             
-                            {/* ✅ If NOT Cancelled, show Rescheduled By (if exists) */}
                             {item.status !== 'Cancelled' && item.bookedBy?.rescheduledBy && (
                               <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                                 <span className="font-bold block mb-0.5">Rescheduled By:</span>
@@ -571,7 +636,6 @@ const AdminInClinicConsultationPage = () => {
                               </div>
                             )}
 
-                            {/* ✅ If Cancelled, show Cancelled By (if exists) */}
                             {item.status === 'Cancelled' && item.cancelledBy && (
                               <div className="p-1.5 bg-red-50/80 rounded border border-red-100 text-[9px] text-red-700 leading-tight w-max">
                                 <span className="font-bold block mb-0.5">Cancelled By:</span>
@@ -581,7 +645,6 @@ const AdminInClinicConsultationPage = () => {
                           </div>
                         </td>
 
-                        {/* ✅ SELL STATUS CELL */}
                         <td className="px-5 py-5 text-center">
                            <span className={`inline-block border px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${getSellStatusColor(item.sellStatus)}`}>
                               {item.sellStatus}
@@ -616,7 +679,6 @@ const AdminInClinicConsultationPage = () => {
                         <div className="flex flex-col gap-1 items-start">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${getStatusColor(item.status)}`}>{item.status}</span>
                           
-                          {/* ✅ If NOT Cancelled, show Rescheduled By (if exists) */}
                           {item.status !== 'Cancelled' && item.bookedBy?.rescheduledBy && (
                             <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                               <span className="font-bold block mb-0.5">Rescheduled By:</span>
@@ -624,7 +686,6 @@ const AdminInClinicConsultationPage = () => {
                             </div>
                           )}
 
-                          {/* ✅ If Cancelled, show Cancelled By (if exists) */}
                           {item.status === 'Cancelled' && item.cancelledBy && (
                             <div className="p-1.5 bg-red-50/80 rounded border border-red-100 text-[9px] text-red-700 leading-tight w-max">
                               <span className="font-bold block mb-0.5">Cancelled By:</span>
@@ -633,7 +694,6 @@ const AdminInClinicConsultationPage = () => {
                           )}
                         </div>
 
-                        {/* ✅ SELL STATUS ON MOBILE */}
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${getSellStatusColor(item.sellStatus)}`}>
                            {item.sellStatus}
                         </span>
@@ -646,7 +706,6 @@ const AdminInClinicConsultationPage = () => {
                   </div>
 
                   <div className="space-y-3 mb-4 pb-4 border-b border-slate-100">
-                     {/* Patient Info */}
                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Patient Details</p>
                        <p className="font-semibold text-slate-800 text-sm">
@@ -662,7 +721,6 @@ const AdminInClinicConsultationPage = () => {
                         )}
                      </div>
 
-                     {/* Booked By Info */}
                      <div>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booked By (Account)</p>
                        {bookedByOriginal.type === "admin" ? (

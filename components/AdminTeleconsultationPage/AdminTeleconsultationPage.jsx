@@ -350,7 +350,7 @@ const AdminTeleconsultationPage = () => {
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchBookings(false);
-    }, 15000);
+    }, 30000);
 
     return () => clearInterval(intervalId);
   }, [selectedTime, activeConsultFilter, activeSellFilter, searchTerm]);
