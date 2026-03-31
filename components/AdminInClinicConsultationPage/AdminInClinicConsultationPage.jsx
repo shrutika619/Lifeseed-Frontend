@@ -7,11 +7,10 @@ import {
   Search, Filter, ChevronDown, Plus, Bell,
   Phone, User, MoreVertical, Calendar, Download,
   FileText, MapPin, X, PhoneCall, ArrowLeft, Loader2,
-  RefreshCw
+  RefreshCw 
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminInclinicService } from "@/app/services/admin/adminInclinic.service"; 
-// ✅ Imported the receipt fetcher 
 import { getBookingReceiptHTML } from "@/app/services/patient/order.service"; 
 
 /* ── CALL MODAL ── */
@@ -103,9 +102,11 @@ const CancelModal = ({ item, onClose, onRefresh }) => {
 /* ── THREE-DOT DROPDOWN ── */
 const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [isDownloading, setIsDownloading] = useState(false);
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
+
   
-  // ✅ HTML RECEIPT DOWNLOAD LOGIC
   const handleDownload = async () => {
     if (!item.recordId) {
       toast.error("Invalid booking ID");
@@ -141,9 +142,10 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
     }
   };
 
+  // ✅ Used basePath correctly for profile routing
   const profileHref = item.patientId 
-    ? `/super-admin/in-clinic-consultation/customerprofile?patientId=${item.patientId}` 
-    : `/super-admin/in-clinic-consultation/customerprofile`;
+    ? `${basePath}/log-in-user/customerprofile?patientId=${item.patientId}` 
+    : `${basePath}/log-in-user/customerprofile`;
 
   const actions = [
     { 
@@ -197,7 +199,7 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
       bg: "hover:bg-emerald-50", 
       onClick: handleDownload,
       disabled: isDownloading,
-      hide: item.status !== 'Complete' // ✅ ONLY SHOW IF COMPLETE
+      hide: item.status !== 'Complete' 
     },
     { 
       icon: FileText,  
@@ -228,10 +230,13 @@ const ActionDropdown = ({ item, onClose, onOpenCancel }) => {
 /* ── ACTION CELL ── */
 const ActionCell = ({ item, onRefresh }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [showDropdown, setShowDropdown] = useState(false);
   const [callModal,    setCallModal]    = useState(false);
   const [cancelModal,  setCancelModal]  = useState(false);
   const dropdownRef = useRef(null);
+  
+  const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
   useEffect(() => {
     const handler = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowDropdown(false); };
@@ -239,9 +244,10 @@ const ActionCell = ({ item, onRefresh }) => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ✅ Used basePath correctly for profile routing here as well
   const profileHref = item.patientId 
-    ? `/super-admin/in-clinic-consultation/customerprofile?patientId=${item.patientId}` 
-    : `/super-admin/in-clinic-consultation/customerprofile`;
+    ? `${basePath}/log-in-user/customerprofile?patientId=${item.patientId}` 
+    : `${basePath}/log-in-user/customerprofile`;
 
   return (
     <>
@@ -405,7 +411,7 @@ const AdminInClinicConsultationPage = () => {
 
     const intervalId = setInterval(() => {
       fetchBookings(false); 
-    }, 30000);
+    }, 15000);
 
     return () => clearInterval(intervalId);
   }, [debouncedSearch, activeFilter, primaryDate, refreshTrigger]); 

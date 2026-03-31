@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { 
   Calendar, Clock, MessageSquare, CheckCircle2, 
   XCircle, Save, ChevronDown, RotateCcw,
-  Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil, Search, UserCheck
+  Monitor, MapPin, X, ArrowLeft, Loader2, Plus, Trash2, Pencil, Search, UserCheck, Phone, User
 } from 'lucide-react';
 import { customerProfileSchema } from '@/app/utils/validation/customerProfileSchema';
 
@@ -224,7 +224,6 @@ const OrderHistoryTab = ({ userId }) => {
     
     const toastId = toast.loading("Cancelling booking...");
     try {
-      // Assuming you have this service imported
       const res = await adminTeleconsultationService.cancelBooking(recordId);
       if (res.success) {
         toast.success("Booking Cancelled Successfully", { id: toastId });
@@ -540,26 +539,6 @@ const TicketCard = ({ ticket, userId }) => {
   )
 }
 
-const TicketTab = ({ activities, userId }) => {
-  const tickets = activities.filter(a => a.category === 'Ticket');
-
-  if (tickets.length === 0) {
-      return (
-        <div className="text-center py-10 text-slate-400 text-sm border border-dashed border-slate-200 rounded-2xl bg-slate-50">
-          No tickets found for this patient.
-        </div>
-      );
-  }
-
-  return (
-    <div className="space-y-4">
-      {tickets.map((ticket) => (
-        <TicketCard key={ticket.activityId} ticket={ticket} userId={userId} />
-      ))}
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────
    ADMIN CLINIC/HOSPITAL SELECT MODAL
 ───────────────────────────────────────────── */
@@ -610,7 +589,7 @@ const AdminClinicSelectModal = ({ onClose, userId }) => {
   };
 
   const handleClinicSelect = (clinicId) => {
-    router.push(`/bookappointment?clinicId=${clinicId}&patientId=${userId}`);
+    router.push(`${basePath}/bookappointment?clinicId=${clinicId}&patientId=${userId}`);
     onClose();
   };
 
@@ -837,10 +816,24 @@ const CustomerProfilePage = () => {
 
       if (isNewUser) {
         const res = await getAdminDropdownData();
-        if (res.success && res.data) {
-           setCustomerData({ currentAdmin: res.data.currentAdmin });
-           setAdminList(res.data.assignToDropdown || []);
-           const defaultOwnerName = res.data.currentAdmin?.fullName || "";
+        if (res.success) {
+           const data = res.data || res;
+           
+           // ✅ FIX: Robust array extraction for Admin List
+           let admins = [];
+           if (Array.isArray(data)) admins = data;
+           else if (data.admins && Array.isArray(data.admins)) admins = data.admins;
+           else if (data.assignToDropdown && Array.isArray(data.assignToDropdown)) admins = data.assignToDropdown;
+           else if (data.data && Array.isArray(data.data)) admins = data.data;
+
+           setAdminList(admins);
+
+           const currentAd = data.currentAdmin || null;
+           setCustomerData({ currentAdmin: currentAd });
+           
+           // Fallback to first admin if current is missing
+           const defaultOwnerName = currentAd?.fullName || (admins.length > 0 ? admins[0].fullName : "");
+           
            reset({
              leadOwner: defaultOwnerName, 
              leadStage: "New",
@@ -1109,7 +1102,7 @@ const CustomerProfilePage = () => {
     }
   };
 
-  // 5. FINAL SUBMIT (✅ Sequential Error Handling & Re-routing)
+  // 5. FINAL SUBMIT
   const onFinalSubmit = async (data) => {
     if (isNewUser) {
       if (!data.flatNo || !data.street || !data.pincode) {
@@ -1119,10 +1112,8 @@ const CustomerProfilePage = () => {
     
     setIsSaving(true);
     
-    // Helper to strictly validate MongoDB ObjectIds
     const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
     
-    // Validate Current Admin ID
     const currentAdminId = isValidObjectId(customerData?.currentAdmin?._id) 
       ? customerData.currentAdmin._id 
       : undefined;
@@ -1135,7 +1126,6 @@ const CustomerProfilePage = () => {
     } else if (data.leadOwner === customerData?.currentAdmin?.fullName) {
       leadOwnerId = currentAdminId;
     } else {
-      // Fallback if data.leadOwner is already a valid ID
       leadOwnerId = isValidObjectId(data.leadOwner) ? data.leadOwner : currentAdminId;
     }
 
@@ -1159,8 +1149,7 @@ const CustomerProfilePage = () => {
 
     if (isNewUser) {
       try {
-        // STEP 1: CREATE USER PROFILE
-        if (leadOwnerId) payload.leadOwner = leadOwnerId; // Attach to initial creation if valid
+        if (leadOwnerId) payload.leadOwner = leadOwnerId; 
         const res = await createCustomerProfile(payload);
         
         if (res.success) {
@@ -1176,7 +1165,6 @@ const CustomerProfilePage = () => {
 
           const parallelTasks = [];
 
-          // STEP 2: PREPARE ADDRESS
           const hasAddress = data.flatNo || data.street || data.pincode;
           if (hasAddress) {
             const addressPayload = {
@@ -1190,7 +1178,6 @@ const CustomerProfilePage = () => {
             parallelTasks.push(adminAddressService.createUserAddress(generatedUserId, addressPayload));
           }
 
-          // STEP 3: PREPARE ACTIVITIES
           if (activities.length > 0) {
             for (const act of activities) {
               
@@ -1217,7 +1204,6 @@ const CustomerProfilePage = () => {
                 scheduledTime: act.scheduledTime || undefined, 
               };
 
-              // Only attach assignedTo if we successfully resolved a valid MongoDB ObjectId
               if (finalAssignedToId) {
                 activityPayload.assignedTo = finalAssignedToId;
               }
@@ -1226,7 +1212,6 @@ const CustomerProfilePage = () => {
             }
           }
 
-          // Execute background tasks
           if (parallelTasks.length > 0) {
             const results = await Promise.allSettled(parallelTasks);
             const failures = results.filter(r => r.status === 'rejected');
@@ -1238,7 +1223,6 @@ const CustomerProfilePage = () => {
             }
           }
 
-          // Reroute to existing user profile
           router.push(`${basePath}/log-in-user/customerprofile?patientId=${generatedUserId}`);
           
         } else {
@@ -1296,7 +1280,7 @@ const CustomerProfilePage = () => {
     );
   }
 
-  const isSuperAdmin = customerData?.currentAdmin?.role === 'super_admin';
+  // const isSuperAdmin = customerData?.currentAdmin?.role === 'super_admin';
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen py-8 px-4 md:px-8 font-sans">
@@ -1634,17 +1618,17 @@ const CustomerProfilePage = () => {
                 Assign to (User) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
+                {/* ✅ Accessible for BOTH Admin and Super Admin */}
                 <select 
                   {...register("activityAssignTo")} 
-                  disabled={!isSuperAdmin}
-                  className={`w-full appearance-none p-2.5 bg-slate-50 border ${activityErrors.activityAssignTo ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none ${!isSuperAdmin ? 'opacity-60 cursor-not-allowed text-slate-500 bg-gray-100' : 'focus:border-blue-500'}`}
+                  className={`w-full appearance-none p-2.5 bg-slate-50 border ${activityErrors.activityAssignTo ? 'border-red-400' : 'border-slate-200'} rounded-xl text-sm outline-none focus:border-blue-500`}
                 >
                   <option value="" disabled>Unassigned</option>
                   {adminList.map(admin => (
                     <option key={admin._id} value={admin.fullName}>{admin.fullName}</option>
                   ))}
                 </select>
-                <ChevronDown className={`absolute right-3 top-3 ${!isSuperAdmin ? 'text-gray-300' : 'text-slate-400'} pointer-events-none`} size={16} />
+                <ChevronDown className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16} />
               </div>
               {activityErrors.activityAssignTo && (
                 <p className="text-red-500 text-[10px] mt-1">{activityErrors.activityAssignTo}</p>
