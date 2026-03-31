@@ -116,7 +116,7 @@ const ConfirmCancelModal = ({ isOpen, onClose, onConfirm, loading }) => {
 ───────────────────────────────────────────── */
 
 const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
-  const router = useRouter(); // ✅ Added router here
+  const router = useRouter(); 
   const pathname = usePathname();
   const basePath = pathname.startsWith('/super-admin') ? '/super-admin' : '/admin';
 
@@ -175,7 +175,6 @@ const ActionDropdown = ({ item, onClose, onCancel, onReschedule, dropUp }) => {
     },
     {
       icon: Calendar, label: "Reschedule", color: "text-orange-600", bg: "hover:bg-orange-50",
-      // ✅ Added logic to prevent double rescheduling
       onClick: () => {
         if (item.consultationStatus === 'Reschedule' || item.consultationStatus === 'Rescheduled') {
           toast.warning("This appointment has already been rescheduled once.");
@@ -321,7 +320,6 @@ const AdminTeleconsultationPage = () => {
       };
 
       const res = await adminTeleconsultationService.getAllBookings(queryFilters);
-      
       if (res.success && res.data) {
         setBookings(res.data.bookings || []);
         setCounts({
@@ -628,11 +626,20 @@ const AdminTeleconsultationPage = () => {
                               {item.consultationStatus}
                             </span>
                             
-                            {item.bookedBy?.rescheduledBy && (
+                            {/* ✅ Hide Rescheduled By if Cancelled */}
+                            {item.consultationStatus !== 'Cancelled' && item.bookedBy?.rescheduledBy && (
                               <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                                 <span className="font-bold block mb-0.5">Rescheduled By:</span>
                                 {item.bookedBy.rescheduledBy.name}
                                 {item.bookedBy.rescheduledBy.mobileNo && <span className="block mt-0.5">📞 {item.bookedBy.rescheduledBy.mobileNo}</span>}
+                              </div>
+                            )}
+
+                            {/* ✅ Show Cancelled By if Cancelled */}
+                            {item.consultationStatus === 'Cancelled' && item.cancelledBy && (
+                              <div className="p-1.5 bg-red-50/80 rounded border border-red-100 text-[9px] text-red-700 leading-tight w-max">
+                                <span className="font-bold block mb-0.5">Cancelled By:</span>
+                                <span className="capitalize">{item.cancelledBy}</span>
                               </div>
                             )}
                           </div>
@@ -732,10 +739,19 @@ const AdminTeleconsultationPage = () => {
                           {item.consultationStatus}
                         </span>
                         
-                        {item.bookedBy?.rescheduledBy && (
+                        {/* ✅ Hide Rescheduled By if Cancelled */}
+                        {item.consultationStatus !== 'Cancelled' && item.bookedBy?.rescheduledBy && (
                           <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                             <span className="font-bold block mb-0.5">Rescheduled By:</span>
                             {item.bookedBy.rescheduledBy.name}
+                          </div>
+                        )}
+
+                        {/* ✅ Show Cancelled By if Cancelled */}
+                        {item.consultationStatus === 'Cancelled' && item.cancelledBy && (
+                          <div className="p-1.5 bg-red-50/80 rounded border border-red-100 text-[9px] text-red-700 leading-tight w-max">
+                            <span className="font-bold block mb-0.5">Cancelled By:</span>
+                            <span className="capitalize">{item.cancelledBy}</span>
                           </div>
                         )}
                       </div>
@@ -768,7 +784,7 @@ const AdminTeleconsultationPage = () => {
                       )}
                    </div>
 
-                   {/* ✅ Updated Booked By Info for Mobile */}
+                   {/* Booked By Info for Mobile */}
                    <div>
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Booked By (Account)</p>
                      {bookedBy.type === "admin" ? (
@@ -843,7 +859,7 @@ const getConsultStyle = (status) => {
     case "Pending/Upcoming": return "bg-orange-50 text-orange-600 border-orange-100";
     case "Cancelled":        return "bg-red-50 text-red-600 border-red-100";
     case "Reschedule":       
-    case "Rescheduled":      return "bg-purple-50 text-purple-600 border-purple-100"; // Added Rescheduled
+    case "Rescheduled":      return "bg-purple-50 text-purple-600 border-purple-100";
     default:                 return "bg-slate-50 text-slate-500 border-slate-100";
   }
 };

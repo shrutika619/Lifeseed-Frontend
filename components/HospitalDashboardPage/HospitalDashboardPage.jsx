@@ -329,7 +329,7 @@ const HospitalDashboard = () => {
                 available: true,
                 image: doctorData.profileImage || null
               },
-              
+              cancelledBy: b.cancelledBy,
               status: b.status?.toLowerCase() || 'pending',
               paymentStatus: b.paymentStatus
             };
@@ -503,6 +503,8 @@ const HospitalDashboard = () => {
         return req.status === activeTab;
       });
 
+      console.log(...requests)
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
 
@@ -672,12 +674,12 @@ const HospitalDashboard = () => {
                           </div>
                           <div>
                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">Agent</p>
-                             <p className="text-sm font-semibold text-gray-800">{request.agent}</p>
+                             <p className="text-sm font-semibold text-gray-800">{request.agent == "Self" ? request.agent : `${request.agent} (admin)`}</p>
                           </div>
-                          <div>
+                          {/* <div>
                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">Hospital</p>
                              <p className="text-sm font-semibold text-gray-800">{request.hospital}</p>
-                          </div>
+                          </div> */}
                         </div>
                       </div>
 
@@ -750,7 +752,7 @@ const HospitalDashboard = () => {
                   )}
                   {request.status === 'cancelled' && (
                     <div className="border-t border-gray-100 p-4 sm:p-6 bg-yellow-50/30 rounded-b-xl">
-                      <div className="text-yellow-700 font-medium text-sm">Appointment Cancelled</div>
+                      <div className="text-yellow-700 font-medium text-sm">Appointment Cancelled by {request.cancelledBy == "patient" ? request.cancelledBy : `${request.cancelledBy} (admin)`}</div>
                     </div>
                   )}
                   {request.status === 'rejected' && (

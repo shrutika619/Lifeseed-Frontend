@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Search, Filter, ChevronDown, Plus, Bell,
   Phone, User, MoreVertical, Calendar, Download,
   FileText, MapPin, X, PhoneCall, ArrowLeft, Loader2,
   RefreshCw // ✅ Imported Refresh Icon
 } from "lucide-react";
-import { useRouter , usePathname} from "next/navigation";
 import { toast } from "sonner";
 import { adminInclinicService } from "@/app/services/admin/adminInclinic.service"; 
 
@@ -261,7 +262,7 @@ const AdminInClinicConsultationPage = () => {
       }
 
       const res = await adminInclinicService.getAllInClinicBookings(`?${params.toString()}`);
-      
+      console.log(res)
       if (res.success && res.data) {
         setMetrics({
           counts: res.data.counts || {},
@@ -285,10 +286,11 @@ const AdminInClinicConsultationPage = () => {
             paymentMode: b.paymentMode === "cash" ? "Cash" : b.paymentMode || "Unknown",
             price: `₹${b.fees}`,
             status: b.status || "New",
-            sellStatus: b.followUpStatus || "--", // ✅ Added Sell Status mapping
+            sellStatus: b.followUpStatus || "--", 
             agent: b.agent || "Self",
             
             bookedBy: b.bookedBy || {},
+            cancelledBy: b.cancelledBy || null, // ✅ Added cancelledBy extraction
 
             patient: { 
               name: patientData.name || "--", 
@@ -491,7 +493,6 @@ const AdminInClinicConsultationPage = () => {
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Agent</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hospital</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                    {/* ✅ ADDED SELL STATUS COLUMN */}
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Sell Status</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Appointment</th>
                     <th className="px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
@@ -561,17 +562,26 @@ const AdminInClinicConsultationPage = () => {
                               {item.status}
                             </span>
                             
-                            {item.bookedBy?.rescheduledBy && (
+                            {/* ✅ If NOT Cancelled, show Rescheduled By (if exists) */}
+                            {item.status !== 'Cancelled' && item.bookedBy?.rescheduledBy && (
                               <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                                 <span className="font-bold block mb-0.5">Rescheduled By:</span>
                                 {item.bookedBy.rescheduledBy.name}
                                 {item.bookedBy.rescheduledBy.mobileNo && <span className="block mt-0.5">📞 {item.bookedBy.rescheduledBy.mobileNo}</span>}
                               </div>
                             )}
+
+                            {/* ✅ If Cancelled, show Cancelled By (if exists) */}
+                            {item.status === 'Cancelled' && item.cancelledBy && (
+                              <div className="p-1.5 bg-red-50/80 rounded border border-red-100 text-[9px] text-red-700 leading-tight w-max">
+                                <span className="font-bold block mb-0.5">Cancelled By:</span>
+                                <span className="capitalize">{item.cancelledBy}</span>
+                              </div>
+                            )}
                           </div>
                         </td>
 
-                        {/* ✅ ADDED SELL STATUS CELL */}
+                        {/* ✅ SELL STATUS CELL */}
                         <td className="px-5 py-5 text-center">
                            <span className={`inline-block border px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${getSellStatusColor(item.sellStatus)}`}>
                               {item.sellStatus}
@@ -606,10 +616,19 @@ const AdminInClinicConsultationPage = () => {
                         <div className="flex flex-col gap-1 items-start">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${getStatusColor(item.status)}`}>{item.status}</span>
                           
-                          {item.bookedBy?.rescheduledBy && (
+                          {/* ✅ If NOT Cancelled, show Rescheduled By (if exists) */}
+                          {item.status !== 'Cancelled' && item.bookedBy?.rescheduledBy && (
                             <div className="p-1.5 bg-purple-50/80 rounded border border-purple-100 text-[9px] text-purple-700 leading-tight w-max">
                               <span className="font-bold block mb-0.5">Rescheduled By:</span>
                               {item.bookedBy.rescheduledBy.name}
+                            </div>
+                          )}
+
+                          {/* ✅ If Cancelled, show Cancelled By (if exists) */}
+                          {item.status === 'Cancelled' && item.cancelledBy && (
+                            <div className="p-1.5 bg-red-50/80 rounded border border-red-100 text-[9px] text-red-700 leading-tight w-max">
+                              <span className="font-bold block mb-0.5">Cancelled By:</span>
+                              <span className="capitalize">{item.cancelledBy}</span>
                             </div>
                           )}
                         </div>
