@@ -95,6 +95,9 @@ const FreeConsultationPage = () => {
   const [selectedSlot, setSelectedSlot] = useState(null); 
   const [activeGroupId, setActiveGroupId] = useState(null); 
   const [topLevelAvailabilityId, setTopLevelAvailabilityId] = useState(null);
+  
+  // Track the original appointment for marking in UI
+  const [originalBooking, setOriginalBooking] = useState(null);
 
   // Auth & Profile States
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
@@ -107,11 +110,9 @@ const FreeConsultationPage = () => {
   const [fullName, setFullName] = useState(searchParams.get('name') || '');
   const [age, setAge] = useState(searchParams.get('age') || '');
   const [gender, setGender] = useState(searchParams.get('gender') || '');
+  const [concern, setConcern] = useState(searchParams.get('concern') ? [searchParams.get('concern')] : []);
   
-  const initialConcern = searchParams.get('concern');
-  const [concern, setConcern] = useState(initialConcern ? [initialConcern] : []);
-
-  // ✅ NEW: Form validation errors state
+  // Form validation errors state
   const [formErrors, setFormErrors] = useState({});
   
   const isAdminBooking = searchParams.get('admin_booking') === 'true'; 
@@ -145,13 +146,49 @@ const FreeConsultationPage = () => {
 
       setIsLoggedIn(true);
       
-      // ADMIN FLOW: Prefill API
+      // ADMIN FLOW: Prefill API or Reschedule Data
       if (isAdminOrSuperAdmin) {
         setProfileLoaded(true); 
         
         const pUserId = searchParams.get('userId');
         
-        if (isAdminBooking && pUserId && !prefillLoaded) {
+        // 1. If Rescheduling: Fetch Original Booking Details
+        if (rescheduleRecordId && !prefillLoaded) {
+          setFetchingProfile(true);
+          try {
+            const res = await adminTeleconsultationService.getBookingDetails(rescheduleRecordId);
+            if (res.success && res.data) {
+              const bpDetails = res.data.bookingPatientDetails || {};
+              const accDetails = res.data.patientDetails || {};
+              const bDetails = res.data.bookingDetails || {};
+              
+              // Store original booking info
+              if (bDetails.appointmentDate && bDetails.timeSlot) {
+                setOriginalBooking({
+                  date: bDetails.appointmentDate.split('T')[0],
+                  time: bDetails.timeSlot
+                });
+              }
+
+              if (!patientContact) setPatientContact(bpDetails.contact || accDetails.loginNumber || ''); 
+              if (!fullName) setFullName(bpDetails.name || '');
+              if (!age) setAge(bpDetails.age ? bpDetails.age.toString() : '');
+              if (!gender) setGender(bpDetails.gender ? bpDetails.gender.toLowerCase() : '');
+              
+              if (bpDetails.concernedAbout && Array.isArray(bpDetails.concernedAbout) && concern.length === 0) {
+                setConcern(bpDetails.concernedAbout);
+              }
+            }
+          } catch (error) {
+            console.error("Failed to load reschedule data", error);
+            toast.error("Could not fetch patient details for rescheduling.");
+          } finally {
+            setPrefillLoaded(true);
+            setFetchingProfile(false);
+          }
+        } 
+        // 2. If Normal Admin Booking: Fetch Patient Prefill Data
+        else if (isAdminBooking && pUserId && !prefillLoaded) {
           setFetchingProfile(true);
           try {
             const res = await adminTeleconsultationService.getAppointmentPrefill(pUserId);
@@ -197,7 +234,7 @@ const FreeConsultationPage = () => {
     };
 
     loadData();
-  }, [isAuthenticated, user, dispatch, profileLoaded, prefillLoaded, fullName, age, gender, patientContact, isAdminBooking, searchParams, isAdminOrSuperAdmin]);
+  }, [isAuthenticated, user, dispatch, profileLoaded, prefillLoaded, fullName, age, gender, patientContact, isAdminBooking, searchParams, isAdminOrSuperAdmin, rescheduleRecordId, concern.length]);
 
   // Fetch Cities 
   useEffect(() => {
@@ -252,18 +289,16 @@ const FreeConsultationPage = () => {
     fetchSlots();
   }, [fetchSlots]);
 
-  // Toggle Multiple Concerns
   const toggleConcern = (item) => {
     if (concern.includes(item)) {
       setConcern(concern.filter(c => c !== item));
     } else {
       setConcern([...concern, item]);
-      // ✅ Clear concern error when user selects one
       setFormErrors(prev => ({ ...prev, concern: '' }));
     }
   };
 
-  // ✅ NEW: Validate form fields and return errors object
+  // Validate form fields
   const validateForm = () => {
     const errors = {};
 
@@ -296,16 +331,14 @@ const FreeConsultationPage = () => {
       return;
     }
 
-    // ✅ Run validation
+    // Run validation
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      // Show slot error via toast since it's on different section
       if (errors.slot) toast.error(errors.slot);
       return;
     }
 
-    // Clear all errors if validation passes
     setFormErrors({});
     setIsBooking(true);
 
@@ -354,6 +387,7 @@ const FreeConsultationPage = () => {
          return;
       }
 
+      // ✅ HANDLE RESPONSES
       if (res.success || res.message?.includes("successfully")) {
         const responseData = res.data;
         const displayDate = new Date(responseData.date).toLocaleDateString('en-US', { 
@@ -379,10 +413,14 @@ const FreeConsultationPage = () => {
             toast.success(`Booking successfully created for ${fullName}`);
         }
       } else {
-        const errorMsg = res.message || "";
+        // Graceful error parse if backend returns non-success but doesn't throw 500
+        const errorMsg = String(res.message || res.data || res.error || "");
         if (errorMsg.includes("VersionError") || errorMsg.includes("No matching document")) {
           toast.error("Slot already full. Please select another time slot.");
           fetchSlots(); 
+        } else if (errorMsg.includes("Please select a different slot than the current one")) {
+          // ✅ USE WARNING TOAST HERE
+          toast.warning("Please select a different time slot than your current one.");
         } else {
           toast.error(errorMsg || "Something went wrong. Please try again.");
         }
@@ -390,12 +428,18 @@ const FreeConsultationPage = () => {
 
     } catch (error) {
       console.error(error);
-      const errorStr = String(error?.message || error?.error || error);
+      
+      // CATCH RAW HTML/500 BACKEND ERRORS
+      const errorStr = String(error?.response?.data || error?.message || error?.error || error);
+      
       if (errorStr.includes("VersionError") || errorStr.includes("No matching document")) {
         toast.error("Slot already full. Please select another time slot.");
         fetchSlots(); 
+      } else if (errorStr.includes("Please select a different slot than the current one")) {
+        // ✅ USE WARNING TOAST HERE TOO
+        toast.warning("Please select a different time slot than your current one.");
       } else {
-        toast.error(error?.message || "Failed to communicate with server.");
+        toast.error(error?.response?.data?.message || error?.message || "Failed to communicate with server.");
       }
     } finally {
       setIsBooking(false);
@@ -639,7 +683,7 @@ const FreeConsultationPage = () => {
                 <input 
                   type="text"
                   value={patientContact}
-                  disabled={rescheduleRecordId}
+                  disabled={!!rescheduleRecordId}
                   onChange={(e) => {
                     setPatientContact(e.target.value);
                     setFormErrors(prev => ({ ...prev, patientContact: '' }));
@@ -667,7 +711,7 @@ const FreeConsultationPage = () => {
               <input 
                 type="text"
                 value={fullName}
-                disabled={rescheduleRecordId}
+                disabled={!!rescheduleRecordId}
                 onChange={(e) => {
                   setFullName(e.target.value);
                   setFormErrors(prev => ({ ...prev, fullName: '' }));
@@ -695,7 +739,7 @@ const FreeConsultationPage = () => {
                 <input 
                   type="number"
                   value={age}
-                  disabled={rescheduleRecordId}
+                  disabled={!!rescheduleRecordId}
                   onChange={(e) => {
                     setAge(e.target.value);
                     setFormErrors(prev => ({ ...prev, age: '' }));
@@ -721,7 +765,7 @@ const FreeConsultationPage = () => {
                 </label>
                 <select 
                   value={gender}
-                  disabled={rescheduleRecordId}
+                  disabled={!!rescheduleRecordId}
                   onChange={(e) => {
                     setGender(e.target.value);
                     setFormErrors(prev => ({ ...prev, gender: '' }));
@@ -757,7 +801,7 @@ const FreeConsultationPage = () => {
                     <button
                       key={item}
                       type="button"
-                      disabled={rescheduleRecordId}
+                      disabled={!!rescheduleRecordId}
                       onClick={() => toggleConcern(item)}
                       className={`px-3 py-2 rounded-lg text-sm border transition ${
                         isSelected
@@ -832,6 +876,11 @@ const FreeConsultationPage = () => {
                           const isPast = isSlotInPast(slot.time, selectedDate); 
                           const isBookable = slot.isAvailable && !isFull && !isPast;
                           const isSelected = selectedSlot?._id === slot._id;
+                          
+                          // LOGIC: Check if this matches the previous appointment
+                          const isOriginal = originalBooking && 
+                                           originalBooking.date === selectedDate && 
+                                           originalBooking.time === slot.time;
 
                           return (
                             <button
@@ -843,17 +892,23 @@ const FreeConsultationPage = () => {
                                 setFormErrors(prev => ({ ...prev, slot: '' }));
                               }}
                               className={`
-                                py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
+                                relative py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
                                 ${isSelected 
                                   ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
                                   : isBookable 
                                     ? 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50' 
                                     : 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed'
                                 }
+                                ${isOriginal ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}
                               `}
                             >
                               <span className="font-medium whitespace-nowrap text-xs">{slot.time}</span>
                               
+                              {/* Show Original/Current badge */}
+                              {isOriginal && (
+                                <span className="absolute -top-2 bg-indigo-600 text-white px-1.5 rounded-full text-[8px] border border-white z-10">Current</span>
+                              )}
+
                               {/* Display Full OR Passed badge based on the condition */}
                               {isFull && !isPast && (
                                 <span className="text-[10px] text-red-500 font-bold mt-0.5 leading-none">Full</span>
