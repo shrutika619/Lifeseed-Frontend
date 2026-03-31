@@ -3,33 +3,31 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   User, Settings, ShoppingBag, HelpCircle, ShieldCheck, 
-  FileText, LogOut, Pencil, MapPin, X, Menu, Save, CheckCircle, Mail 
+  FileText, LogOut, Pencil, MapPin, X, Menu, Save, CheckCircle, Mail, Plus, Trash2 
 } from "lucide-react";
 import { toast } from "sonner";
 
 // ✅ REDUX & SERVICES
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectIsAuthenticated, logoutSuccess } from "@/redux/slices/authSlice";
-import { getPatientProfile, savePatientProfile } from "@/app/services/patient.service"; 
+import { getPatientProfile, savePatientProfile } from "@/app/services/patient/patient.service"; 
+import { addressService } from "@/app/services/patient/address.service";
 import api from "@/lib/axios";
 
 const ProfilePage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  // Redux State
   const authUser = useSelector(selectUser);
   const isAuthenticated = useSelector(selectIsAuthenticated);
 
-  // UI State
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false); // Track saving state separately
+  const [isSaving, setIsSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [saveStatus, setSaveStatus] = useState(false);
-  const [isNewProfile, setIsNewProfile] = useState(false); // Track if this is a first-time setup
+  const [isNewProfile, setIsNewProfile] = useState(false);
 
-  // Form State
   const [formData, setFormData] = useState({
     name: "",
     gender: "Male",
@@ -37,47 +35,57 @@ const ProfilePage = () => {
     email: "",
     phone: "",
     profileImageUrl: "",
-    homeAddress: "",
-    workAddress: ""
   });
 
-  /* =========================================================
-      1. AUTH & DATA FETCHING
-     ========================================================= */
+  const [addresses, setAddresses] = useState([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [editAddressId, setEditAddressId] = useState(null);
+  const [addressForm, setAddressForm] = useState({
+    label: "Home",
+    flatNo: "",
+    streetArea: "",
+    landmark: "",
+    pinCode: "",
+    contactNumber: ""
+  });
+
   useEffect(() => {
     if (!isAuthenticated) return; 
 
     const fetchDetails = async () => {
       try {
         setLoading(true);
-        const res = await getPatientProfile();
+        const [profileRes, addressRes] = await Promise.all([
+          getPatientProfile().catch(err => err),
+          addressService.getAllAddresses().catch(err => err)
+        ]);
         
-        if (res.success && res.data) {
-          const data = res.data;
+        if (profileRes?.success && profileRes?.data) {
+          const data = profileRes.data;
           setFormData({
-              name: data.fullName || "",
-              gender: data.gender ? (data.gender.charAt(0).toUpperCase() + data.gender.slice(1)) : "Male",
-              age: data.age || "",
-              email: data.email || "",
-              phone: data.user_id?.mobileNo || authUser?.mobileNo || "Not Provided",
-              profileImageUrl: data.profileImageUrl || "",
-              homeAddress: data.homeAddress || "",
-              workAddress: data.workAddress || ""
+            name: data.fullName || "",
+            gender: data.gender ? (data.gender.charAt(0).toUpperCase() + data.gender.slice(1)) : "Male",
+            age: data.age || "",
+            email: data.email || "",
+            phone: data.user_id?.mobileNo || authUser?.mobileNo || "Not Provided",
+            profileImageUrl: data.profileImageUrl || "",
           });
           setIsEditing(false); 
           setIsNewProfile(false);
-        } else {
+        } else if (profileRes?.response?.status === 404 || !profileRes?.success) {
           handleMissingProfile();
         }
+
+        if (addressRes?.success && addressRes?.data?.addresses) {
+          setAddresses(addressRes.data.addresses);
+        }
+
       } catch (err) {
-          console.log("Profile fetch error:", err);
-          if (err.response?.status === 404) {
-             handleMissingProfile();
-          } else {
-            toast.error("Failed to load profile data");
-          }
+        console.error("Data fetch error:", err);
+        toast.error("Failed to load some profile data");
       } finally {
-          setLoading(false);
+        setLoading(false);
       }
     };
 
@@ -87,38 +95,27 @@ const ProfilePage = () => {
   const handleMissingProfile = () => {
     toast.info("Please complete your profile setup.", { duration: 4000 });
     setIsNewProfile(true); 
-    setFormData(prev => ({
-      ...prev,
-      phone: authUser?.mobileNo || "Not Provided"
-    }));
+    setFormData(prev => ({ ...prev, phone: authUser?.mobileNo || "Not Provided" }));
   };
 
-  /* =========================================================
-      2. HANDLERS
-     ========================================================= */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleGenderChange = (genderValue) => {
-     setFormData(prev => ({ ...prev, gender: genderValue }));
+    setFormData(prev => ({ ...prev, gender: genderValue }));
   };
 
-  const handleSave = async () => {
-    if (!formData.name.trim()) {
-      return toast.error("Full Name is required");
-    }
+  const handleSaveProfile = async () => {
+    if (!formData.name.trim()) return toast.error("Full Name is required");
 
     setIsSaving(true);
-
     const payload = {
       fullName: formData.name,
       email: formData.email,
       age: formData.age ? parseInt(formData.age) : 0,
       gender: formData.gender.toLowerCase(),
-      homeAddress: formData.homeAddress,
-      workAddress: formData.workAddress
     };
 
     try {
@@ -127,7 +124,7 @@ const ProfilePage = () => {
         toast.success(isNewProfile ? "Profile Created Successfully!" : "Profile Updated!");
         setSaveStatus(true);
         setIsEditing(false);
-        setIsNewProfile(false); // Transitions to full dashboard
+        setIsNewProfile(false);
         setTimeout(() => setSaveStatus(false), 3000);
       } else {
         toast.error(res.message || "Failed to save profile");
@@ -152,9 +149,73 @@ const ProfilePage = () => {
     }
   };
 
-  /* =========================================================
-      3. UI RENDERING
-     ========================================================= */
+  const handleAddressInputChange = (e) => {
+    const { name, value } = e.target;
+    setAddressForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const openAddAddressModal = () => {
+    setAddressForm({ label: "Home", flatNo: "", streetArea: "", landmark: "", pinCode: "", contactNumber: "" });
+    setEditAddressId(null);
+    setShowAddressModal(true);
+  };
+
+  const openEditAddressModal = (address) => {
+    setAddressForm({
+      label: address.label || "Other",
+      flatNo: address.flatNo || "",
+      streetArea: address.streetArea || "",
+      landmark: address.landmark || "",
+      pinCode: address.pinCode || "",
+      contactNumber: address.contactNumber || ""
+    });
+    setEditAddressId(address._id);
+    setShowAddressModal(true);
+  };
+
+  const handleSaveAddress = async (e) => {
+    e.preventDefault();
+    if (!addressForm.flatNo || !addressForm.streetArea || !addressForm.pinCode) {
+      return toast.error("Flat No, Street, and PIN Code are required.");
+    }
+
+    setIsSavingAddress(true);
+    try {
+      if (editAddressId) {
+        const res = await addressService.updateAddress(editAddressId, addressForm);
+        if (res.success) {
+          toast.success("Address updated!");
+          setAddresses(prev => prev.map(addr => addr._id === editAddressId ? { ...addr, ...addressForm } : addr));
+        }
+      } else {
+        const res = await addressService.createAddress(addressForm);
+        if (res.success) {
+          toast.success("Address added!");
+          setAddresses(prev => [...prev, res.data]); 
+        }
+      }
+      setShowAddressModal(false);
+    } catch (error) {
+      toast.error(error.message || "Failed to save address");
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addressId) => {
+    if (!window.confirm("Are you sure you want to delete this address?")) return;
+    
+    try {
+      const res = await addressService.deleteAddress(addressId);
+      if (res.success) {
+        toast.success("Address deleted");
+        setAddresses(prev => prev.filter(addr => addr._id !== addressId));
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to delete address");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -166,7 +227,6 @@ const ProfilePage = () => {
     );
   }
 
-  // ✅ IF NEW PROFILE (Show Basic Setup Form like Login Page)
   if (isNewProfile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#1e1e1e] p-4 font-sans">
@@ -192,36 +252,12 @@ const ProfilePage = () => {
             </div>
             
             <div className="space-y-4">
-              <input 
-                name="name"
-                placeholder="Full Name" 
-                className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" 
-                value={formData.name} 
-                onChange={handleInputChange} 
-              />
-              <input 
-                name="age"
-                placeholder="Enter Age" 
-                type="number" 
-                className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" 
-                value={formData.age} 
-                onChange={handleInputChange} 
-              />
-              <input 
-                name="email"
-                placeholder="Email Address" 
-                type="email" 
-                className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" 
-                value={formData.email} 
-                onChange={handleInputChange} 
-              />
+              <input name="name" placeholder="Full Name" value={formData.name} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <input name="age" placeholder="Enter Age" type="number" value={formData.age} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <input name="email" placeholder="Email Address" type="email" value={formData.email} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
             </div>
             
-            <button 
-              onClick={handleSave} 
-              disabled={isSaving} 
-              className="bg-[#4285F4] text-white w-full py-4 rounded-xl font-bold mt-8 shadow-md hover:bg-blue-600 transition-all"
-            >
+            <button onClick={handleSaveProfile} disabled={isSaving} className="bg-[#4285F4] text-white w-full py-4 rounded-xl font-bold mt-8 shadow-md hover:bg-blue-600 transition-all">
               {isSaving ? "Saving..." : "Save & Finish"}
             </button>
           </div>
@@ -230,11 +266,9 @@ const ProfilePage = () => {
     );
   }
 
-  // ✅ IF EXISTING PROFILE (Show Full Dashboard)
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans p-4 md:p-8">
       
-      {/* MOBILE MENU TRIGGER */}
       <div className="lg:hidden mb-4 flex justify-end">
         <button onClick={() => setMenuOpen(true)} className="p-2 bg-white rounded-xl shadow-sm text-gray-600">
           <Menu size={24} />
@@ -243,15 +277,15 @@ const ProfilePage = () => {
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* ---------------- SIDEBAR ---------------- */}
+        {/* ── SIDEBAR ── */}
         <aside className="hidden lg:block lg:col-span-3">
           <div className="bg-white border-white border rounded-2xl p-6 shadow-sm sticky top-8">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md overflow-hidden bg-blue-600">
                 {formData.profileImageUrl ? (
-                   <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                   <User size={24} />
+                  <User size={24} />
                 )}
               </div>
               <div className="overflow-hidden">
@@ -262,7 +296,12 @@ const ProfilePage = () => {
 
             <div className="space-y-1">
               <SidebarItem icon={<Settings size={16}/>} label="Settings" active />
-              <SidebarItem icon={<ShoppingBag size={16}/>} label="My Orders" />
+              {/* ✅ My Orders — redirects to /profile/myorders */}
+              <SidebarItem
+                icon={<ShoppingBag size={16}/>}
+                label="My Orders"
+                onClick={() => router.push("/profile/myorders")}
+              />
               <SidebarItem icon={<HelpCircle size={16}/>} label="Help" />
               <SidebarItem icon={<ShieldCheck size={16}/>} label="Privacy Policy" />
               <SidebarItem icon={<FileText size={16}/>} label="Terms & Conditions" />
@@ -277,7 +316,7 @@ const ProfilePage = () => {
           </div>
         </aside>
 
-        {/* ---------------- MAIN CONTENT ---------------- */}
+        {/* ── MAIN CONTENT ── */}
         <main className="lg:col-span-9 space-y-6">
           
           {saveStatus && (
@@ -291,9 +330,9 @@ const ProfilePage = () => {
             <div className="flex items-center gap-6 w-full">
               <div className="hidden sm:flex w-16 h-16 bg-blue-50 rounded-full items-center justify-center text-blue-600 border border-blue-50 overflow-hidden shrink-0">
                 {formData.profileImageUrl ? (
-                   <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={formData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                   <User size={32} />
+                  <User size={32} />
                 )}
               </div>
               
@@ -301,48 +340,21 @@ const ProfilePage = () => {
                 {isEditing ? (
                   <div className="max-w-lg space-y-5 animate-in fade-in duration-300">
                     <div>
-                       <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Full Name *</label>
-                       <input 
-                         name="name" 
-                         value={formData.name} 
-                         onChange={handleInputChange} 
-                         className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" 
-                         placeholder="Enter Full Name"
-                       />
+                      <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Full Name *</label>
+                      <input name="name" value={formData.name} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" placeholder="Enter Full Name" />
                     </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <div>
-                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Age</label>
-                         <input 
-                           name="age" 
-                           type="number" 
-                           value={formData.age} 
-                           onChange={handleInputChange} 
-                           className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" 
-                           placeholder="Enter Age"
-                         />
-                       </div>
-
-                       <div>
-                         <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Gender</label>
-                         <div className="flex bg-[#F7FAFC] rounded-xl overflow-hidden border border-[#EDF2F7] p-1 h-[48px]">
-                           <button 
-                              type="button"
-                              onClick={() => handleGenderChange('Male')} 
-                              className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Male' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}
-                           >
-                             Male
-                           </button>
-                           <button 
-                              type="button"
-                              onClick={() => handleGenderChange('Female')} 
-                              className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Female' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}
-                           >
-                             Female
-                           </button>
-                         </div>
-                       </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Age</label>
+                        <input name="age" type="number" value={formData.age} onChange={handleInputChange} className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-[#F7FAFC]" placeholder="Enter Age" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Gender</label>
+                        <div className="flex bg-[#F7FAFC] rounded-xl overflow-hidden border border-[#EDF2F7] p-1 h-[48px]">
+                          <button type="button" onClick={() => handleGenderChange('Male')} className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Male' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}>Male</button>
+                          <button type="button" onClick={() => handleGenderChange('Female')} className={`flex-1 text-sm font-semibold rounded-lg transition-all ${formData.gender === 'Female' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-gray-700'}`}>Female</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -363,12 +375,10 @@ const ProfilePage = () => {
                 </button>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all border border-gray-200 w-full sm:w-auto">
-                        Cancel
-                    </button>
-                    <button onClick={handleSave} disabled={isSaving} className="flex items-center justify-center gap-2 bg-[#4285F4] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all shadow-md w-full sm:w-auto">
-                        <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
-                    </button>
+                  <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-gray-500 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all border border-gray-200 w-full sm:w-auto">Cancel</button>
+                  <button onClick={handleSaveProfile} disabled={isSaving} className="flex items-center justify-center gap-2 bg-[#4285F4] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all shadow-md w-full sm:w-auto">
+                    <Save size={16} /> {isSaving ? "Saving..." : "Save Changes"}
+                  </button>
                 </div>
               )}
             </div>
@@ -381,24 +391,12 @@ const ProfilePage = () => {
                 <Mail className="text-blue-600" size={20} />
                 <h3 className="font-semibold text-base text-gray-900">Contact Information</h3>
               </div>
-              {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md">
-                  <Pencil size={14} />
-                </button>
-              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Email Address</label>
                 {isEditing ? (
-                  <input 
-                    name="email" 
-                    type="email"
-                    value={formData.email} 
-                    onChange={handleInputChange} 
-                    placeholder="name@example.com"
-                    className="w-full p-3.5 border border-[#EDF2F7] bg-[#F7FAFC] rounded-xl text-sm outline-none focus:ring-1 focus:ring-blue-400 transition-all" 
-                  />
+                  <input name="email" type="email" value={formData.email} onChange={handleInputChange} placeholder="name@example.com" className="w-full p-3.5 border border-[#EDF2F7] bg-[#F7FAFC] rounded-xl text-sm outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
                 ) : (
                   <p className="text-sm text-gray-700 font-medium px-1">{formData.email || "No email provided"}</p>
                 )}
@@ -406,7 +404,7 @@ const ProfilePage = () => {
               <div className="space-y-1">
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Phone Number <span className="text-[9px] normal-case text-gray-400 font-medium">(Read-only)</span></label>
                 <div className="w-full p-3.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed">
-                    {formData.phone}
+                  {formData.phone}
                 </div>
               </div>
             </div>
@@ -419,36 +417,96 @@ const ProfilePage = () => {
                 <MapPin className="text-blue-600" size={20} />
                 <h3 className="font-semibold text-base text-gray-900">Address Book</h3>
               </div>
-              {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md">
-                  <Pencil size={14} />
-                </button>
-              )}
+              <button 
+                onClick={openAddAddressModal} 
+                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Plus size={16} /> Add Address
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <EditableAddress 
-                label="HOME ADDRESS" 
-                name="homeAddress" 
-                value={formData.homeAddress} 
-                isEditing={isEditing} 
-                onChange={handleInputChange} 
-                accentColor="bg-blue-500" 
-              />
-              <EditableAddress 
-                label="WORK ADDRESS" 
-                name="workAddress" 
-                value={formData.workAddress} 
-                isEditing={isEditing} 
-                onChange={handleInputChange} 
-                accentColor="bg-orange-400" 
-              />
+              {addresses.length === 0 ? (
+                <div className="col-span-full p-6 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  No addresses saved yet. Click "Add Address" to create one.
+                </div>
+              ) : (
+                addresses.map((addr) => (
+                  <div key={addr._id} className="border border-gray-100 rounded-xl p-5 bg-[#FAFBFC] hover:shadow-sm transition-all relative overflow-hidden group">
+                    <div className={`absolute top-0 left-0 w-1.5 h-full ${addr.label === 'Home' ? 'bg-blue-500' : addr.label === 'Work' ? 'bg-orange-400' : 'bg-purple-500'}`} />
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">{addr.label}</span>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => openEditAddressModal(addr)} className="text-gray-400 hover:text-blue-600 p-1"><Pencil size={14}/></button>
+                        <button onClick={() => handleDeleteAddress(addr._id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-700 leading-relaxed font-medium">
+                      <p>{addr.flatNo}, {addr.streetArea}</p>
+                      {addr.landmark && <p className="text-gray-500 font-normal">Landmark: {addr.landmark}</p>}
+                      <p className="text-gray-500 font-normal">PIN: {addr.pinCode}</p>
+                      {addr.contactNumber && <p className="text-gray-500 font-normal mt-1">📞 {addr.contactNumber}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         </main>
       </div>
 
-      {/* ---------------- MOBILE DRAWER ---------------- */}
+      {/* ── ADDRESS MODAL ── */}
+      {showAddressModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-bold text-gray-900">{editAddressId ? "Edit Address" : "Add New Address"}</h3>
+              <button onClick={() => setShowAddressModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+            </div>
+            
+            <form onSubmit={handleSaveAddress} className="space-y-4">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Label</label>
+                <select name="label" value={addressForm.label} onChange={handleAddressInputChange} className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50">
+                  <option value="Home">Home</option>
+                  <option value="Work">Work</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Flat / House No. *</label>
+                  <input required name="flatNo" value={addressForm.flatNo} onChange={handleAddressInputChange} placeholder="e.g. B-202" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Street / Area *</label>
+                  <input required name="streetArea" value={addressForm.streetArea} onChange={handleAddressInputChange} placeholder="e.g. Koregaon Park" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Landmark</label>
+                  <input name="landmark" value={addressForm.landmark} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">PIN Code *</label>
+                  <input required name="pinCode" value={addressForm.pinCode} onChange={handleAddressInputChange} placeholder="e.g. 411001" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] text-gray-500 uppercase font-bold tracking-wider ml-1 mb-1 block">Contact Number</label>
+                  <input name="contactNumber" value={addressForm.contactNumber} onChange={handleAddressInputChange} placeholder="Optional" className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 bg-gray-50" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowAddressModal(false)} className="flex-1 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold transition-colors">Cancel</button>
+                <button type="submit" disabled={isSavingAddress} className="flex-1 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-xl text-sm font-semibold transition-colors">
+                  {isSavingAddress ? "Saving..." : "Save Address"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MOBILE DRAWER ── */}
       {menuOpen && (
         <div className="fixed inset-0 z-[100] flex items-end lg:hidden">
           <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
@@ -460,13 +518,15 @@ const ProfilePage = () => {
             </div>
             <div className="space-y-3">
               <MobileLink icon={<Settings size={18}/>} label="Account Settings" />
-              <MobileLink icon={<ShoppingBag size={18}/>} label="Order History" />
+              {/* ✅ My Orders mobile — redirects to /profile/myorders */}
+              <MobileLink
+                icon={<ShoppingBag size={18}/>}
+                label="Order History"
+                onClick={() => { setMenuOpen(false); router.push("/profile/myorders"); }}
+              />
               <MobileLink icon={<HelpCircle size={18}/>} label="Help & Support" />
               <div className="h-px bg-gray-100 my-5" />
-              <button 
-                onClick={handleLogout}
-                className="w-full py-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-              >
+              <button onClick={handleLogout} className="w-full py-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm flex items-center justify-center gap-2 transition-colors">
                 <LogOut size={18} /> Logout Account
               </button>
             </div>
@@ -477,12 +537,14 @@ const ProfilePage = () => {
   );
 };
 
-// --- HELPER COMPONENTS ---
+// ── HELPER COMPONENTS ──
 
-const SidebarItem = ({ icon, label, active = false }) => (
-  <button className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-medium transition-all ${
-    active ? "bg-blue-50 text-blue-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-  }`}>
+// ✅ onClick prop added
+const SidebarItem = ({ icon, label, active = false, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-medium transition-all ${active ? "bg-blue-50 text-blue-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+  >
     <div className="flex items-center gap-3">
       <span className={active ? "text-blue-600" : "text-gray-400"}>{icon}</span>
       <span>{label}</span>
@@ -490,32 +552,15 @@ const SidebarItem = ({ icon, label, active = false }) => (
   </button>
 );
 
-const MobileLink = ({ icon, label }) => (
-  <button className="w-full p-4 bg-gray-50 rounded-xl flex items-center gap-4 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+// ✅ onClick prop added
+const MobileLink = ({ icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full p-4 bg-gray-50 rounded-xl flex items-center gap-4 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+  >
     <span className="text-blue-600">{icon}</span>
     <span>{label}</span>
   </button>
-);
-
-const EditableAddress = ({ label, name, value, isEditing, onChange, accentColor }) => (
-  <div className="border border-gray-100 rounded-xl p-5 bg-[#FAFBFC] hover:shadow-sm transition-all relative overflow-hidden">
-    <div className={`absolute top-0 left-0 w-1.5 h-full ${accentColor}`} />
-    <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-3">{label}</span>
-    {isEditing ? (
-      <textarea 
-        name={name}
-        value={value}
-        onChange={onChange}
-        rows={3}
-        placeholder={`Enter your ${label.toLowerCase()}...`}
-        className="w-full p-3 bg-white border border-[#EDF2F7] rounded-xl text-sm outline-none focus:ring-1 focus:ring-blue-400 resize-none transition-shadow text-gray-700 placeholder:text-gray-300"
-      />
-    ) : (
-      <p className="text-sm text-gray-700 leading-relaxed font-medium min-h-[40px] whitespace-pre-wrap">
-          {value || <span className="text-gray-400 italic font-normal">No address added yet.</span>}
-      </p>
-    )}
-  </div>
 );
 
 export default ProfilePage;

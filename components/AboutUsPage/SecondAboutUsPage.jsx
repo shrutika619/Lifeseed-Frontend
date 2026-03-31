@@ -3,10 +3,10 @@ import Image from "next/image";
 
 const SecondAboutUsPage = () => {
   return (
-    <section className="bg-white py-20">
-      <div className="container mx-auto px-12 space-y-20">
+    <section className="bg-white py-12 sm:py-16 md:py-20">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-12 space-y-12 sm:space-y-16 md:space-y-20">
         {/* First Section - Who We Are */}
-        <div className="grid md:grid-cols-2 items-center px-12 py-12 gap-12">
+        <div className="grid md:grid-cols-2 items-center px-4 sm:px-6 md:px-12 py-8 sm:py-10 md:py-12 gap-8 sm:gap-10 md:gap-12">
           {/* Text Content */}
           <div>
             <h2 className="text-2xl font-extrabold text-gray-900 mb-4">
@@ -31,16 +31,16 @@ const SecondAboutUsPage = () => {
               alt="Who We Are"
               width={500}
               height={400}
-              className="rounded-xl shadow-md"
+              className="rounded-xl shadow-md w-full max-w-sm sm:max-w-md md:max-w-full h-auto"
             />
           </div>
         </div>
       </div>
 
       {/* Second Section - Our Story (Full-width with grey background) */}
-      <div className="bg-[#F3F6FF] py-20">
-        <div className="container mx-auto px-12">
-          <div className="grid md:grid-cols-2 items-center gap-12">
+      <div className="bg-[#F3F6FF] py-12 sm:py-16 md:py-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-12">
+          <div className="grid md:grid-cols-2 items-center gap-8 sm:gap-10 md:gap-12">
             {/* Image */}
             <div className="flex justify-center order-1 md:order-none">
               <Image
@@ -48,7 +48,7 @@ const SecondAboutUsPage = () => {
                 alt="Our Story"
                 width={500}
                 height={400}
-                className="rounded-xl shadow-md"
+                className="rounded-xl shadow-md w-full max-w-sm sm:max-w-md md:max-w-full h-auto"
               />
             </div>
 
@@ -65,7 +65,7 @@ const SecondAboutUsPage = () => {
                 <br />
                 When this part of life is disturbed, it can affect families,
                 relationships, and overall happiness. Many people are willing to
-                seek help, but most treatments available in the market today don’t
+                seek help, but most treatments available in the market today don't
                 offer long-term benefits and sometimes cause side effects.
                 <br />
                 <br />

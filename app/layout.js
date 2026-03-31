@@ -40,7 +40,11 @@ export default function RootLayout({ children }) {
     "/admin/clinics","/super-admin/clinics", "/login", "/register", "/verify-otp", "/hospitaldashboard/time-table"
     ,"/hospitaldashboard/doctors","/customerprofile","/hospitaldashboard/add-doctors", "/hospitaldashboard/profile","/hospitaldashboard/terms-conditions"
     ,"/super-admin/teleconsultation/customerprofile","/super-admin/in-clinic-consultation/customerprofile","/timeslotmanagement"
-    ,"/super-admin/teleconsultation/configureslot","/admin/teleconsultation/configureslot"
+    ,"/super-admin/teleconsultation/configureslot","/admin/teleconsultation/configureslot","/super-admin/first-time-user/customerprofile",
+    "/admin/first-time-user/customerprofile","/super-admin/log-in-user/customerprofile", "/admin/log-in-user/customerprofile","/super-admin/newuser","/admin/newuser",
+    "/super-admin/teleconsultation/doctorpanel","/admin/teleconsultation/doctorpanel","/super-admin/teleconsultation/placeorder","/admin/teleconsultation/placeorder",
+    "/super-admin/log-in-user/placeorder","/admin/log-in-user/placeorder","/hospitaldashboard/plus","/hospitaldashboard/dashboard",
+    "/super-admin/cities","/admin/cities"
   ];
 
   // Logic to handle exact matches or sub-paths if necessary

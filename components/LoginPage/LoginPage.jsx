@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useDispatch } from "react-redux";
 
-import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth.service";
-import { getPatientProfile, savePatientProfile } from "@/app/services/patient.service";
+import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth/auth.service";
+import { getPatientProfile, savePatientProfile } from "@/app/services/patient/patient.service";
 import { setCredentials } from "@/redux/slices/authSlice";
 
 const LoginPage = () => {
@@ -13,12 +13,35 @@ const LoginPage = () => {
   const dispatch = useDispatch();
   
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("from") || "/";
+
+  // ✅ ROBUST REDIRECT LOGIC: Capture "from" AND any other dangling parameters (like clinicId)
+  const [redirectPath, setRedirectPath] = useState("/");
+
+  useEffect(() => {
+    let basePath = searchParams.get("from") || "/";
+    const additionalParams = new URLSearchParams();
+    
+    // Loop through all parameters in the URL
+    searchParams.forEach((value, key) => {
+      // If it's not the "from" parameter, it belongs to the destination URL
+      if (key !== "from") {
+        additionalParams.append(key, value);
+      }
+    });
+    
+    const queryString = additionalParams.toString();
+    if (queryString) {
+      // Safely append to the path, checking if a '?' already exists
+      basePath += (basePath.includes("?") ? "&" : "?") + queryString;
+    }
+    
+    setRedirectPath(basePath);
+  }, [searchParams]);
 
   // State
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(Array(6).fill("")); 
-  const [step, setStep] = useState("send"); 
+  const [step, setStep] = useState("send"); // 'send' | 'verify' | 'success' | 'profile'
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   
@@ -39,16 +62,21 @@ const LoginPage = () => {
     }
     setLoading(true);
 
-    const response = await sendLoginOtp(phone);
+    try {
+      const response = await sendLoginOtp(phone);
 
-    if (response?.success === false) {
-        setMessage(response.message || "Failed to send OTP");
-    } else {
-        setMessage("");
-        setStep("verify");
-        toast.success("OTP Sent!");
+      if (response?.success === false) {
+          setMessage(response.message || "Failed to send OTP");
+      } else {
+          setMessage("");
+          setStep("verify");
+          toast.success("OTP Sent!");
+      }
+    } catch (err) {
+      setMessage("An error occurred while sending OTP");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   /* ================= VERIFY OTP ================= */
@@ -62,7 +90,7 @@ const LoginPage = () => {
     
     try {
       const data = await verifyLoginOtp(phone, finalOtp);
-      // ✅ Extract User & Role
+      // Extract User & Role
       const { accessToken, user, isNewUser } = data;
       
       if (!accessToken) throw new Error("Login failed - no access token");
@@ -79,9 +107,8 @@ const LoginPage = () => {
       const exemptedRoles = ["clinic_admin", "doctor", "super_admin", "admin"];
 
       if (exemptedRoles.includes(userRole)) {
-        console.log(`User is ${userRole} -> Skipping profile check`);
         router.push(redirectPath);
-        return; // Stop execution here
+        return; 
       }
 
       // 🟢 PATIENT LOGIC BELOW
@@ -90,6 +117,7 @@ const LoginPage = () => {
       if (isNewUser) {
         console.log("New Patient detected -> Profile Setup");
         setStep("success"); 
+        setLoading(false);
         return;
       }
 
@@ -97,13 +125,17 @@ const LoginPage = () => {
       try {
         const profileCheck = await getPatientProfile();
         
-        if (profileCheck.success && profileCheck.data) {
-          // Profile Found -> Redirect
-          console.log(`Patient Profile found -> Redirecting to ${redirectPath}`);
+        // ✅ BUG FIX: Explicitly check if the user has a name saved, not just if the profile object exists.
+        const pData = profileCheck?.data || {};
+        const isProfileComplete = !!(pData.fullName || pData.name || pData.age);
+
+        if (profileCheck.success && isProfileComplete) {
+          // Profile Found AND Complete -> Redirect
+          console.log(`Patient Profile complete -> Redirecting to ${redirectPath}`);
           router.push(redirectPath);
         } else {
-          // Profile Missing -> Setup
-          console.log("Patient Profile missing -> Profile Setup");
+          // Profile Found BUT Incomplete (missing name/age) -> Setup
+          console.log("Patient Profile incomplete -> Profile Setup");
           setStep("success");
         }
       } catch (profileError) {
@@ -137,15 +169,20 @@ const LoginPage = () => {
         gender: profileData.gender.toLowerCase()
     };
 
-    const response = await savePatientProfile(payload);
+    try {
+      const response = await savePatientProfile(payload);
 
-    if (response.success) {
-        toast.success("Profile Saved!");
-        router.push(redirectPath);
-    } else {
-        setMessage(response.message || "Failed to save profile");
+      if (response.success) {
+          toast.success("Profile Saved!");
+          router.push(redirectPath);
+      } else {
+          setMessage(response.message || "Failed to save profile");
+      }
+    } catch (err) {
+      setMessage("An error occurred while saving the profile.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   /* ================= OTP INPUT HELPER ================= */
@@ -154,21 +191,32 @@ const LoginPage = () => {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
+    
+    // Auto-focus next input
     if (value && index < 5) {
-      document.getElementById(`otp-${index + 1}`)?.focus();
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  // Allow backspace to focus previous input
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      if (prevInput) prevInput.focus();
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#1e1e1e] p-4 font-sans">
-      <div className="bg-white w-full max-w-[340px] p-6 rounded-[24px] shadow-lg">
+      <div className="bg-white w-full max-w-[340px] p-6 rounded-[24px] shadow-lg relative">
         
         {/* STEP 1: SEND OTP */}
         {step === "send" && (
-          <div className="text-center">
+          <div className="text-center animate-in fade-in duration-300">
             <h2 className="text-[#2D3748] text-xl font-bold mb-6">Login</h2>
             <input
-              type="text"
+              type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Enter phone number"
@@ -176,7 +224,7 @@ const LoginPage = () => {
               maxLength={10}
             />
             <p className="text-xs text-[#718096] mb-8 text-left px-1">OTP will be shared for Verification</p>
-            <button onClick={sendOtp} disabled={loading} className="bg-[#4285F4] hover:bg-blue-600 text-white w-full py-3.5 rounded-xl font-semibold transition-all mb-4">
+            <button onClick={sendOtp} disabled={loading} className="bg-[#4285F4] hover:bg-blue-600 text-white w-full py-3.5 rounded-xl font-semibold transition-all mb-4 disabled:opacity-70">
               {loading ? "Sending..." : "Login"}
             </button>
             <p className="text-[11px] text-[#A0AEC0]">By signing in you agree to our <span className="text-[#4285F4] underline cursor-pointer">Terms and Conditions</span></p>
@@ -185,18 +233,26 @@ const LoginPage = () => {
 
         {/* STEP 2: VERIFY OTP */}
         {step === "verify" && (
-          <div className="text-center">
+          <div className="text-center animate-in fade-in duration-300">
             <h2 className="text-[#2D3748] text-xl font-bold mb-2">Login</h2>
             <p className="text-sm text-[#4A5568] mb-6 text-left">Enter OTP received on xxxxx{phone.slice(-4)}</p>
             <div className="flex justify-between gap-2 mb-8">
               {otp.map((digit, i) => (
-                <input key={i} id={`otp-${i}`} value={digit} maxLength={1} onChange={(e) => handleOtpChange(e.target.value, i)} className="w-10 h-12 border border-[#EDF2F7] text-center rounded-xl bg-[#F7FAFC] text-lg font-bold focus:border-blue-400 focus:outline-none" />
+                <input 
+                  key={i} 
+                  id={`otp-${i}`} 
+                  value={digit} 
+                  maxLength={1} 
+                  onChange={(e) => handleOtpChange(e.target.value, i)} 
+                  onKeyDown={(e) => handleOtpKeyDown(e, i)}
+                  className="w-10 h-12 border border-[#EDF2F7] text-center rounded-xl bg-[#F7FAFC] text-lg font-bold focus:border-blue-400 focus:outline-none" 
+                />
               ))}
             </div>
-            <button onClick={verifyOtp} disabled={loading} className="bg-[#4285F4] text-white w-full py-3.5 rounded-xl font-semibold mb-3 shadow-md">
+            <button onClick={verifyOtp} disabled={loading} className="bg-[#4285F4] hover:bg-blue-600 text-white w-full py-3.5 rounded-xl font-semibold mb-3 shadow-md transition-all disabled:opacity-70">
               {loading ? "Verifying..." : "Submit"}
             </button>
-            <button onClick={sendOtp} className="text-[#4285F4] text-sm font-semibold border border-[#E2E8F0] w-full py-3 rounded-xl hover:bg-gray-50 transition-all">
+            <button onClick={sendOtp} disabled={loading} className="text-[#4285F4] text-sm font-semibold border border-[#E2E8F0] w-full py-3 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-70">
               Resend OTP
             </button>
           </div>
@@ -204,42 +260,108 @@ const LoginPage = () => {
 
         {/* STEP 3: SUCCESS / REGISTER */}
         {step === "success" && (
-          <div className="text-center py-4">
+          <div className="text-center py-4 animate-in fade-in zoom-in-95 duration-500">
             <div className="flex justify-center mb-4">
-              <div className="w-14 h-14 border-2 border-[#4FD1C5] rounded-full flex items-center justify-center">
+              <div className="w-14 h-14 border-2 border-[#4FD1C5] rounded-full flex items-center justify-center bg-teal-50">
                 <svg className="w-8 h-8 text-[#4FD1C5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
               </div>
             </div>
-            <h3 className="text-sm font-semibold text-[#4A5568] mb-10">Registered Successfully</h3>
-            <button onClick={() => setStep("profile")} className="bg-[#4285F4] text-white w-full py-3.5 rounded-xl font-semibold mb-3 hover:bg-blue-600 transition-colors">
-              Set Profile
+            <h3 className="text-base font-bold text-[#2D3748] mb-2">Registered Successfully!</h3>
+            <p className="text-xs text-[#718096] mb-8">Let's set up your profile to continue.</p>
+            
+            <button 
+              onClick={() => {
+                setMessage(""); 
+                setStep("profile"); 
+              }} 
+              className="bg-[#4285F4] text-white w-full py-3.5 rounded-xl font-semibold mb-3 hover:bg-blue-600 transition-all shadow-md"
+            >
+              Set Profile Now
             </button>
-            <button onClick={() => router.push(redirectPath)} className="text-[#4285F4] text-sm font-semibold border border-[#E2E8F0] w-full py-3 rounded-xl hover:bg-gray-50 transition-colors">
-              Skip
+            
+            {/* ✅ "SKIP" redirects reliably to where they came from */}
+            <button 
+              onClick={() => router.push(redirectPath)} 
+              className="text-[#4A5568] text-sm font-semibold border border-[#E2E8F0] w-full py-3 rounded-xl hover:bg-gray-50 transition-all"
+            >
+              Skip for later
             </button>
           </div>
         )}
 
         {/* STEP 4: PROFILE SETUP */}
         {step === "profile" && (
-          <div className="text-left animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-[#2D3748] text-lg font-bold mb-4">Profile</h2>
-            <div className="flex bg-[#F7FAFC] rounded-xl mb-6 overflow-hidden border border-[#EDF2F7] p-1">
-              <button onClick={() => setProfileData({...profileData, gender: 'Male'})} className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${profileData.gender === 'Male' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0]'}`}>Male</button>
-              <button onClick={() => setProfileData({...profileData, gender: 'Female'})} className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${profileData.gender === 'Female' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0]'}`}>Female</button>
+          <div className="text-left animate-in fade-in slide-in-from-right-8 duration-300">
+            <h2 className="text-[#2D3748] text-xl font-bold mb-6 text-center">Complete Profile</h2>
+            
+            <div className="flex bg-[#F7FAFC] rounded-xl mb-6 overflow-hidden border border-[#EDF2F7] p-1 shadow-sm">
+              <button 
+                onClick={() => setProfileData({...profileData, gender: 'Male'})} 
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${profileData.gender === 'Male' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-[#4A5568]'}`}
+              >
+                Male
+              </button>
+              <button 
+                onClick={() => setProfileData({...profileData, gender: 'Female'})} 
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${profileData.gender === 'Female' ? 'bg-[#4285F4] text-white shadow-sm' : 'text-[#A0AEC0] hover:text-[#4A5568]'}`}
+              >
+                Female
+              </button>
             </div>
+            
             <div className="space-y-4">
-              <input placeholder="Full Name" className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" value={profileData.name} onChange={(e) => setProfileData({...profileData, name: e.target.value})} />
-              <input placeholder="Enter Age" type="number" className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" value={profileData.age} onChange={(e) => setProfileData({...profileData, age: e.target.value})} />
-              <input placeholder="Email Address" type="email" className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" value={profileData.email} onChange={(e) => setProfileData({...profileData, email: e.target.value})} />
+              <div>
+                <label className="block text-xs font-semibold text-[#718096] mb-1 ml-1">Full Name <span className="text-red-500">*</span></label>
+                <input 
+                  placeholder="Enter your full name" 
+                  className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:border-[#4285F4] focus:ring-1 focus:ring-[#4285F4] transition-all bg-[#F7FAFC] focus:bg-white" 
+                  value={profileData.name} 
+                  onChange={(e) => setProfileData({...profileData, name: e.target.value})} 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-semibold text-[#718096] mb-1 ml-1">Age</label>
+                <input 
+                  placeholder="Enter your age" 
+                  type="number" 
+                  className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:border-[#4285F4] focus:ring-1 focus:ring-[#4285F4] transition-all bg-[#F7FAFC] focus:bg-white" 
+                  value={profileData.age} 
+                  onChange={(e) => setProfileData({...profileData, age: e.target.value})} 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-semibold text-[#718096] mb-1 ml-1">Email Address</label>
+                <input 
+                  placeholder="Enter your email (optional)" 
+                  type="email" 
+                  className="w-full p-3.5 border border-[#EDF2F7] rounded-xl text-sm focus:outline-none focus:border-[#4285F4] focus:ring-1 focus:ring-[#4285F4] transition-all bg-[#F7FAFC] focus:bg-white" 
+                  value={profileData.email} 
+                  onChange={(e) => setProfileData({...profileData, email: e.target.value})} 
+                />
+              </div>
             </div>
-            <button onClick={handleSaveProfile} disabled={loading} className="bg-[#4285F4] text-white w-full py-4 rounded-xl font-bold mt-8 shadow-md hover:bg-blue-600 transition-all">
+            
+            <button 
+              onClick={handleSaveProfile} 
+              disabled={loading} 
+              className="bg-[#4285F4] text-white w-full py-4 rounded-xl font-bold mt-8 shadow-md hover:bg-blue-600 transition-all disabled:opacity-70 flex justify-center items-center gap-2"
+            >
               {loading ? "Saving..." : "Save & Finish"}
             </button>
           </div>
         )}
 
-        {message && <p className="text-[12px] mt-4 text-red-500 text-center font-medium bg-red-50 p-2 rounded-lg border border-red-100">{message}</p>}
+        {/* Global Error Message Display */}
+        {message && (
+          <div className="absolute -bottom-16 left-0 right-0 mx-auto w-full">
+            <p className="text-[12px] text-red-500 text-center font-medium bg-red-50 p-2 rounded-lg border border-red-100 shadow-sm animate-in slide-in-from-top-2">
+              {message}
+            </p>
+          </div>
+        )}
+
       </div>
     </div>
   );

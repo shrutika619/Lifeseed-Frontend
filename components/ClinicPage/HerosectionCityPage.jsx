@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from "react";
 import { Search, MapPin, Phone, Navigation, Star, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getAllClinics, getAllCities } from "@/app/services/clinic.service";
+import { getAllClinics, getAllCities } from "@/app/services/patient/clinic.service";
 
 export default function HerosectionCity({ cityName }) {
   const [searchTerm, setSearchTerm] = useState("");
+  // Ensure we always initialize with an empty array
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -37,13 +38,13 @@ export default function HerosectionCity({ cityName }) {
 
         // 2. Fetch clinics ONLY for that specific city ID
         const clinicResult = await getAllClinics(targetCity._id);
-
-        console.log(clinicResult)
-
+        
         if (clinicResult.success) {
-          setClinics(clinicResult.clinics);
+          // ✅ FIXED: We discovered earlier the data is directly in clinicResult.clinics
+          const fetchedClinics = clinicResult.clinics || [];
+          setClinics(fetchedClinics);
         } else {
-          setError(clinicResult.message);
+          setError(clinicResult.message || "Failed to load clinics.");
         }
       } catch (err) {
         console.error("Initialization error:", err);
@@ -57,11 +58,12 @@ export default function HerosectionCity({ cityName }) {
   }, [cityName]);
 
   // Client-side search within the already filtered city results
-  const filteredList = clinics.filter(
+  // ✅ Added optional chaining ? to prevent further undefined crashes
+  const filteredList = clinics?.filter(
     (clinic) =>
-      clinic.clinicName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      clinic.clinicName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       clinic.areaName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) || [];
 
   const handleCall = (phone) => (window.location.href = `tel:${phone}`);
   const handleDetails = (id) => router.push(`/clinicseedetails?id=${id}`);
@@ -112,7 +114,7 @@ export default function HerosectionCity({ cityName }) {
             >
               <div className="h-48 w-full bg-gray-200 overflow-hidden border-b border-gray-300">
                 <img
-                  src={clinic.photos?.clinicfrontPhoto}
+                  src={clinic.photos?.clinicfrontPhoto || "https://via.placeholder.com/400x200?text=Clinic"}
                   alt={clinic.clinicName}
                   className="w-full h-full object-cover"
                 />
@@ -139,9 +141,11 @@ export default function HerosectionCity({ cityName }) {
                     <button onClick={() => handleCall(clinic.mobileNo)} className="text-purple-600 hover:bg-purple-50 p-1 rounded-md transition-colors">
                         <Phone className="w-5 h-5" />
                     </button>
-                    <button onClick={() => window.open(clinic.googleMapsLink, '_blank')} className="text-purple-600 hover:bg-purple-50 p-1 rounded-md transition-colors">
-                        <Navigation className="w-5 h-5" />
-                    </button>
+                    {clinic.googleMapsLink && (
+                      <button onClick={() => window.open(clinic.googleMapsLink, '_blank')} className="text-purple-600 hover:bg-purple-50 p-1 rounded-md transition-colors">
+                          <Navigation className="w-5 h-5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

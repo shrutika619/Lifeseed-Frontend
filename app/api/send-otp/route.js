@@ -19,13 +19,11 @@ export async function POST(request) {
       expires: Date.now() + 5 * 60 * 1000
     };
 
-    console.log(`Generated OTP for ${phone}: ${otp}`);
 
     // Build URL exactly as shown in your Fast2SMS interface
     const apiKey = process.env.FAST2SMS_API_KEY;
     const apiUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=DRFUSN&message=174808&variables_values=${otp}&numbers=${phone}&flash=0`;
 
-    console.log('API URL:', apiUrl);
 
     // Send GET request
     const response = await fetch(apiUrl, {
@@ -33,7 +31,6 @@ export async function POST(request) {
     });
 
     const data = await response.json();
-    console.log('Fast2SMS Response:', data);
 
     // Check for success
     if (response.ok && (data.return === true || data.status === 'success' || data.message?.includes('success'))) {

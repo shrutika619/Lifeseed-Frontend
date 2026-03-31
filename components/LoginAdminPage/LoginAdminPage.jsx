@@ -6,20 +6,17 @@ import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 import { Lock, Mail, Eye, EyeOff, Shield, CheckCircle, ArrowRight } from "lucide-react";
 
-// ✅ Import Combined Auth Service & Redux
-import { adminLogin, logoutUser } from "@/app/services/auth.service";
+import { adminLogin, logoutUser } from "@/app/services/auth/auth.service";
 import { setCredentials, logoutSuccess, selectIsAuthenticated, selectUserRole, selectUser } from "@/redux/slices/authSlice";
 
 const LoginAdminPage = () => {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  // ✅ Redux State
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const userRole = useSelector(selectUserRole);
   const currentUser = useSelector(selectUser);
 
-  // Local State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -27,27 +24,21 @@ const LoginAdminPage = () => {
   const [loginMode, setLoginMode] = useState("ADMIN"); 
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ 1. Auto-Redirect for existing Admins
+  // ✅ 1. Auto-Redirect: Clean URLs for everyone
   useEffect(() => {
     if (isAuthenticated && (userRole === 'admin' || userRole === 'super_admin')) {
       const dest = userRole === 'super_admin' ? '/super-admin/dashboard' : '/admin/dashboard';
       router.replace(dest);
     }
-  }, [isAuthenticated, userRole, router]);
+  }, [isAuthenticated, userRole, router]);    
 
-  // ✅ 2. Logout Logic (For the Blocker UI)
   const handleLogout = async () => {
-    // Call service (we don't await/block the UI on failure, we force clear state anyway)
     await logoutUser();
-    
     dispatch(logoutSuccess());
     toast.success("Logged out successfully");
     router.refresh();
   };
 
-  /* -------------------------------------------------------------
-     🛑 BLOCKER UI: If Non-Admin User is Logged In
-     ------------------------------------------------------------- */
   if (isAuthenticated && userRole !== 'admin' && userRole !== 'super_admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
@@ -55,17 +46,12 @@ const LoginAdminPage = () => {
           <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="w-8 h-8" />
           </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Access Restricted
-          </h2>
-          
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h2>
           <p className="text-gray-600 mb-6 leading-relaxed">
             You are currently logged in as <strong>{currentUser?.username || 'User'}</strong> ({userRole}). 
             <br />
             This portal is restricted to Administrators only. To sign in as an Admin, you must log out first.
           </p>
-
           <div className="space-y-3">
              <button
               onClick={() => {
@@ -76,7 +62,6 @@ const LoginAdminPage = () => {
             >
               Return to My Dashboard
             </button>
-
             <button
               onClick={handleLogout}
               className="w-full border border-red-200 text-red-600 bg-red-50 py-3 rounded-xl font-medium hover:bg-red-100 transition"
@@ -89,9 +74,6 @@ const LoginAdminPage = () => {
     );
   }
 
-  /* -------------------------------------------------------------
-     ✅ STANDARD ADMIN LOGIN UI
-     ------------------------------------------------------------- */
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
 
@@ -102,29 +84,28 @@ const LoginAdminPage = () => {
 
     setIsLoading(true);
 
-    // ✅ Call the new Service Function
     const result = await adminLogin(email, password);
 
     if (result.success) {
       const { accessToken, user } = result.data;
 
-      // Save to Redux
+      // ✅ Saves user object (INCLUDING modulePermissions!) directly to Redux
       dispatch(setCredentials({ 
         accessToken, 
         user, 
-        role: user.role 
+        role: user.role ,
+        // modulePermissions: user.modulePermissions
       }));
 
       toast.success(`Welcome back, ${user.username || 'Admin'}`);
 
-      // Redirect based on Role
+      // ✅ 2. Clean routing! No more URL parameters needed.
       if (user.role === 'super_admin') {
         router.push('/super-admin/dashboard');
       } else {
         router.push('/admin/dashboard');
       }
     } else {
-      // Error handling via service response
       toast.error(result.message);
     }
 
@@ -133,10 +114,7 @@ const LoginAdminPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] p-6">
-      {/* Main Rectangular Container */}
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[550px]">
-        
-        {/* Left Side: Branding */}
         <div className="md:w-5/12 bg-gradient-to-br from-blue-700 to-indigo-800 p-10 flex flex-col justify-between text-white">
           <div>
             <div className="inline-flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl mb-6">
@@ -149,7 +127,6 @@ const LoginAdminPage = () => {
               Securely manage your healthcare services with ease.
             </p>
           </div>
-          
           <div className="space-y-4">
             <div className="flex items-center gap-3 text-sm text-blue-100/80">
               <CheckCircle className="w-4 h-4 text-blue-300" />
@@ -161,14 +138,12 @@ const LoginAdminPage = () => {
           </div>
         </div>
 
-        {/* Right Side: Login Form */}
         <div className="md:w-7/12 p-8 md:p-12 flex flex-col justify-center bg-white">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800">Sign In</h2>
             <p className="text-gray-500 text-sm">Select your access level to continue</p>
           </div>
 
-          {/* Role Selection */}
           <div className="grid grid-cols-2 gap-4 mb-8">
             <button
               onClick={() => setLoginMode("ADMIN")}
@@ -199,7 +174,6 @@ const LoginAdminPage = () => {
             </button>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="group">
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Email / Username</label>

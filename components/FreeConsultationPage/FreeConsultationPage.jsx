@@ -1,39 +1,130 @@
 "use client";
-import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, X } from 'lucide-react';
-import { getAllCities } from '@/app/services/clinic.service';
-import { useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, Clock, MapPin, X, Loader2, ArrowLeft } from 'lucide-react';
+import { getAllCities } from '@/app/services/patient/clinic.service';
+import { bookTeleconsultation, getPatientTeleSlots } from '@/app/services/patient/appointment.service';
+import { adminTeleconsultationService } from '@/app/services/admin/adminTeleconsultation.service'; 
 import Link from "next/link";
+import { useRouter, useSearchParams } from 'next/navigation'; 
+import { toast } from 'sonner'; 
 
+import { useSelector, useDispatch } from "react-redux";
+import { 
+  selectUser, 
+  selectIsAuthenticated, 
+  fetchProfileDetails 
+} from "@/redux/slices/authSlice";
+
+// Helper to generate the next 3 days dynamically
+const generateUpcomingDates = (numDays = 3) => {
+  const dates = [];
+  const today = new Date();
+  for (let i = 0; i < numDays; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    dates.push({
+      fullDate: d.toISOString().split('T')[0], 
+      label: d.toLocaleDateString('en-US', { weekday: 'short' }), 
+      date: d.getDate().toString() 
+    });
+  }
+  return dates;
+};
+
+// Sort periods chronologically
+const sortPeriodsChronologically = (groups) => {
+  const orderMap = { night: 1, morning: 2, afternoon: 3, evening: 4 };
+  return [...groups].sort((a, b) => {
+    return (orderMap[a.period] || 99) - (orderMap[b.period] || 99);
+  });
+};
+
+// ✅ HELPER: Check if a time slot string (e.g., "10:30 AM - 11:00 AM") is in the past (for today)
+const isSlotInPast = (slotTimeStr, selectedDateStr) => {
+  if (!slotTimeStr || !selectedDateStr) return false;
+
+  const today = new Date();
+  const selectedDate = new Date(selectedDateStr);
+  
+  // If selected date is strictly in the future, slot is not in the past
+  if (selectedDate.setHours(0,0,0,0) > today.setHours(0,0,0,0)) return false;
+  // If selected date is strictly in the past, slot is definitely in the past
+  if (selectedDate.setHours(0,0,0,0) < today.setHours(0,0,0,0)) return true;
+
+  // Otherwise, it's today. Extract start time (e.g. "10:30 AM")
+  const startTimeStr = slotTimeStr.split("-")[0].trim();
+  const match = startTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return false;
+
+  let [_, hours, minutes, period] = match;
+  hours = parseInt(hours, 10);
+  minutes = parseInt(minutes, 10);
+
+  if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+  if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+  const currentTime = new Date();
+  const slotTime = new Date();
+  slotTime.setHours(hours, minutes, 0, 0);
+
+  return slotTime < currentTime;
+};
 
 const FreeConsultationPage = () => {
-  const [selectedDay, setSelectedDay] = useState('Mon');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [gender, setGender] = useState('');
-  const [concern, setConcern] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [age, setAge] = useState('');
+  const router = useRouter(); 
+  const dispatch = useDispatch();
+  const searchParams = useSearchParams();
+
+  // Read Auth State from Redux
+  const user = useSelector(selectUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+
+  // Determine if the logged-in user is an Admin/SuperAdmin
+  const userRole = user?.role?.toLowerCase() || '';
+  const isAdminOrSuperAdmin = ['admin', 'super_admin', 'superadmin', 'clinic_admin'].includes(userRole);
+  const adminDashboardPath = (userRole === 'super_admin' || userRole === 'superadmin') 
+      ? '/super-admin/teleconsultation' 
+      : '/admin/teleconsultation';
+
+  // Dynamic Date & Slot States
+  const [availableDates, setAvailableDates] = useState(generateUpcomingDates());
+  const [selectedDate, setSelectedDate] = useState(availableDates[0].fullDate);
+  const [slotGroups, setSlotGroups] = useState([]);
+  const [patientLimit, setPatientLimit] = useState(1);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null); 
+  const [activeGroupId, setActiveGroupId] = useState(null); 
+  const [topLevelAvailabilityId, setTopLevelAvailabilityId] = useState(null);
+  
+  // Track the original appointment for marking in UI
+  const [originalBooking, setOriginalBooking] = useState(null);
+
+  // Auth & Profile States
+  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const [fetchingProfile, setFetchingProfile] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false); 
+  const [prefillLoaded, setPrefillLoaded] = useState(false);
+
+  // Form States
+  const [patientContact, setPatientContact] = useState(searchParams.get('contact') || ''); 
+  const [fullName, setFullName] = useState(searchParams.get('name') || '');
+  const [age, setAge] = useState(searchParams.get('age') || '');
+  const [gender, setGender] = useState(searchParams.get('gender') || '');
+  const [concern, setConcern] = useState(searchParams.get('concern') ? [searchParams.get('concern')] : []);
+  
+  // Form validation errors state
+  const [formErrors, setFormErrors] = useState({});
+  
+  const isAdminBooking = searchParams.get('admin_booking') === 'true'; 
+  const rescheduleRecordId = searchParams.get('rescheduleRecordId'); 
+  
+  // UI States
   const [showCityPopup, setShowCityPopup] = useState(false);
   const [activeTab, setActiveTab] = useState('online');
   const [isBooked, setIsBooked] = useState(false);
+  const [isBooking, setIsBooking] = useState(false); 
   const [bookingData, setBookingData] = useState(null);
-
-  const days = [
-    { label: 'Sat', date: '13' },
-    { label: 'Sun', date: '14' },
-    { label: 'Mon', date: '15' },
-    { label: 'Tue', date: '16' },
-    { label: 'Wed', date: '17' },
-    { label: 'Thu', date: '18' },
-    { label: 'Fri', date: '19' }
-  ];
-
-  const timeSlots = {
-    morning: ['10:30 AM', '11:00 AM', '11:30 AM'],
-    afternoon: ['12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM'],
-    evening: ['6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM', '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'],
-    night: ['12:00 AM', '12:30 AM', '1:00 AM', '1:30 AM', '2:00 AM']
-  };
+  const [clinicLinks, setClinicLinks] = useState({});
 
   const concerns = [
     'Sexual Dysfunction',
@@ -44,28 +135,116 @@ const FreeConsultationPage = () => {
     'Other'
   ];
 
-  // const cities = [
-  //   { name: 'NAGPUR', state: 'Maharashtra, India' },
-  //   { name: 'MUMBAI', state: 'Maharashtra' },
-  //   { name: 'PUNE', state: 'Maharashtra' },
-  //   { name: 'AMRAVATI', state: 'Maharashtra' },
-  //   { name: 'DELHI', state: 'Delhi' }
-  // ];
+  // SYNC DATA
+  useEffect(() => {
+    const loadData = async () => {
+      if (!isAuthenticated) {
+        setIsLoggedIn(false);
+        setFetchingProfile(false);
+        return;
+      }
 
-  const [clinicLinks, setClinicLinks] = useState({});
-  
+      setIsLoggedIn(true);
+      
+      // ADMIN FLOW: Prefill API or Reschedule Data
+      if (isAdminOrSuperAdmin) {
+        setProfileLoaded(true); 
+        
+        const pUserId = searchParams.get('userId');
+        
+        // 1. If Rescheduling: Fetch Original Booking Details
+        if (rescheduleRecordId && !prefillLoaded) {
+          setFetchingProfile(true);
+          try {
+            const res = await adminTeleconsultationService.getBookingDetails(rescheduleRecordId);
+            if (res.success && res.data) {
+              const bpDetails = res.data.bookingPatientDetails || {};
+              const accDetails = res.data.patientDetails || {};
+              const bDetails = res.data.bookingDetails || {};
+              
+              // Store original booking info
+              if (bDetails.appointmentDate && bDetails.timeSlot) {
+                setOriginalBooking({
+                  date: bDetails.appointmentDate.split('T')[0],
+                  time: bDetails.timeSlot
+                });
+              }
 
-useEffect(() => {
+              if (!patientContact) setPatientContact(bpDetails.contact || accDetails.loginNumber || ''); 
+              if (!fullName) setFullName(bpDetails.name || '');
+              if (!age) setAge(bpDetails.age ? bpDetails.age.toString() : '');
+              if (!gender) setGender(bpDetails.gender ? bpDetails.gender.toLowerCase() : '');
+              
+              if (bpDetails.concernedAbout && Array.isArray(bpDetails.concernedAbout) && concern.length === 0) {
+                setConcern(bpDetails.concernedAbout);
+              }
+            }
+          } catch (error) {
+            console.error("Failed to load reschedule data", error);
+            toast.error("Could not fetch patient details for rescheduling.");
+          } finally {
+            setPrefillLoaded(true);
+            setFetchingProfile(false);
+          }
+        } 
+        // 2. If Normal Admin Booking: Fetch Patient Prefill Data
+        else if (isAdminBooking && pUserId && !prefillLoaded) {
+          setFetchingProfile(true);
+          try {
+            const res = await adminTeleconsultationService.getAppointmentPrefill(pUserId);
+            if (res.success && res.data) {
+              if (!patientContact && (res.data.bookingContactNumber || res.data.mobileNo)) {
+                setPatientContact(res.data.bookingContactNumber || res.data.mobileNo); 
+              }
+              if (!fullName && res.data.fullName) setFullName(res.data.fullName);
+              if (!age && res.data.age) setAge(res.data.age.toString());
+              if (!gender && res.data.gender) setGender(res.data.gender.toLowerCase());
+            }
+          } catch (error) {
+            console.error("Failed to load prefill data", error);
+            toast.error("Could not fetch patient prefill data.");
+          } finally {
+            setPrefillLoaded(true);
+            setFetchingProfile(false);
+          }
+        } else {
+          setFetchingProfile(false);
+        }
+        return; 
+      }
+
+      // PATIENT FLOW: Redux profile
+      if (!user?.fullName && !profileLoaded) {
+        setFetchingProfile(true);
+        await dispatch(fetchProfileDetails());
+        setFetchingProfile(false);
+      } 
+      
+      if (user && !profileLoaded && !isAdminOrSuperAdmin) {
+        if (!patientContact && (user.mobileNo || user.contactNumber || user.phone)) {
+           setPatientContact(user.mobileNo || user.contactNumber || user.phone);
+        }
+        if (!fullName && user.fullName) setFullName(user.fullName);
+        if (!age && user.age) setAge(user.age.toString());
+        if (!gender && user.gender) setGender(user.gender.toLowerCase());
+        
+        setProfileLoaded(true); 
+        setFetchingProfile(false);
+      }
+    };
+
+    loadData();
+  }, [isAuthenticated, user, dispatch, profileLoaded, prefillLoaded, fullName, age, gender, patientContact, isAdminBooking, searchParams, isAdminOrSuperAdmin, rescheduleRecordId, concern.length]);
+
+  // Fetch Cities 
+  useEffect(() => {
     const fetchCityData = async () => {
       try {
         const response = await getAllCities();
         const data = response?.data || response; 
-        
         if (Array.isArray(data)) {
           const formattedLinks = data.reduce((acc, city) => {
-            if (city?.name) {
-                acc[city.name] = city.name.toLowerCase();
-            }
+            if (city?.name) acc[city.name] = city.name.toLowerCase();
             return acc;
           }, {});
           setClinicLinks(formattedLinks);
@@ -77,65 +256,240 @@ useEffect(() => {
     fetchCityData();
   }, []);
 
-  
-
-  const handleBooking = () => {
-    const selectedDayData = days.find(d => d.label === selectedDay);
-    const data = {
-      orderId: 'TC10',
-      date: `September ${selectedDayData.date}, 2025`,
-      time: selectedTime,
-      name: fullName,
-      age: age,
-      gender: gender,
-      concern: concern
-    };
+  // Fetch Slots
+  const fetchSlots = useCallback(async () => {
+    if (!selectedDate) return;
     
-    setBookingData(data);
-    setIsBooked(true);
+    setLoadingSlots(true);
+    setSelectedSlot(null); 
+    setActiveGroupId(null);
+    setTopLevelAvailabilityId(null); 
+
+    try {
+      const res = await getPatientTeleSlots(selectedDate);
+      const responseData = res?.data?.slotGroups ? res.data : res;
+      
+      if (responseData && responseData.slotGroups) {
+        setTopLevelAvailabilityId(responseData.availabilityId); 
+        const sortedGroups = sortPeriodsChronologically(responseData.slotGroups);
+        setSlotGroups(sortedGroups);
+        setPatientLimit(responseData.patientLimit || 1);
+      } else {
+        setSlotGroups([]);
+      }
+    } catch (error) {
+      console.error("Slot fetch error", error);
+      setSlotGroups([]);
+    }
+    
+    setLoadingSlots(false);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchSlots();
+  }, [fetchSlots]);
+
+  const toggleConcern = (item) => {
+    if (concern.includes(item)) {
+      setConcern(concern.filter(c => c !== item));
+    } else {
+      setConcern([...concern, item]);
+      setFormErrors(prev => ({ ...prev, concern: '' }));
+    }
+  };
+
+  // Validate form fields
+  const validateForm = () => {
+    const errors = {};
+
+    if (isAdminOrSuperAdmin && !rescheduleRecordId && !patientContact) {
+      errors.patientContact = 'Patient Username / Contact is required.';
+    }
+
+    if (!rescheduleRecordId) {
+      if (!fullName.trim()) errors.fullName = 'Full Name is required.';
+      if (!age) {
+        errors.age = 'Age is required.';
+      } else if (isNaN(age) || Number(age) <= 0 || Number(age) > 120) {
+        errors.age = 'Please enter a valid age.';
+      }
+      if (!gender) errors.gender = 'Gender is required.';
+      if (!concern || concern.length === 0) errors.concern = 'Please select at least one concern.';
+    }
+
+    if (!selectedSlot || !activeGroupId || !topLevelAvailabilityId) {
+      errors.slot = 'Please select a valid time slot.';
+    }
+
+    return errors;
+  };
+
+  // BOOKING / RESCHEDULING HANDLER
+  const handleBooking = async () => {
+    if (!isLoggedIn) {
+      router.push('/login?from=/free-consultation'); 
+      return;
+    }
+
+    // Run validation
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      if (errors.slot) toast.error(errors.slot);
+      return;
+    }
+
+    setFormErrors({});
+    setIsBooking(true);
+
+    try {
+      let res;
+      let orderIdToDisplay = "";
+
+      if (rescheduleRecordId) {
+        const reschedulePayload = {
+          availabilityId: topLevelAvailabilityId,
+          slotGroupId: activeGroupId,             
+          slotId: selectedSlot._id || selectedSlot.id,
+        };
+
+        res = await adminTeleconsultationService.rescheduleBooking(rescheduleRecordId, reschedulePayload);
+        
+        if (res.success) {
+           orderIdToDisplay = res.data.requestId || res.data.bookingId || "RESCHEDULED";
+        }
+      } 
+      else {
+        const bookingPayload = {
+          availabilityId: topLevelAvailabilityId,
+          slotGroupId: activeGroupId,             
+          slotId: selectedSlot._id || selectedSlot.id,
+          fullName: fullName,
+          age: Number(age), 
+          gender: gender,
+          concernedAbout: concern,
+          bookingContactNumber: patientContact || searchParams.get('contact') || ''
+        };
+
+        if (isAdminOrSuperAdmin && isAdminBooking && searchParams.get('userId')) {
+           bookingPayload.patientUserId = searchParams.get('userId'); 
+        }
+
+        res = await bookTeleconsultation(bookingPayload);
+        
+        if (res.success) {
+          orderIdToDisplay = res.data.appointmentId || res.data.requestId;
+        }
+      }
+
+      if (res.message?.toLowerCase().includes("unauthorized") || res.statusCode === 401) {
+         router.push('/login?from=/free-consultation');
+         return;
+      }
+
+      // ✅ HANDLE RESPONSES
+      if (res.success || res.message?.includes("successfully")) {
+        const responseData = res.data;
+        const displayDate = new Date(responseData.date).toLocaleDateString('en-US', { 
+          month: 'long', day: 'numeric', year: 'numeric' 
+        });
+
+        setBookingData({
+          orderId: orderIdToDisplay, 
+          date: displayDate,
+          time: responseData.timeSlot,
+          name: fullName || "Existing Patient",
+          contact: patientContact || "On File", 
+          age: age || "--",
+          gender: gender || "--",
+          concern: concern.length > 0 ? concern.join(", ") : "Follow-Up" 
+        });
+        
+        setIsBooked(true);
+
+        if (rescheduleRecordId) {
+            toast.success("Booking successfully rescheduled!");
+        } else if (isAdminBooking) {
+            toast.success(`Booking successfully created for ${fullName}`);
+        }
+      } else {
+        // Graceful error parse if backend returns non-success but doesn't throw 500
+        const errorMsg = String(res.message || res.data || res.error || "");
+        if (errorMsg.includes("VersionError") || errorMsg.includes("No matching document")) {
+          toast.error("Slot already full. Please select another time slot.");
+          fetchSlots(); 
+        } else if (errorMsg.includes("Please select a different slot than the current one")) {
+          // ✅ USE WARNING TOAST HERE
+          toast.warning("Please select a different time slot than your current one.");
+        } else {
+          toast.error(errorMsg || "Something went wrong. Please try again.");
+        }
+      }
+
+    } catch (error) {
+      console.error(error);
+      
+      // CATCH RAW HTML/500 BACKEND ERRORS
+      const errorStr = String(error?.response?.data || error?.message || error?.error || error);
+      
+      if (errorStr.includes("VersionError") || errorStr.includes("No matching document")) {
+        toast.error("Slot already full. Please select another time slot.");
+        fetchSlots(); 
+      } else if (errorStr.includes("Please select a different slot than the current one")) {
+        // ✅ USE WARNING TOAST HERE TOO
+        toast.warning("Please select a different time slot than your current one.");
+      } else {
+        toast.error(error?.response?.data?.message || error?.message || "Failed to communicate with server.");
+      }
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   const handleCancelAppointment = () => {
     setIsBooked(false);
     setBookingData(null);
-    setFullName('');
-    setAge('');
-    setGender('');
-    setConcern('');
-    setSelectedDay('Mon');
-    setSelectedTime('');
+    setConcern([]); 
+    setSelectedDate(availableDates[0].fullDate);
+    setSelectedSlot(null);
+    setActiveGroupId(null);
+    setFormErrors({});
   };
 
   const handleTabClick = (tab) => {
-    if (tab === 'clinic') {
-      setShowCityPopup(true);
-    }
+    if (tab === 'clinic') setShowCityPopup(true);
     setActiveTab(tab);
   };
 
-  const handleCitySelect = (cityName) => {
-    setShowCityPopup(false);
-  };
-
+  // SUCCESS SCREEN
   if (isBooked && bookingData) {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-md mx-auto">
+          {/* Back Button */}
+          <button 
+            onClick={handleCancelAppointment}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            <span className="font-medium">Back to Booking</span>
+          </button>
+
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Success Header */}
             <div className="bg-gradient-to-b from-white to-gray-50 p-8 text-center">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">Consultation Booked!</h1>
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                 {rescheduleRecordId ? "Consultation Rescheduled!" : "Consultation Booked!"}
+              </h1>
               <p className="text-sm text-gray-600">Your appointment details are confirmed below.</p>
             </div>
 
-            {/* Booking Details */}
             <div className="p-6 space-y-6">
-              {/* Payment & Booking Details */}
+              {/* Payment Details */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -150,7 +504,7 @@ useEffect(() => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Payment Status</p>
-                    <p className="font-semibold text-gray-800">N/A</p>
+                    <p className="font-semibold text-green-600">Free / ₹0</p>
                   </div>
                 </div>
               </div>
@@ -189,6 +543,12 @@ useEffect(() => {
                   <h2 className="font-semibold text-gray-800">Patient Details</h2>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  {isAdminOrSuperAdmin && bookingData.contact && (
+                    <div className="flex justify-between">
+                      <p className="text-sm text-gray-600">Contact / Username:</p>
+                      <p className="text-sm font-semibold text-gray-800">{bookingData.contact}</p>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <p className="text-sm text-gray-600">Full Name:</p>
                     <p className="text-sm font-semibold text-gray-800">{bookingData.name}</p>
@@ -201,21 +561,29 @@ useEffect(() => {
                     <p className="text-sm text-gray-600">Gender:</p>
                     <p className="text-sm font-semibold text-gray-800 capitalize">{bookingData.gender}</p>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col gap-1">
                     <p className="text-sm text-gray-600">Concern:</p>
                     <p className="text-sm font-semibold text-gray-800">{bookingData.concern}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Cancel Button */}
-              <div className="pt-4">
-                <p className="text-center text-sm text-gray-600 mb-3">Need to make a change?</p>
+              <div className="pt-4 flex flex-col gap-3">
+                {isAdminBooking ? (
+                  <button 
+                    onClick={() => router.push(adminDashboardPath)}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
+                  >
+                    Back to Admin Dashboard
+                  </button>
+                ) : (
+                  <p className="text-center text-sm text-gray-600 mb-3">Need to make a change?</p>
+                )}
                 <button 
                   onClick={handleCancelAppointment}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition"
+                  className={`w-full font-semibold py-3 rounded-lg transition ${isAdminBooking ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-red-500 hover:bg-red-600 text-white'}`}
                 >
-                  Cancel Appointment
+                  Book Another Slot
                 </button>
               </div>
             </div>
@@ -225,28 +593,31 @@ useEffect(() => {
     );
   }
 
+  const activeGroups = slotGroups.filter(g => g.slots && g.slots.length > 0);
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
+        
+        {/* Admin Warning Banner */}
+        {isAdminBooking && (
+            <div className={`border px-4 py-3 rounded-lg mb-6 font-semibold flex items-center justify-between ${rescheduleRecordId ? 'bg-indigo-100 border-indigo-300 text-indigo-800' : 'bg-orange-100 border-orange-300 text-orange-800'}`}>
+                <span>⚠️ Admin Mode: {rescheduleRecordId ? "Rescheduling an existing appointment." : "Booking an appointment on behalf of a patient."}</span>
+                <button onClick={() => router.push(adminDashboardPath)} className={`text-sm bg-white px-3 py-1 rounded shadow-sm hover:bg-gray-50 ${rescheduleRecordId ? 'text-indigo-700' : 'text-orange-700'}`}>Back to Dashboard</button>
+            </div>
+        )}
+
         {/* Header Tabs */}
         <div className="flex justify-center gap-4 mb-8">
           <button 
             onClick={() => handleTabClick('online')}
-            className={`pb-2 font-medium ${
-              activeTab === 'online'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500'
-            }`}
+            className={`pb-2 font-medium ${activeTab === 'online' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
           >
             Online Consultation
           </button>
           <button 
             onClick={() => handleTabClick('clinic')}
-            className={`pb-2 ${
-              activeTab === 'clinic'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500'
-            }`}
+            className={`pb-2 ${activeTab === 'clinic' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
           >
             Book In-Clinic Visit
           </button>
@@ -255,21 +626,36 @@ useEffect(() => {
         {/* Main Heading */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Book Your <span className="text-blue-600">FREE</span> Online Consultation
+            {rescheduleRecordId 
+               ? "Reschedule Appointment" 
+               : <>Book {isAdminBooking ? 'Patient' : 'Your'} <span className="text-blue-600">FREE</span> Online Consultation</>
+            }
           </h1>
           <p className="text-gray-600 text-sm">
-            Speak privately with our expert. Your first consultation is on us.
+            {rescheduleRecordId 
+               ? "Please select a new date and time for the patient's consultation." 
+               : "Speak privately with our expert. Your first consultation is on us."}
           </p>
-          <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
-            <span className="line-through text-gray-400">₹400</span>
-            <span className="text-green-600 font-bold text-xl">₹0</span>
-            <span className="text-gray-600 text-sm">Limited Time Offer!</span>
-          </div>
+          
+          {!rescheduleRecordId && (
+            <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+              <span className="line-through text-gray-400">₹400</span>
+              <span className="text-green-600 font-bold text-xl">₹0</span>
+              <span className="text-gray-600 text-sm">Limited Time Offer!</span>
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Left Section - Your Details */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-lg shadow-sm p-6 relative">
+            
+            {fetchingProfile && (
+               <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+               </div>
+            )}
+
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Consulting Expert</h2>
             
             {/* Doctor Card */}
@@ -286,65 +672,155 @@ useEffect(() => {
               </div>
             </div>
 
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Details</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">{isAdminBooking ? "Patient Details" : "Your Details"}</h2>
             
-            {/* Full Name */}
+            {/* ✅ Admin Contact Field with star */}
+            {isAdminOrSuperAdmin && (
+              <div className="mb-4">
+                <label className="block text-sm text-gray-600 mb-2">
+                  Patient Username / Contact <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text"
+                  value={patientContact}
+                  disabled={!!rescheduleRecordId}
+                  onChange={(e) => {
+                    setPatientContact(e.target.value);
+                    setFormErrors(prev => ({ ...prev, patientContact: '' }));
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                    formErrors.patientContact
+                      ? 'border-red-400 bg-red-50'
+                      : rescheduleRecordId
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'border-blue-200 focus:border-blue-500 bg-blue-50/30'
+                  }`}
+                  placeholder="e.g. 8908999995"
+                />
+                {formErrors.patientContact && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.patientContact}</p>
+                )}
+              </div>
+            )}
+
+            {/* ✅ Full Name with star */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-600 mb-2">Full Name</label>
+              <label className="block text-sm text-gray-600 mb-2">
+                Full Name {!rescheduleRecordId && <span className="text-red-500">*</span>}
+              </label>
               <input 
                 type="text"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                placeholder="Enter your name"
+                disabled={!!rescheduleRecordId}
+                onChange={(e) => {
+                  setFullName(e.target.value);
+                  setFormErrors(prev => ({ ...prev, fullName: '' }));
+                }}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                  formErrors.fullName
+                    ? 'border-red-400 bg-red-50'
+                    : rescheduleRecordId
+                      ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'border-gray-300 focus:border-blue-500'
+                }`}
+                placeholder="Enter patient name"
               />
+              {formErrors.fullName && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>
+              )}
             </div>
 
-            {/* Age and Gender */}
             <div className="grid grid-cols-2 gap-4 mb-4">
+              {/* ✅ Age with star */}
               <div>
-                <label className="block text-sm text-gray-600 mb-2">Age</label>
+                <label className="block text-sm text-gray-600 mb-2">
+                  Age {!rescheduleRecordId && <span className="text-red-500">*</span>}
+                </label>
                 <input 
                   type="number"
                   value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  disabled={!!rescheduleRecordId}
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                    setFormErrors(prev => ({ ...prev, age: '' }));
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                    formErrors.age
+                      ? 'border-red-400 bg-red-50'
+                      : rescheduleRecordId
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'border-gray-300 focus:border-blue-500'
+                  }`}
                   placeholder="Age"
                 />
+                {formErrors.age && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.age}</p>
+                )}
               </div>
+
+              {/* ✅ Gender with star */}
               <div>
-                <label className="block text-sm text-gray-600 mb-2">Gender</label>
+                <label className="block text-sm text-gray-600 mb-2">
+                  Gender {!rescheduleRecordId && <span className="text-red-500">*</span>}
+                </label>
                 <select 
                   value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 bg-pink-50"
+                  disabled={!!rescheduleRecordId}
+                  onChange={(e) => {
+                    setGender(e.target.value);
+                    setFormErrors(prev => ({ ...prev, gender: '' }));
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none ${
+                    formErrors.gender
+                      ? 'border-red-400 bg-red-50'
+                      : rescheduleRecordId
+                        ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'border-gray-300 focus:border-blue-500 bg-pink-50'
+                  }`}
                 >
                   <option value="">Gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </select>
+                {formErrors.gender && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.gender}</p>
+                )}
               </div>
             </div>
 
-            {/* Concerns */}
+            {/* ✅ Concern with star */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-600 mb-2">What are you concerned about?</label>
+              <label className="block text-sm text-gray-600 mb-2">
+                What are you concerned about? {!rescheduleRecordId && <span className="text-red-500">*</span>}
+              </label>
               <div className="grid grid-cols-2 gap-2">
-                {concerns.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => setConcern(item)}
-                    className={`px-3 py-2 rounded-lg text-sm border transition ${
-                      concern === item
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
+                {concerns.map((item) => {
+                  const isSelected = concern.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      disabled={!!rescheduleRecordId}
+                      onClick={() => toggleConcern(item)}
+                      className={`px-3 py-2 rounded-lg text-sm border transition ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : rescheduleRecordId
+                            ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                            : formErrors.concern
+                              ? 'bg-white text-gray-700 border-red-300 hover:border-blue-300 hover:bg-blue-50'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
               </div>
+              {formErrors.concern && (
+                <p className="text-red-500 text-xs mt-2">{formErrors.concern}</p>
+              )}
             </div>
           </div>
 
@@ -352,121 +828,122 @@ useEffect(() => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Date & Time</h2>
             
-            {/* Date Selection */}
             <div className="mb-6">
               <label className="block text-sm text-gray-600 mb-3">Select a Date</label>
               <div className="grid grid-cols-7 gap-2">
-                {days.map((day, index) => (
+                {availableDates.map((day) => (
                   <button
-                    key={`${day.label}-${index}`}
-                    onClick={() => setSelectedDay(day.label)}
-                    className={`py-3 px-2 rounded-lg text-center transition ${
-                      selectedDay === day.label
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    key={day.fullDate}
+                    onClick={() => setSelectedDate(day.fullDate)}
+                    className={`py-3 px-2 rounded-lg text-center transition border ${
+                      selectedDate === day.fullDate
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                        : 'bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200'
                     }`}
                   >
-                    <div className="font-semibold text-xs">{day.label}</div>
-                    <div className="text-sm">{day.date}</div>
+                    <div className={`font-semibold text-xs ${selectedDate === day.fullDate ? 'text-blue-100' : 'text-gray-500'}`}>
+                      {day.label}
+                    </div>
+                    <div className="text-sm font-bold mt-1">{day.date}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Time Selection */}
-            <div>
+            <div className="min-h-[250px]">
               <label className="block text-sm text-gray-600 mb-3">Select a Time Slot</label>
               
-              {/* Morning */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Morning</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.morning.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
+              {loadingSlots ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-blue-600" />
+                  <p className="text-sm">Loading available slots...</p>
                 </div>
-              </div>
+              ) : activeGroups.length === 0 ? (
+                <div className="text-center py-10 px-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <p className="text-gray-500 text-sm">No slots available for this date.</p>
+                  <p className="text-gray-400 text-xs mt-1">Please select a different date.</p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {activeGroups.map((group) => (
+                    <div key={group._id || group.period}>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 capitalize tracking-wide">
+                        {group.period}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {group.slots.map((slot) => {
+                          const isFull = slot.bookedCount >= patientLimit;
+                          const isPast = isSlotInPast(slot.time, selectedDate); 
+                          const isBookable = slot.isAvailable && !isFull && !isPast;
+                          const isSelected = selectedSlot?._id === slot._id;
+                          
+                          // LOGIC: Check if this matches the previous appointment
+                          const isOriginal = originalBooking && 
+                                           originalBooking.date === selectedDate && 
+                                           originalBooking.time === slot.time;
 
-              {/* Afternoon */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Afternoon</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.afternoon.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                          return (
+                            <button
+                              key={slot._id}
+                              disabled={!isBookable}
+                              onClick={() => {
+                                setSelectedSlot(slot);
+                                setActiveGroupId(group._id); 
+                                setFormErrors(prev => ({ ...prev, slot: '' }));
+                              }}
+                              className={`
+                                relative py-2 px-1 rounded-lg text-sm transition border flex flex-col items-center justify-center
+                                ${isSelected 
+                                  ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                                  : isBookable 
+                                    ? 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50' 
+                                    : 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed'
+                                }
+                                ${isOriginal ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}
+                              `}
+                            >
+                              <span className="font-medium whitespace-nowrap text-xs">{slot.time}</span>
+                              
+                              {/* Show Original/Current badge */}
+                              {isOriginal && (
+                                <span className="absolute -top-2 bg-indigo-600 text-white px-1.5 rounded-full text-[8px] border border-white z-10">Current</span>
+                              )}
 
-              {/* Evening */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Evening</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.evening.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
+                              {/* Display Full OR Passed badge based on the condition */}
+                              {isFull && !isPast && (
+                                <span className="text-[10px] text-red-500 font-bold mt-0.5 leading-none">Full</span>
+                              )}
+                              {isPast && (
+                                <span className="text-[10px] text-gray-400 font-bold mt-0.5 leading-none">Passed</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Night */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">Night</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.night.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`py-2 px-3 rounded-lg text-sm transition ${
-                        selectedTime === time
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Book Button */}
-        <div className="text-center mt-8">
+        <div className="text-center mt-8 flex justify-center">
           <button 
             onClick={handleBooking}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-12 py-3 rounded-lg transition"
+            disabled={isBooking}
+            className={`flex items-center justify-center min-w-[320px] gap-2 text-white font-semibold px-12 py-4 rounded-xl shadow-lg transition-all transform active:scale-95 ${
+              !selectedSlot ? 'bg-gray-400 hover:bg-gray-500' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
-            Book Free Consultation
+            {isBooking ? (
+              <><Loader2 className="w-5 h-5 animate-spin" /> {rescheduleRecordId ? 'Rescheduling...' : 'Booking...'}</>
+            ) : selectedSlot ? (
+              rescheduleRecordId ? 'Confirm Reschedule' : 'Confirm & Book Free Consultation'
+            ) : (
+              'Select a Slot'
+            )}
           </button>
         </div>
       </div>
@@ -475,7 +952,6 @@ useEffect(() => {
       {showCityPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
             <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Select Clinic City</h3>
               <button 
@@ -486,37 +962,20 @@ useEffect(() => {
               </button>
             </div>
 
-            {/* City List */}
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {/* {cities.map((city) => (
+              {Object.entries(clinicLinks).map(([label, path]) => (
                 <button
-                  key={city.name}
-                  onClick={() => handleCitySelect(city.name)}
+                  key={path}
                   className="w-full flex items-start gap-3 p-4 hover:bg-gray-50 rounded-lg transition border-b border-gray-100 text-left"
                 >
-                  <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
-                  <div>
-                    <div className="font-semibold text-gray-800">{city.name}</div>
-                    <div className="text-sm text-gray-500">{city.state}</div>
-                  </div>
+                  <Link href={`/clinic/${path}`} className="flex items-center gap-2 w-full">
+                    <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
+                    <div className="font-semibold text-gray-800">{label}</div>
+                  </Link>
                 </button>
-              ))} */}
-
-               {Object.entries(clinicLinks).map(([label, path]) => (
-                  <button
-                   key={path}
-                   className="w-full flex items-start gap-3 p-4 hover:bg-gray-50 rounded-lg transition border-b border-gray-100 text-left"
-                  >
-                    <Link href={`/clinic/${path}`} className="flex items-center gap-2" >
-                      <MapPin className="text-gray-400 mt-1 flex-shrink-0" size={20} />
-                      <div className="font-semibold text-gray-800">{label}</div>
-                    </Link>
-                  </button>
-                ))}
-              
-              {/* Footer text */}
+              ))}
               <p className="text-center text-sm text-gray-400 mt-4 pb-2">
-                Can't find your city? Contact Customer...
+                Can't find your city? Contact Customer Support.
               </p>
             </div>
           </div>

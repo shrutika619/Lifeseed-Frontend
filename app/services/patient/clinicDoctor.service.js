@@ -17,15 +17,11 @@ export const ClinicDoctorService = {
     }
   },
 
-  // 2. ✅ UPDATED: Get Combined Doctor Profile, Clinic Info, & Booking Slots
+  // 2. Get Combined Doctor Profile, Clinic Info, & Booking Slots
   getDoctorDetailsById: async (doctorId) => {
     if (!doctorId) throw new Error("Doctor ID is required");
     try {
-      // Note: Make sure this endpoint matches your patient-facing doctor route 
-      // (e.g., app.use("/api/v1/clinicDoctor", ...))
-      const response = await api.get(`/clinicDoctor/${doctorId}`);
-      
-      // Returns { success: true, data: { doctor, clinic, availability } }
+      const response = await api.get(`${Constants.urlEndPoints.GET_CLINIC_DOCTORS}/${doctorId}`);
       return response.data; 
     } catch (error) {
       console.error(`Error fetching details for doctor ${doctorId}:`, error);
@@ -37,7 +33,7 @@ export const ClinicDoctorService = {
   bookAppointment: async (bookingPayload) => {
     try {
       const response = await api.post(
-        '/appoinntmentBooking/book', // Replace with exact endpoint if different
+        Constants.urlEndPoints.BOOK_APPOINTMENT,
         bookingPayload
       );
       return response.data;

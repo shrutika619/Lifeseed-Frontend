@@ -67,14 +67,27 @@ export const getModulePermissions = async () => {
 export const getAdminById = async (userId) => {
   try {
     const response = await api.get(Constants.urlEndPoints.ADMIN_ACTION(userId));
-    if (response.data.success) {
-       // Handle Backend Quirk
-      const resultData = typeof response.data.message === 'object' ? response.data.message : response.data.data;
-      return { success: true, data: resultData }; 
+    const resData = response.data; // This is the full JSON from the backend
+
+    if (resData.success) {
+      // Backend Quirk: The actual object is sometimes inside 'message' instead of 'data'
+      const extractedData = (typeof resData.message === 'object' && resData.message !== null) 
+        ? resData.message 
+        : resData.data;
+
+      return { 
+        success: true, 
+        data: extractedData 
+      }; 
     }
-    return { success: false, message: "Failed to fetch admin details" };
+    
+    return { success: false, message: resData.message || "Failed to fetch admin details" };
   } catch (error) {
-    return { success: false, message: error.response?.data?.message || "Server error" };
+    console.error("Error fetching Admin by ID:", error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || "Server error" 
+    };
   }
 };
 

@@ -1,11 +1,46 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Bell, Menu } from "lucide-react";
+import { getMeClinicProfile } from "@/app/services/clinic/hospitalProfile.service"; // ⬅️ NEW IMPORT
 
-const HospitalDashboardHeaderPage = ({ 
-  hospitalName = "Care Hospital", 
-  onMenuToggle 
-}) => {
+const HospitalDashboardHeaderPage = ({ onMenuToggle }) => {
+  // 1. Setup local state for clinic data
+  const [clinicInfo, setClinicInfo] = useState({
+    name: "MEN10 Clinic",
+    location: "Loading...",
+    initial: "M",
+  });
+
+  // 2. Fetch data on component mount
+  useEffect(() => {
+    const fetchSidebarData = async () => {
+      try {
+        const response = await getMeClinicProfile();
+        if (response.success && response.data) {
+          const clinic = response.data.clinic;
+          
+          // Clean up location format (e.g. "Sitaburdi, Nagpur")
+          const area = clinic.areaName || "";
+          const city = response.data.cityName || "";
+          const formattedLocation = [area, city].filter(Boolean).join(", ");
+
+          setClinicInfo({
+            name: clinic.clinicName || "MEN10 Clinic",
+            location: formattedLocation || "Location Unavailable",
+            initial: (clinic.clinicName || "M").charAt(0).toUpperCase()
+          });
+        } else {
+          setClinicInfo({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
+        }
+      } catch (error) {
+        console.error("Failed to load sidebar clinic data", error);
+        setClinicInfo({ name: "MEN10 Clinic", location: "Location Unavailable", initial: "M" });
+      }
+    };
+
+    fetchSidebarData();
+  }, []);
+
   const handleMenuClick = () => {
     console.log("Hamburger clicked");
     if (onMenuToggle) {
@@ -44,10 +79,20 @@ const HospitalDashboardHeaderPage = ({
             </span>
           </button>
 
-          {/* Profile Icon */}
-          <button className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm hover:bg-blue-700 transition-colors">
-            {hospitalName.charAt(0).toUpperCase()}
-          </button>
+          {/* Profile Icon with Fetched Data */}
+          <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
+            <div className="hidden md:flex flex-col items-end mr-1">
+              <span className="text-sm font-semibold text-gray-800 leading-none">
+                {clinicInfo.name}
+              </span>
+              <span className="text-[10px] text-gray-500 font-medium tracking-wide mt-1">
+                {clinicInfo.location}
+              </span>
+            </div>
+            <button className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm">
+              {clinicInfo.initial}
+            </button>
+          </div>
         </div>
       </div>
     </header>

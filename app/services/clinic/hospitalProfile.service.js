@@ -78,18 +78,24 @@ export const updateClinicProfile = async (formData) => {
  * Update Clinic Timings
  * @param {string} clinicId - The MongoDB _id of the clinic
  * @param {Array} timingsArray - Array of timing objects
+ * @param {number} slotDuration - Duration of each slot in minutes
+ * @param {number} patientLimit - Max number of patients per slot
  */
-export const updateClinicTimings = async (clinicId, timingsArray, slotDuration) => {
+export const updateClinicTimings = async (clinicId, timingsArray, slotDuration, patientLimit = 1) => {
   try {
-    const endpoint = `/clinic-profile/${clinicId}/timings`;
+    // ✅ REMOVE ${clinicId} FROM THIS LINE
+    const endpoint = `/clinic-profile/timings`; 
     
-    const response = await api.patch(endpoint, {
-      timings: timingsArray,
-      slotDuration: slotDuration // ✅ Now sending the duration
-    });
+    // ✅ Make sure payload has all properties
+    const payload = {
+      slotDuration: slotDuration,
+      patientLimit: patientLimit,
+      timings: timingsArray
+    };
+
+    const response = await api.patch(endpoint, payload);
 
     if (response.data.success) {
-      // ✅ Pass the whole data object back so we can read the warnings
       return { success: true, data: response.data.data, message: response.data.message };
     }
     return { success: false, message: response.data.message || "Failed to update timings" };

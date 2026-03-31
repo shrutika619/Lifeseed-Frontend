@@ -1,74 +1,140 @@
 export class Constants {
 
-   static API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+  static API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
 
-  
-  static urlEndPoints = {
-    // --- PATIENT AUTH ---
-    SEND_OTP: `${this.API_BASE_URL}/auth/send-otp`,
-    RESEND_OTP: `${this.API_BASE_URL}/auth/resend-otp`,
-    VERIFY_OTP: `${this.API_BASE_URL}/auth/verify-otp`,
-    REFRESH_TOKEN: `${this.API_BASE_URL}/auth/refresh-access-token`,
-    LOGOUT: `${this.API_BASE_URL}/auth/logout`,
+ static urlEndPoints = {
+   // ---  AUTH ---
+   SEND_OTP: `${this.API_BASE_URL}/auth/send-otp`,
+   RESEND_OTP: `${this.API_BASE_URL}/auth/resend-otp`,
+   VERIFY_OTP: `${this.API_BASE_URL}/auth/verify-otp`,
+   REFRESH_TOKEN: `${this.API_BASE_URL}/auth/refresh-access-token`,
+   LOGOUT: `${this.API_BASE_URL}/auth/logout`,
 
-    //--- PATIENT PROFILE ---
-    SAVE_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile/save`,
-    GET_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile`,
-    GET_CLINIC_PROFILE: `${this.API_BASE_URL}/clinic-profile`,
+   // --- ADMIN / AUTH (Added these for Redux) ---
+   ADMIN_LOGIN: `${this.API_BASE_URL}/admin/login`,
+   ADMIN_LOGOUT: `${this.API_BASE_URL}/admin/logout`,
+   EMPLOYEE_LOGIN: `${this.API_BASE_URL}/employee/login`,
+   SUPER_ADMIN_LOGIN: `${this.API_BASE_URL}/super-admin/login`,
+   ADMIN_REGISTER: `${this.API_BASE_URL}/adminregister`,
+   ADMIN_DASHBOARD: `${this.API_BASE_URL}/admindashboard`,
 
-    // --- ADMIN / AUTH (Added these for Redux) ---
-    ADMIN_LOGIN: `${this.API_BASE_URL}/admin/login`,
-    ADMIN_LOGOUT: `${this.API_BASE_URL}/admin/logout`,
-    EMPLOYEE_LOGIN: `${this.API_BASE_URL}/employee/login`,
-    SUPER_ADMIN_LOGIN: `${this.API_BASE_URL}/super-admin/login`,
-    ADMIN_REGISTER: `${this.API_BASE_URL}/adminregister`,
-    ADMIN_DASHBOARD: `${this.API_BASE_URL}/admindashboard`,
+   //--- ADMIN TEAM MEMBER ---
+   REGISTER_TEAM: "/admin/register/teammember",
+   GET_ALL_ADMINS: "/users/admins",
+   GET_MODULES: "/users/modules",
+   
+   // --- TELECONSULTATION ---
+   TELECONSULTATION_AVAILABILITY: "/teleconsultation/availability",
+   TELECONSULTATION_TIME_SLOTS: "/teleconsultation/time-slots",
+   TELECONSULTATION_DURATION_OPTIONS: "/teleconsultation/duration-options",
+   
+   // --- CLINICS ---
+   GET_ALL_CLINICS: `${this.API_BASE_URL}/admin/clinics`,
+   
+   // --- CUSTUMER LEADS ---
+   ADMIN_FIRST_TIME_CUSTUMER: `${this.API_BASE_URL}/customer/first-time`,
+   ADMIN_LOGGED_IN_CUSTUMER: `${this.API_BASE_URL}/customer/login-users`,
+   GET_PATIENT_DETAILS: `${this.API_BASE_URL}/customer/patient`,
+   SUBMIT_CUSTOMER_PROFILE: `${this.API_BASE_URL}/customer/submit`,
+   MANUAL_CUSTOMER_CREATE: `${this.API_BASE_URL}/customer/manual`,
+   CUSTOMER_ORDER_HISTORY: `${this.API_BASE_URL}/customer/order-history`,
+   SEARCH_PATIENTS: `${this.API_BASE_URL}/customer/search-patient`,
 
-    //--- ADMIN TEAM MEMBER ---
-    REGISTER_TEAM: "/admin/register/teammember",
-    GET_ALL_ADMINS: "/users/admins",
-    GET_MODULES: "/users/modules",
-    
-    // Dynamic endpoints (Functions)
-    ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE
-    ADMIN_PERMISSIONS: (id) => `/users/admin/${id}/permissions`, // PUT
-    ADMIN_PROFILE: (id) => `/users/admin/${id}/profile`,
+  // --- ADMIN IN-CLINIC BOOKINGS ---
+   ADMIN_INCLINIC_BOOKINGS: `${this.API_BASE_URL}/admin/inClinicBooking`,
+   ADMIN_CANCEL_INCLINIC_BOOKING: (bookingId) => `/admin/inClinicBooking/${bookingId}/cancel`,
+   
+   // Add these inside your URL endpoints object
+   CUSTOMER_ACTIVITY: "/customer/activity", // Used for fetching tickets
+   TICKET_UPDATE: "/customer/activity", // Adjust if you have a specific /ticket route
+   TICKET_COMMENT: "/customer/activity/comment", // Adjust to your actual comment POST route
 
-    // --- CLINIC ---
-    CLINIC_SEND_OTP: `${this.API_BASE_URL}/clinic/send-otp`,
-    CLINIC_VERIFY_OTP: `${this.API_BASE_URL}/clinic/verify-otp`,
-    SUBMIT_CLINIC_FORM: `${this.API_BASE_URL}/clinic/submit-form`,
-    GET_CLINICS: `${this.API_BASE_URL}/public/clinics`,
-    GET_CLINICS_city: `${this.API_BASE_URL}/cities`,
+   // --- ADMIN ADDRESS --- 
+   ADMIN_ADDRESS_BASE: `${this.API_BASE_URL}/address/admin`,
 
-    // --- ASSESSMENT ---
-    GET_CONCERNS: `${this.API_BASE_URL}/assessment/concerns`,
-    GET_QUESTIONS: `${this.API_BASE_URL}/assessment/questions`,
-    SUBMIT_ASSESSMENT: `${this.API_BASE_URL}/assessment/submit`,
-    GET_MY_ASSESSMENT: `${this.API_BASE_URL}/assessment/my-assessment`,
-    
-    // --- ADMIN ---
-    GET_ALL_CLINICS: `${this.API_BASE_URL}/admin/clinics`,
+   // --- ADMIN TELECONSULTATION BOOKINGS --- 
+   ADMIN_TELECONSULTATION_BOOKINGS: `${this.API_BASE_URL}/admin/teleconsultationBooking/bookings`,
+   APPOINTMENT_PREFILL: `${this.API_BASE_URL}/appoinntmentBooking/appointment/prefill`,
+   
+   // --- ADMIN PLACE ORDER --- 
+   ADMIN_ORDER_PREFETCH: `${this.API_BASE_URL}/admin/orders/prefetch`,
+   ADMIN_ORDER_PLACE: `${this.API_BASE_URL}/admin/orders/place`,
+   ADMIN_ORDER_HISTORY: `${this.API_BASE_URL}/admin/orders/history`,
+   
+   // Dynamic endpoints (Functions)
+   ADMIN_ACTION: (id) => `/users/admin/${id}`,                  // GET, DELETE
+   ADMIN_PERMISSIONS: (id) => `/users/admin/${id}/permissions`, // PUT
+   ADMIN_PROFILE: (id) => `/users/admin/${id}/profile`,
 
-    //--SLOTS & DOCTOR--
-    GET_CLINIC_DOCTORS: `${this.API_BASE_URL}/clinicDoctor`,
-    GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/appoinntmentslot`, 
-    
-    //--HOSPITAL DASHBOARD--
-    HOSPITAL_DOCTORS: `${this.API_BASE_URL}/doctors`,
-    GET_CLINIC_SLOTS: "/doctors/clinic-slots",
-    
-    //--- HOSPITAL PROFILE ---
-    GET_ME_CLINIC_PROFILE: "/clinic-profile",
-    GET_PUBLIC_CLINICS: "/clinic-profile/clinics",
-    UPDATE_CLINIC_PROFILE: "/clinic-profile/update",
 
-    // Master Data Endpoints
-    GET_MASTER_TIME_SLOTS: "/master/time-slots",
-    GET_UG_DEGREES: `/master/ug-degrees`,
-    GET_PG_DEGREES: `/master/pg-degrees`,
-    GET_SUPER_SPECIALIZATIONS: `/master/super-specializations`,
-    GET_PRIMARY_SPECIALTIES: `/master/primary-specialties`,
+   
+   // --- CLINIC ---
+   CLINIC_SEND_OTP: `${this.API_BASE_URL}/clinic/send-otp`,
+   CLINIC_VERIFY_OTP: `${this.API_BASE_URL}/clinic/verify-otp`,
+   SUBMIT_CLINIC_FORM: `${this.API_BASE_URL}/clinic/submit-form`,
+   
+   //--HOSPITAL--
+   HOSPITAL_DOCTORS: `${this.API_BASE_URL}/doctors`,
+   GET_CLINIC_SLOTS: "/doctors/clinic-slots",
+   
+   //--- HOSPITAL PROFILE ---
+   GET_ME_CLINIC_PROFILE: "/clinic-profile",
+   GET_PUBLIC_CLINICS: "/clinic-profile/clinics",
+   UPDATE_CLINIC_PROFILE: "/clinic-profile/update",
 
-  };
+   // Master Data Endpoints
+   GET_MASTER_TIME_SLOTS: "/master/time-slots",
+   GET_UG_DEGREES: `/master/ug-degrees`,
+   GET_PG_DEGREES: `/master/pg-degrees`,
+   GET_SUPER_SPECIALIZATIONS: `/master/super-specializations`,
+   GET_PRIMARY_SPECIALTIES: `/master/primary-specialties`,
+
+   // --- WALKIN BOOKINGS ---
+    GET_WALKIN_DOCTORS: `${this.API_BASE_URL}/walkin/doctors`,
+    GET_WALKIN_SLOTS: (doctorId) => `/walkin/slots/${doctorId}`,
+    SEARCH_WALKIN_PATIENTS: `${this.API_BASE_URL}/walkin/search`,
+    GET_WALKIN_PREFILL: `${this.API_BASE_URL}/walkin/prefill`,
+    BOOK_WALKIN_APPOINTMENT: `${this.API_BASE_URL}/walkin/book`,
+
+    // --- IN-CLINIC BOOKINGS (CLINIC DASHBOARD) ---
+    GET_INCLINIC_BOOKINGS: `${this.API_BASE_URL}/inClinicBookings`,
+    UPDATE_INCLINIC_BOOKING_STATUS: (bookingId) => `/inClinicBookings/${bookingId}/status`,
+
+
+   
+   //--- PATIENT ---
+   SAVE_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile/save`,
+   GET_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile`,
+   UPDATE_PATIENT_PROFILE: `${this.API_BASE_URL}/patient-profile`,
+   
+   // --- PATIENT BOOKINGS & ORDERS ---
+   PATIENT_BOOKINGS: `${this.API_BASE_URL}/patient-profile/bookings`,
+   PATIENT_ORDERS: `${this.API_BASE_URL}/patient-profile/orders`,
+
+   // --- PAYMENT ---
+   CREATE_CASH_BOOKING: `${this.API_BASE_URL}/payment/create-cash-booking`,
+
+   // --- ASSESSMENT ---
+   GET_CONCERNS: `${this.API_BASE_URL}/assessment/concerns`,
+   GET_QUESTIONS: `${this.API_BASE_URL}/assessment/questions`,
+   SUBMIT_ASSESSMENT: `${this.API_BASE_URL}/assessment/submit`,
+   GET_MY_ASSESSMENT: `${this.API_BASE_URL}/assessment/my-assessment`,
+   
+   //--SLOTS & DOCTOR--
+   GET_CLINIC_DOCTORS: `${this.API_BASE_URL}/clinicDoctor`,
+   GET_DOCTOR_AVAILABILITY: `${this.API_BASE_URL}/appoinntmentslot`, 
+   
+   GET_PATIENT_TELE_SLOTS: `${this.API_BASE_URL}/teleconsultation/slots`,
+
+   // -- APPOINTMENT BOOKING --
+   BOOK_TELECONSULTATION: `${this.API_BASE_URL}/appoinntmentBooking/teleconsultation`,
+   BOOK_APPOINTMENT: `${this.API_BASE_URL}/appoinntmentBooking/book`,
+
+   // --- ADDRESS ---
+   ADDRESS: `${this.API_BASE_URL}/address`,
+   ADDRESS_SINGLE: `${this.API_BASE_URL}/address/single`,
+   
+   GET_CLINICS: `${this.API_BASE_URL}/public/clinics`,
+   GET_CLINICS_city: `${this.API_BASE_URL}/cities`,
+ };
 }

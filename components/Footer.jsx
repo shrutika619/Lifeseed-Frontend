@@ -52,7 +52,14 @@ const Footer = () => {
             <li><Link href="/faqs">FAQs</Link></li>
             <li><Link href="/contact">Contact Us</Link></li>
             <li><Link href="/refund-policy">Refund Policy</Link></li>
-            <li><Link href="/partnershipprogram">Partnership Program</Link></li>
+            <li>
+              <Link
+                href="/partnershipprogram"
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-md transition-colors duration-200"
+              >
+                🤝 Partnership Program
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -79,7 +86,7 @@ const Footer = () => {
       {/* Divider + Bottom Bar */}
       <div className="max-w-7xl mx-auto mt-10 border-t border-gray-700 pt-6 flex flex-col md:flex-row justify-between text-sm text-gray-400">
         <p>
-          © 2026  <span className="font-semibold">MEN10</span>. All rights reserved.
+          © 2026 <span className="font-semibold">MEN10</span>. All rights reserved.
         </p>
         <div className="space-x-6 mt-3 md:mt-0">
           <Link href="/privacy-policy">Privacy Policy</Link>

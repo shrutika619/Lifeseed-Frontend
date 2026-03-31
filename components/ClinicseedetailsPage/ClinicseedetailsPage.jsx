@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 // ❌ Remove useParams
 // import { useParams } from "next/navigation"; 
-import { getClinicById } from "@/app/services/clinic.service"; 
+import { getClinicById } from "@/app/services/patient/clinic.service"; 
 
 import HerosectionClinincseedetailsPage from "./HerosectionClinincseedetailsPage";
 import SecondClinicseedetailsPage from "./SecondClinicseedetailsPage";
@@ -14,7 +14,7 @@ const ClinicseedetailsPage = ({ id }) => {
   const [loading, setLoading] = useState(true);
 
   // Debugging: Confirm ID is received
-  console.log("✅ Clinic ID Received:", id);
+  // console.log("✅ Clinic ID Received:", id);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,7 +44,7 @@ const ClinicseedetailsPage = ({ id }) => {
     </div>
   );
 
-  console.log(clinicData);
+  // console.log(clinicData);
   
   if (!clinicData) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4">

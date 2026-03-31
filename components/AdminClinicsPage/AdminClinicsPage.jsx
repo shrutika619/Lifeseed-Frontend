@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ClinicStatusService } from "@/app/services/clinicStatus.service"; 
+import { ClinicStatusService } from "@/app/services/admin/clinicStatus.service"; 
 // ✅ IMPORT BOTH SERVICES
-import { getAllClinics, getClinicById } from "@/app/services/adminClinic.service"; 
+import { getAllClinics, getClinicById } from "@/app/services/admin/adminClinic.service"; 
 import { toast } from "sonner"; 
 import {
   Filter,
@@ -47,6 +47,7 @@ export default function AdminClinicsPage() {
     setLoading(true);
     
     const result = await getAllClinics(signal);
+    // console.log(result);
     
     if (result.canceled) return; 
 
@@ -63,7 +64,7 @@ export default function AdminClinicsPage() {
         address: c.areaName || "Nagpur",
         fullAddress: c.fulladdress,
         googleLink: c.googleMapsLink,
-        doctors: "0 Doctors", 
+        doctors: c.totalDoctors, 
         transactions: "00",   
         status: (c.status === "approved" || c.status === "APPROVED") ? "Active" : 
                 (c.status === "pending" || c.status === "PENDING") ? "New" : 
@@ -128,7 +129,7 @@ export default function AdminClinicsPage() {
 
     try {
       const result = await getClinicById(clinic.dbId);
-      console.log(result);
+      // console.log(result);
       if (result.success) {
         // Based on backend returning { clinic, doctors }
         const doctors = result.data?.doctors || [];
@@ -583,6 +584,7 @@ export default function AdminClinicsPage() {
 
                         {openDropdownId === clinic.id && (
                           <div className="absolute right-0 top-8 w-40 bg-white rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.08)] border border-gray-100 py-1.5 z-50">
+                            {/* ✅ Updated Logic: Block button only shows for Active clinics */}
                             {clinic.status === 'Active' && (
                               <button onClick={(e) => openActionModal('Block', clinic.dbId, e)} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Block</button>
                             )}
@@ -590,7 +592,6 @@ export default function AdminClinicsPage() {
                               <>
                                 <button onClick={(e) => { e.stopPropagation(); handleAction('Accept', clinic.dbId); }} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Accept</button>
                                 <button onClick={(e) => openActionModal('Reject', clinic.dbId, e)} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Reject</button>
-                                <button onClick={(e) => openActionModal('Block', clinic.dbId, e)} className="w-full text-left px-4 py-2 text-[15px] text-[#334155] hover:bg-gray-50 transition-colors">Block</button>
                               </>
                             )}
                             {(clinic.status === 'Inactive' || clinic.status === 'Block') && (

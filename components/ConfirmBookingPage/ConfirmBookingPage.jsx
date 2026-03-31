@@ -1,5 +1,6 @@
 "use client";
-import React, { useRef, useState } from 'react';
+
+import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { 
   Check, 
   MapPin, 
@@ -12,60 +13,157 @@ import {
   Building2, 
   Calendar, 
   CreditCard,
-  Leaf
+  Leaf,
+  Loader2,
+  AlertCircle,
+  Phone,
+  ArrowLeft
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { getMyBookingDetails, getBookingReceiptHTML } from "@/app/services/patient/order.service"; 
 
-const ConfirmBookingPage = () => {
+const ConfirmBookingContent = () => {
+  const searchParams = useSearchParams();
+  const bookingId = searchParams.get('bookingId');
+  const type = searchParams.get('type') || 'inclinic'; 
+
   const receiptRef = useRef(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  
+  const [bookingData, setBookingData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Function to handle PDF Download using print
-  const handleDownloadReceipt = () => {
-    const element = receiptRef.current;
-    if (!element) return;
+  // Fetch Booking Details
+  useEffect(() => {
+    const fetchDetails = async () => {
+      if (!bookingId || !type) {
+        setError("Invalid booking parameters.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await getMyBookingDetails(bookingId, type);
+        if (res.success && res.data) {
+          setBookingData(res.data);
+        } else {
+          setError(res.message || "Failed to load booking details.");
+        }
+      } catch (err) {
+        setError("Error communicating with server.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDetails();
+  }, [bookingId, type]);
+
+  // ✅ UPDATED: Fetch HTML from server and print
+  const handleDownloadReceipt = async () => {
+    if (!bookingData?._id && !bookingId) {
+      toast.error("Invalid booking ID");
+      return;
+    }
+
+    const targetId = bookingData?._id || bookingId;
 
     setIsDownloading(true);
+    const toastId = toast.loading("Generating receipt...");
 
-    // Create a new window with only the receipt content
-    const printWindow = window.open('', '', 'width=800,height=600');
-    const receiptHTML = element.innerHTML;
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Appointment Receipt - M10-250916</title>
-          <style>
-            body {
-              font-family: system-ui, -apple-system, sans-serif;
-              margin: 20px;
-              background: white;
-            }
-            * {
-              box-sizing: border-box;
-            }
-          </style>
-          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-        </head>
-        <body>
-          ${receiptHTML}
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    
-    // Wait for content to load then print
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
+    try {
+      const res = await getBookingReceiptHTML(targetId);
+      
+      if (res.success && res.html) {
+        toast.success("Receipt generated successfully", { id: toastId });
+        
+        // Open a new window
+        const printWindow = window.open('', '', 'width=800,height=600');
+        
+        // Inject the raw HTML received from the server
+        printWindow.document.write(res.html);
+        printWindow.document.close();
+        
+        // Wait for content/images to load then print
+        setTimeout(() => {
+          printWindow.print();
+          // Optional: close window after print dialog is closed
+          // printWindow.close(); 
+        }, 500);
+
+      } else {
+        toast.error(res.message || "Could not generate receipt.", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error communicating with server for receipt.", { id: toastId });
+    } finally {
       setIsDownloading(false);
-    }, 500);
+    }
   };
+
+  // ─── LOADING STATE ───
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
+        <p className="text-indigo-900 font-semibold">Preparing your receipt...</p>
+      </div>
+    );
+  }
+
+  // ─── ERROR STATE ───
+  if (error || !bookingData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border-t-4 border-rose-500">
+          <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-rose-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Oops! Something went wrong</h2>
+          <p className="text-gray-600 mb-6">{error || "Could not retrieve booking details."}</p>
+          <button 
+            onClick={() => window.history.back()}
+            className="w-full py-3 px-4 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── DATA EXTRACTION ───
+  const displayId = bookingData.appointmentId || bookingData.requestId || bookingId;
+  const doctorName = bookingData.doctor?.name || bookingData.doctorName || "Specialist";
+  const fees = bookingData.fees || 0;
+  const paymentMode = bookingData.paymentMode?.toLowerCase() === 'cash' ? 'To be paid at clinic' : 'Prepaid / Online';
+  
+  // Format Date
+  const dateStr = bookingData.appointmentDate || bookingData.bookingDate;
+  let formattedDate = "Date not available";
+  if (dateStr) {
+    const dateObj = new Date(dateStr);
+    formattedDate = dateObj.toLocaleDateString('en-US', { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4 font-sans">
-      <div className="max-w-xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="max-w-xl w-full">
+
+        {/* ── TOP BACK BUTTON ── */}
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-2 mb-4 text-indigo-700 font-semibold hover:text-indigo-900 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
+
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
         
         {/* --- CONTENT TO CAPTURE FOR RECEIPT STARTS HERE --- */}
         <div ref={receiptRef} className="p-6 md:p-8 bg-white">
@@ -77,7 +175,7 @@ const ConfirmBookingPage = () => {
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Appointment Confirmed!</h1>
             <p className="text-gray-500 text-sm md:text-base max-w-md leading-relaxed">
-              Thank you for trusting us with your health. Your appointment has been successfully booked and payment is complete.
+              Thank you for trusting us with your health. Your appointment has been successfully booked.
             </p>
           </div>
 
@@ -90,7 +188,7 @@ const ConfirmBookingPage = () => {
                 <Ticket className="w-4 h-4 mr-2 text-indigo-500" />
                 Booking ID:
               </div>
-              <div className="text-gray-900 font-bold text-sm">M10-250916-BESA-8421</div>
+              <div className="text-gray-900 font-bold text-sm font-mono tracking-wide">{displayId}</div>
             </div>
 
             {/* Specialist */}
@@ -99,23 +197,31 @@ const ConfirmBookingPage = () => {
                 <User className="w-4 h-4 mr-2 text-indigo-500" />
                 Specialist:
               </div>
-              <div className="text-gray-900 font-bold text-sm">Dr. Priya Sharma</div>
+              <div className="text-gray-900 font-bold text-sm">{doctorName}</div>
             </div>
 
-            {/* Clinic */}
+            {/* Clinic OR Teleconsultation Info */}
             <div className="flex flex-col sm:flex-row sm:items-start mb-5 pb-5 border-b border-gray-200">
               <div className="flex items-center w-36 shrink-0 text-gray-500 text-sm font-semibold mb-2 sm:mb-0">
-                <Building2 className="w-4 h-4 mr-2 text-indigo-500" />
-                Clinic:
+                {type === 'inclinic' ? <Building2 className="w-4 h-4 mr-2 text-indigo-500" /> : <Phone className="w-4 h-4 mr-2 text-indigo-500" />}
+                {type === 'inclinic' ? 'Clinic:' : 'Consultation:'}
               </div>
               <div className="text-sm">
-                <div className="font-bold text-gray-900">MEN 10 Clinic - Besa, Nagpur</div>
-                <div className="text-gray-500 mt-1 text-xs leading-relaxed">
-                  Plot 45, Manish Nagar Road, Besa, Nagpur, 440034
-                </div>
-                <div className="text-indigo-600 font-medium text-xs mt-2">
-                  (Partnered with Meditrina Hospital, Nagpur)
-                </div>
+                {type === 'inclinic' ? (
+                  <>
+                    <div className="font-bold text-gray-900">{bookingData.clinic?.name || bookingData.clinic?.clinicName || "Clinic"}</div>
+                    <div className="text-gray-500 mt-1 text-xs leading-relaxed">
+                      {bookingData.clinic?.address || bookingData.clinic?.fulladdress || "Address available in app"}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-bold text-gray-900">Online Teleconsultation</div>
+                    <div className="text-gray-500 mt-1 text-xs leading-relaxed">
+                      Registered Phone: <span className="font-semibold text-gray-700">{bookingData.bookingContactNumber || bookingData.patientDetails?.loginNumber || bookingData.bookingPatientDetails?.contact || "Not Provided"}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -126,7 +232,7 @@ const ConfirmBookingPage = () => {
                 Date & Time:
               </div>
               <div className="text-gray-900 font-bold text-sm">
-                Tuesday, September 16, 2025 at 11:30 AM
+                {formattedDate} at {bookingData.timeSlot || '--'}
               </div>
             </div>
 
@@ -137,7 +243,10 @@ const ConfirmBookingPage = () => {
                 Payment:
               </div>
               <div className="text-gray-900 font-bold text-sm">
-                ₹600 <span className="text-gray-400 font-normal ml-1">(Paid Online)</span>
+                {type === 'tele' ? 'Prepaid / Included' : `₹${fees}`} 
+                {type === 'inclinic' && (
+                  <span className="text-gray-400 font-normal ml-1">({paymentMode})</span>
+                )}
               </div>
             </div>
 
@@ -148,13 +257,46 @@ const ConfirmBookingPage = () => {
         {/* Action Buttons */}
         <div className="px-6 md:px-8 pb-8">
           <div className="flex flex-col sm:flex-row gap-3 mb-8 pb-8 border-b border-gray-100">
-            <button 
-              onClick={() => window.open('https://www.google.com/maps/search/?api=1&query=Plot+45%2C+Manish+Nagar+Road%2C+Besa%2C+Nagpur%2C+440034', '_blank')}
+
+            {/* Back Button */}
+            <button
+              onClick={() => window.history.back()}
               className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-indigo-400 transition-all"
             >
-              <MapPin className="w-4 h-4" />
-              Get Directions
+              <ArrowLeft className="w-4 h-4" />
+              Back
             </button>
+            
+            {type === 'inclinic' && (
+              <button 
+                onClick={() => {
+                  if (bookingData?.clinic) {
+                    // Try direct map link first
+                    if (bookingData.clinic.googleMapsLink) {
+                       window.open(bookingData.clinic.googleMapsLink, '_blank');
+                       return;
+                    }
+                    
+                    // Fallback to Search
+                    const clinicName = bookingData.clinic.name || bookingData.clinic.clinicName || '';
+                    const clinicAddress = bookingData.clinic.address || bookingData.clinic.fulladdress || '';
+                    
+                    const query = `${clinicName} ${clinicAddress}`.trim();
+                    if (query) {
+                      const encodedQuery = encodeURIComponent(query);
+                      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedQuery}`, '_blank');
+                    } else {
+                      toast.error("Clinic location details are missing.");
+                    }
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-indigo-400 transition-all"
+              >
+                <MapPin className="w-4 h-4" />
+                Get Directions
+              </button>
+            )}
+
             <button 
               onClick={handleDownloadReceipt}
               disabled={isDownloading}
@@ -182,7 +324,10 @@ const ConfirmBookingPage = () => {
                   <Clock className="w-4 h-4 text-indigo-600" />
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed pt-1">
-                  Please <span className="font-semibold text-gray-800">arrive 10-15 minutes early</span> to complete any necessary paperwork.
+                  {type === 'inclinic' 
+                    ? <><span className="font-semibold text-gray-800">Arrive 10-15 minutes early</span> to complete any necessary paperwork.</>
+                    : <><span className="font-semibold text-gray-800">Be ready 5 minutes early</span> and ensure you have a stable internet connection.</>
+                  }
                 </p>
               </li>
               <li className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
@@ -190,13 +335,13 @@ const ConfirmBookingPage = () => {
                   <Bell className="w-4 h-4 text-indigo-600" />
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed pt-1">
-                  If you need to reschedule or cancel, please contact us at least <span className="font-semibold text-gray-800">24 hours in advance.</span>
+                  If you need to reschedule or cancel, please do so from your <span className="font-semibold text-gray-800">Orders Dashboard</span>.
                 </p>
               </li>
             </ul>
           </div>
 
-          {/* Ayurveda Footer */}
+          {/* Footer */}
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center border-2 border-green-200 shadow-sm">
             <div className="flex justify-center mb-3">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md">
@@ -211,9 +356,20 @@ const ConfirmBookingPage = () => {
           </div>
         </div>
         
+        </div>
       </div>
     </div>
   );
-}
+};
 
-export default ConfirmBookingPage;
+export default function ConfirmBookingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+      </div>
+    }>
+      <ConfirmBookingContent />
+    </Suspense>
+  );
+}

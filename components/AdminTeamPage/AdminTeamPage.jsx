@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Filter, Menu, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 // ✅ Import Services
 import { 
@@ -11,9 +12,10 @@ import {
   updateAdminProfile, 
   updateAdminPermissions, 
   getModulePermissions 
-} from '@/app/services/adminUsers.service';
+} from '@/app/services/admin/adminUsers.service';
 
 export const AdminTeamPage = () => {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,10 +71,9 @@ export const AdminTeamPage = () => {
   }, []);
 
   const handleChange = (e) => {
-    // Basic real-time sanitize (e.g., prevent non-numbers in mobile field)
     let value = e.target.value;
     if (e.target.name === 'mobileNo') {
-      value = value.replace(/\D/g, ''); // Remove non-digits
+      value = value.replace(/\D/g, '');
       if (value.length > 10) value = value.slice(0, 10);
     }
 
@@ -131,7 +132,6 @@ export const AdminTeamPage = () => {
       return false;
     }
 
-    // Only validate passwords if creating a new user OR if they are trying to update the password
     if (!editingMember) {
       if (!password || password.length < 6) {
         toast.error("Password is required and must be at least 6 characters.");
@@ -148,13 +148,12 @@ export const AdminTeamPage = () => {
 
   // ✅ Handle Submit
   const handleFormSubmit = async () => {
-    if (!validateForm()) return; // Stop if validation fails
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
 
     try {
       if (editingMember) {
-        // UPDATE EXISTING
         const res = await updateAdminProfile(editingMember._id, {
           fullName: formData.fullName,
           email: formData.email,
@@ -162,14 +161,12 @@ export const AdminTeamPage = () => {
           address: formData.address
         });
 
-        // ✅ Properly handle success/failure from the service
         if (res.success) {
           toast.success("Profile updated successfully!");
           loadData();
           setCurrentView('list');
           setEditingMember(null);
         } else {
-          // Explicitly catch 409 or duplicate errors for updates
           if (res.status === 409 || res.message?.toLowerCase().includes("use") || res.message?.toLowerCase().includes("exist")) {
             toast.error("Team member with same mobile no/email already exists");
           } else {
@@ -178,7 +175,6 @@ export const AdminTeamPage = () => {
         }
 
       } else {
-        // CREATE NEW
         const activePermissionsArray = Object.keys(permissions).filter(k => permissions[k]);
 
         const res = await registerTeamMember({
@@ -191,7 +187,6 @@ export const AdminTeamPage = () => {
           role: formData.teamRole
         });
 
-        // ✅ Properly handle success/failure from the service
         if (res.success) {
           toast.success("Team member created successfully!");
           loadData();
@@ -199,7 +194,6 @@ export const AdminTeamPage = () => {
           
           setFormData({ fullName: '', email: '', mobileNo: '', password: '', confirmPassword: '', address: '', teamRole: 'admin' });
         } else {
-          // Explicitly catch 409 or duplicate errors for new registrations
           if (res.status === 409 || res.message?.toLowerCase().includes("exist")) {
             toast.error("Team member with same mobile no/email already exists");
           } else {
@@ -274,6 +268,15 @@ export const AdminTeamPage = () => {
       <div className="min-h-screen bg-white">
         <header className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-100">
           <div className="flex items-center gap-3 sm:gap-4">
+            {/* ── BACK BUTTON ── */}
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
             <Menu className="text-gray-500 cursor-pointer" size={20} />
             <h1 className="text-gray-600 font-medium text-sm sm:text-base">Team Management</h1>
           </div>
@@ -457,7 +460,6 @@ export const AdminTeamPage = () => {
               </div>
             </div>
 
-            {/* Passwords only required for new members */}
             {!editingMember && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>

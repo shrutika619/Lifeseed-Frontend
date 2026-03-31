@@ -11,7 +11,6 @@ export async function POST(request) {
     let response;
     
     // 🛡️ Helper to ensure absolute URL on the server side
-    // (If Constants already includes the base URL, this won't break it)
     const getAbsoluteUrl = (endpoint) => {
       if (endpoint.startsWith("http")) return endpoint;
       return `${Constants.API_BASE_URL || process.env.NEXT_PUBLIC_API_URL}${endpoint}`;
@@ -72,12 +71,15 @@ export async function POST(request) {
   } catch (error) {
     console.error("❌ Login Proxy Error:", error.response?.data || error.message);
     
+    // ✅ Extract the exact error message from the backend (e.g. "Invalid Password")
+    const backendMessage = error.response?.data?.message || error.response?.data?.error || "Invalid Credentials. Please try again.";
+
     return NextResponse.json(
       { 
         success: false, 
-        message: error.response?.data?.message || "Login failed on server proxy" 
+        message: backendMessage 
       },
-      { status: error.response?.status || 500 }
+      { status: error.response?.status || 401 } // Fallback to 401 for auth errors
     );
   }
 }

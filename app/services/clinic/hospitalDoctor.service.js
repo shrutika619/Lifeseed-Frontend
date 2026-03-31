@@ -39,7 +39,7 @@ export const createDoctor = async (formData) => {
       headers: { "Content-Type": "multipart/form-data" }
     });
     if (response.data.success) {
-      return { success: true, data: response.data };
+      return { success: true, data: response.data.data };
     }
     return { success: false, message: response.data.message };
   } catch (error) {
@@ -48,14 +48,23 @@ export const createDoctor = async (formData) => {
   }
 };
 
-// 4. Update Doctor (Full Edit)
+// 4. Update Doctor (Full Edit) - ✅ UPDATED TO HANDLE CONFLICT WARNINGS
 export const updateDoctor = async (id, formData) => {
   try {
     const response = await api.patch(`${Constants.urlEndPoints.HOSPITAL_DOCTORS}/${id}`, formData, {
       headers: { "Content-Type": "multipart/form-data" }
     });
+    
     if (response.data.success) {
-      return { success: true, data: response.data };
+      // ✅ Explicitly return the conflict warning flags from the backend
+      return { 
+        success: true, 
+        data: response.data.data,
+        hasBookings: response.data.hasBookings || false,         // Trigger for the UI modal
+        patientWarnings: response.data.patientWarnings || [],    // Data for the UI modal
+        warnings: response.data.warnings || [],
+        message: response.data.message
+      };
     }
     return { success: false, message: response.data.message };
   } catch (error) {
@@ -79,7 +88,7 @@ export const toggleDoctorStatus = async (id, isActive) => {
   }
 };
 
-// 6. ✅ NEW: Get Doctor Slot Configuration & Conflict Checking
+// 6. Get Doctor Slot Configuration & Conflict Checking
 export const getDoctorSlotConfig = async (id, signal) => {
   try {
     const response = await api.get(`${Constants.urlEndPoints.HOSPITAL_DOCTORS}/${id}/slot-config`, { signal });

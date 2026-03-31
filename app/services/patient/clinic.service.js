@@ -1,7 +1,6 @@
 import axios from "axios";
 import { Constants } from "@/app/utils/constants";
 
-
 export const getAllClinics = async (cityId) => {
     if (!cityId) {
         return { 
@@ -19,7 +18,7 @@ export const getAllClinics = async (cityId) => {
         if (response.data && response.data.success) {
             return {
                 success: true,
-                clinics: response.data.data.clinics,
+                clinics: response.data.data.filteredClinics || [], 
                 total: response.data.data.total,
                 message: response.data.message
             };
@@ -45,7 +44,6 @@ export const getAllCities = async () => {
     try {
         // 1. Debug the URL first
         const url = Constants.urlEndPoints.GET_CLINICS_city;
-        console.log("Fetching Cities from:", url); // Check your console
 
         if (!url) throw new Error("URL Constant is undefined!");
 
