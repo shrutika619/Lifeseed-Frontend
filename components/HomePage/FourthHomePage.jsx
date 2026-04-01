@@ -7,10 +7,10 @@ const FourthHomePage = () => {
       {/* Journey Section */}
       <div className="max-w-6xl mx-auto mb-16">
         <h2 className="text-3xl font-bold text-center mb-2">
-          Your Journey with <span className="text-blue-700">MEN10</span>
+          Your Journey with <span className="text-blue-700">LifeSeed</span>
         </h2>
         <p className="text-center text-gray-500 mb-12">
-          A simple, discreet, and effective path to renewed sexual confidence.
+          A simple, private, and compassionate path to your fertility and wellness goals.
         </p>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -25,9 +25,9 @@ const FourthHomePage = () => {
                 <p className="text-gray-500 text-xs">Takes 2–4 mins</p>
               </div>
             </div>
-            <h4 className="font-semibold mb-2">Free Call with Expert</h4>
+            <h4 className="font-semibold mb-2">Free Fertility Consultation</h4>
             <p className="text-gray-600 text-sm">
-              Discuss your concerns privately with our wellness expert. No judgment, just professional guidance.
+              Speak privately with our fertility expert. Share your concerns confidentially and get honest, professional guidance on your path forward.
             </p>
           </div>
 
@@ -42,9 +42,9 @@ const FourthHomePage = () => {
                 <p className="text-gray-500 text-xs">Takes 5 mins</p>
               </div>
             </div>
-            <h4 className="font-semibold mb-2">Get Your Custom Plan</h4>
+            <h4 className="font-semibold mb-2">Your Personalised Treatment Plan</h4>
             <p className="text-gray-600 text-sm">
-              Based on your consultation, we design a personalized treatment plan with our unique Ayurvedic formulations.
+              Based on your assessment and consultation, our specialists design a customised IVF or fertility care plan tailored to your unique needs.
             </p>
           </div>
 
@@ -56,12 +56,12 @@ const FourthHomePage = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 text-sm">STEP 3 💪</h3>
-                <p className="text-gray-500 text-xs">15 days – 3 months</p>
+                <p className="text-gray-500 text-xs">Ongoing support</p>
               </div>
             </div>
-            <h4 className="font-semibold mb-2">Regain Your Confidence</h4>
+            <h4 className="font-semibold mb-2">Begin Your Fertility Journey</h4>
             <p className="text-gray-600 text-sm">
-              Follow your plan with our continuous support and experience a noticeable improvement in your sexual wellness and confidence.
+              Start your treatment with continuous expert support at every stage — from diagnosis to embryo transfer and beyond.
             </p>
           </div>
         </div>
@@ -73,7 +73,7 @@ const FourthHomePage = () => {
           Our 4-Pillar Approach
         </h2>
         <p className="text-center text-gray-500 mb-12">
-          A complete plan for your well-being, made simple.
+          Comprehensive fertility care built on science, compassion, and trust.
         </p>
 
         <div className="grid md:grid-cols-4 gap-6 text-center">
@@ -81,9 +81,9 @@ const FourthHomePage = () => {
             <div className="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-green-100 text-green-600 mb-4">
               <Leaf size={24} />
             </div>
-            <h3 className="font-semibold mb-2">Natural Ayurveda</h3>
+            <h3 className="font-semibold mb-2">Advanced IVF Care</h3>
             <p className="text-gray-600 text-sm">
-              Safe, patented herbal formulas made just for you.
+              State-of-the-art IVF, IUI, and ICSI treatments with the latest reproductive technology.
             </p>
           </div>
 
@@ -91,9 +91,9 @@ const FourthHomePage = () => {
             <div className="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-pink-100 text-pink-600 mb-4">
               <Pill size={24} />
             </div>
-            <h3 className="font-semibold mb-2">Modern Medicine</h3>
+            <h3 className="font-semibold mb-2">Evidence-Based Medicine</h3>
             <p className="text-gray-600 text-sm">
-              Trusted, science-backed solutions for effective results.
+              Clinically proven protocols and treatments backed by the latest fertility research.
             </p>
           </div>
 
@@ -101,9 +101,9 @@ const FourthHomePage = () => {
             <div className="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-yellow-100 text-yellow-600 mb-4">
               <Activity size={24} />
             </div>
-            <h3 className="font-semibold mb-2">Healthy Lifestyle</h3>
+            <h3 className="font-semibold mb-2">Lifestyle & Wellness</h3>
             <p className="text-gray-600 text-sm">
-              Simple guidance on exercise & habits to boost your energy.
+              Personalised nutrition, lifestyle, and wellness guidance to naturally improve your fertility outcomes.
             </p>
           </div>
 
@@ -111,9 +111,9 @@ const FourthHomePage = () => {
             <div className="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-purple-100 text-purple-600 mb-4">
               <Stethoscope size={24} />
             </div>
-            <h3 className="font-semibold mb-2">Expert Support</h3>
+            <h3 className="font-semibold mb-2">End-to-End Support</h3>
             <p className="text-gray-600 text-sm">
-              Continuous and private guidance from our expert team.
+              Dedicated counselling and emotional support from consultation through to pregnancy and beyond.
             </p>
           </div>
         </div>

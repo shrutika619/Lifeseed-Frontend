@@ -13,14 +13,17 @@ const SecondAboutUsPage = () => {
               Who We Are
             </h2>
             <p className="text-base text-gray-600 leading-relaxed">
-              MEN10 was started by two doctors, Dr. Aditya Aswar (MBBS) and
-              Dr. Suresh Moon (Ayurvedacharya). Both come from families with a
-              strong background in Ayurveda. Using their medical knowledge, they
-              created a special Ayurvedic medicine that has shown a 97% success
-              rate. Seeing such positive results, they decided to move beyond
-              just treating patients in clinics and built MEN10 – a sexual
-              wellness brand that makes these proven remedies available to more
-              people.
+              LifeSeed is a cloud-based fertility care platform founded with a
+              vision to make advanced IVF and reproductive healthcare accessible
+              to every couple across India. Built by a team of experienced
+              fertility specialists, embryologists, and healthcare professionals,
+              LifeSeed digitally connects patients with trusted fertility clinics
+              and doctors on a single, secure platform.
+              <br />
+              <br />
+              We believe that every individual deserves compassionate,
+              evidence-based fertility care — and LifeSeed was created to make
+              that a reality.
             </p>
           </div>
 
@@ -58,22 +61,24 @@ const SecondAboutUsPage = () => {
                 Our Story
               </h2>
               <p className="text-base text-gray-600 leading-relaxed">
-                People often say that food, clothing, and shelter are the three
-                basic needs of life. But we believe there is a fourth – a healthy
-                and fulfilling intimate relationship with your partner.
+                Infertility is one of the most emotionally challenging journeys
+                a couple can face. Yet for millions of families across India,
+                access to quality fertility care remains out of reach — due to
+                cost, lack of awareness, or simply not knowing where to begin.
                 <br />
                 <br />
-                When this part of life is disturbed, it can affect families,
-                relationships, and overall happiness. Many people are willing to
-                seek help, but most treatments available in the market today don't
-                offer long-term benefits and sometimes cause side effects.
+                LifeSeed was born from a simple but powerful belief: that the
+                dream of parenthood should not be limited by geography,
+                resources, or lack of guidance. We set out to build a platform
+                that brings together the best fertility clinics, doctors, and
+                treatment options under one roof — making the journey to
+                parenthood simpler, safer, and more hopeful.
                 <br />
                 <br />
-                At MEN10, we set out to change this. Backed by Ayurveda and years
-                of medical expertise, we developed a line of proven Ayurvedic
-                medicines that deliver 97% success rates. Our treatments are not
-                just effective but also affordable, long-term, and backed by a
-                money-back guarantee.
+                Today, LifeSeed supports patients through every stage of their
+                fertility journey — from initial assessment and consultation to
+                IVF treatment, emotional counselling, and post-treatment care —
+                all with complete privacy, transparency, and compassion.
               </p>
             </div>
           </div>

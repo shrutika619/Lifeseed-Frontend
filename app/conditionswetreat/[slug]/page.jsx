@@ -1,55 +1,58 @@
 "use client";
 import React from "react";
 
-// Import all components directly
-import DelayedEjaculationPage from "@/components/ConditionsWeTreatPage/DelayedEjaculationPage/DelayedEjaculationPage";
-import SexualDysfunctionPage from "@/components/ConditionsWeTreatPage/SexualDysfunctionPage/SexualDysfunctionPage";
-import ErectileDysfunctionPage from "@/components/ConditionsWeTreatPage/ErectileDysfunctionPage/ErectileDysfunctionPage";
-import LowSpermCountPage from "@/components/ConditionsWeTreatPage/LowSpermCountPage/LowSpermCountPage";
-import PrematureEjaculationPage from "@/components/ConditionsWeTreatPage/PrematureEjaculationPage/PrematureEjaculationPage";
-import CoupleSexProblemsPage from "@/components/ConditionsWeTreatPage/CoupleSexProblemsPage/CoupleSexProblemsPage";
+import MedicoLegalSupportPage from "@/components/ConditionsWeTreatPage/MedicoLegalSupportPage/MedicoLegalSupportPage";
+import SemenBankingandSupplyPage from "@/components/ConditionsWeTreatPage/SemenBankingandSupplyPage/SemenBankingandSupplyPage";
+import OocyteDonationPage from "@/components/ConditionsWeTreatPage/OocyteDonationPage/OocyteDonation";
+import LifestyleAdvicePage from "@/components/ConditionsWeTreatPage/LifestyleAdvicePage/LifestyleAdvicePage";
+import FertilityCounselingPage from "@/components/ConditionsWeTreatPage/FertilityCounselingPage/FertilityCounselingPage";
+import CouplesCounselingPage from "@/components/ConditionsWeTreatPage/CouplesCounselingPage/CouplesCounselingPage";
 
-// Map slugs to their respective components
 const componentMap = {
-  "sexual-dysfunction": SexualDysfunctionPage,
-  "erectile-dysfunction": ErectileDysfunctionPage,
-  "premature-ejaculation": PrematureEjaculationPage,
-  "delayed-ejaculation": DelayedEjaculationPage,
-  "couple-sex-problems": CoupleSexProblemsPage,
-  "low-sperm-count": LowSpermCountPage,
+  "medico-legal-support": MedicoLegalSupportPage,
+  "semen-banking-and-supply": SemenBankingandSupplyPage,
+  "oocyte-donation": OocyteDonationPage,
+  "lifestyle-advice": LifestyleAdvicePage,
+  "fertility-counseling": FertilityCounselingPage,
+  "couples-counseling": CouplesCounselingPage,
 };
 
 const ConditionPage = ({ params }) => {
   const { slug } = React.use(params);
   const Component = componentMap[slug];
 
-  // If component doesn't exist, show 404
   if (!Component) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center max-w-md mx-auto p-8 bg-white rounded-lg shadow-lg">
-          <div className="text-6xl mb-4">❌</div>
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Page Not Found</h2>
-          <p className="text-gray-600 mb-4">
-            The condition page <span className="font-semibold">"{slug}"</span> could not be loaded.
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4 sm:px-6 lg:px-8">
+        <div className="text-center w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto p-6 sm:p-8 bg-white rounded-lg shadow-lg">
+          <div className="text-5xl sm:text-6xl mb-4">❌</div>
+          <h2 className="text-xl sm:text-2xl font-bold text-red-600 mb-3 sm:mb-4">
+            Page Not Found
+          </h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">
+            The condition page{" "}
+            <span className="font-semibold break-all">"{slug}"</span> could not
+            be loaded.
           </p>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-xs sm:text-sm text-gray-500 mb-5 sm:mb-6 break-words">
             Available pages: {Object.keys(componentMap).join(", ")}
           </p>
-          <div className="space-y-3">
-            <button 
-              onClick={() => window.location.href = '/'}
-              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Go Home
-            </button>
-          </div>
+          <button
+            onClick={() => (window.location.href = "/")}
+            className="w-full bg-blue-600 text-white text-sm sm:text-base px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors touch-manipulation"
+          >
+            Go Home
+          </button>
         </div>
       </div>
     );
   }
 
-  return <Component />;
+  return (
+    <div className="w-full min-h-screen overflow-x-hidden">
+      <Component />
+    </div>
+  );
 };
 
 export default ConditionPage;

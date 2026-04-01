@@ -1,14 +1,14 @@
 import React from "react";
-import { Leaf, Dumbbell, Users } from "lucide-react"; // icons for cards
+import { Leaf, Dumbbell, Users } from "lucide-react";
 
-const ThirdPrematureEjaculationPage = () => {
+const ThirdFertilityCounselingPage = () => {
   return (
     <section className="w-full">
-      {/* =================== OUR INTEGRATED TREATMENT APPROACH =================== */}
+      {/* =================== OUR INTEGRATED COUNSELING APPROACH =================== */}
       <div className="px-4 sm:px-6 md:px-12 lg:px-20 py-12 md:py-16 bg-[#F9FAFB]">
         <div className="text-center max-w-3xl mx-auto mb-10">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">
-            Our Integrated Treatment Approach
+            Our Integrated Counseling Approach
           </h2>
         </div>
 
@@ -20,11 +20,11 @@ const ThirdPrematureEjaculationPage = () => {
               <Leaf className="text-blue-600 w-8 h-8" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 text-center">
-              Herbal Remedies
+              Therapeutic Sessions
             </h3>
             <p className="text-gray-600 text-sm text-center mt-2">
-              Tailored Ayurvedic formulations to address your specific root
-              causes.
+              Evidence-based CBT and mindfulness sessions tailored to your
+              unique emotional needs throughout the fertility journey.
             </p>
           </div>
 
@@ -34,10 +34,11 @@ const ThirdPrematureEjaculationPage = () => {
               <Dumbbell className="text-blue-600 w-8 h-8" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 text-center">
-              Exercise & Lifestyle
+              Wellness & Stress Relief
             </h3>
             <p className="text-gray-600 text-sm text-center mt-2">
-              Guidance on pelvic floor exercises (Kegels), yoga, and diet.
+              Guided relaxation techniques, breathing exercises, yoga, and
+              lifestyle strategies to reduce anxiety and support treatment.
             </p>
           </div>
 
@@ -47,20 +48,21 @@ const ThirdPrematureEjaculationPage = () => {
               <Users className="text-blue-600 w-8 h-8" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 text-center">
-              Counseling & Support
+              Couples & Group Support
             </h3>
             <p className="text-gray-600 text-sm text-center mt-2">
-              Managing stress, improving communication, and boosting confidence.
+              Strengthening communication, rebuilding intimacy, and connecting
+              with others through guided group support circles.
             </p>
           </div>
         </div>
       </div>
 
-      {/* =================== YOUR TREATMENT JOURNEY =================== */}
+      {/* =================== YOUR COUNSELING JOURNEY =================== */}
       <div className="w-full bg-white px-4 sm:px-6 md:px-12 lg:px-20 py-12 md:py-16">
         <div className="text-center max-w-3xl mx-auto mb-10">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">
-            Your Treatment Journey
+            Your Counseling Journey
           </h2>
         </div>
 
@@ -71,7 +73,7 @@ const ThirdPrematureEjaculationPage = () => {
               1
             </div>
             <p className="mt-3 text-gray-700 text-sm sm:text-base font-medium">
-              Confidential Consultation
+              Confidential Intake Session
             </p>
           </div>
 
@@ -81,7 +83,7 @@ const ThirdPrematureEjaculationPage = () => {
               2
             </div>
             <p className="mt-3 text-gray-700 text-sm sm:text-base font-medium">
-              Root-Cause Diagnosis
+              Emotional Needs Assessment
             </p>
           </div>
 
@@ -91,7 +93,7 @@ const ThirdPrematureEjaculationPage = () => {
               3
             </div>
             <p className="mt-3 text-gray-700 text-sm sm:text-base font-medium">
-              Personalised Ayurvedic Plan
+              Personalised Counseling Plan
             </p>
           </div>
 
@@ -101,7 +103,7 @@ const ThirdPrematureEjaculationPage = () => {
               4
             </div>
             <p className="mt-3 text-gray-700 text-sm sm:text-base font-medium">
-              Monitoring & Regular Follow-Up
+              Ongoing Sessions & Check-ins
             </p>
           </div>
 
@@ -111,7 +113,7 @@ const ThirdPrematureEjaculationPage = () => {
               5
             </div>
             <p className="mt-3 text-gray-700 text-sm sm:text-base font-medium">
-              Long-Term Wellness
+              Long-Term Emotional Wellness
             </p>
           </div>
         </div>
@@ -120,4 +122,4 @@ const ThirdPrematureEjaculationPage = () => {
   );
 };
 
-export default ThirdPrematureEjaculationPage;
+export default ThirdFertilityCounselingPage;

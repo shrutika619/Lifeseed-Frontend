@@ -3,7 +3,7 @@ import React from "react";
 import { Users, TrendingUp, BarChart3 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const SecondErectileDysfunctionPage = () => {
+const SecondOocyteDonationPage = () => {
   const router = useRouter();
 
   return (
@@ -13,12 +13,13 @@ const SecondErectileDysfunctionPage = () => {
         {/* Title */}
         <div className="text-center max-w-3xl mx-auto mb-10">
           <h2 className="text-xl md:text-2xl font-semibold text-gray-900">
-            You Are Not Alone
+            You Are Not Alone in This Journey
           </h2>
           <p className="mt-2 text-gray-600 text-sm md:text-base">
-            Erectile dysfunction is a common health issue affecting men of all
-            ages. Understanding its prevalence is the first step toward finding a
-            solution.
+            Millions of women around the world face challenges with egg quality
+            or ovarian reserve. Oocyte donation is a well-established,
+            compassionate solution that has helped countless families achieve
+            the dream of parenthood.
           </p>
         </div>
 
@@ -29,9 +30,9 @@ const SecondErectileDysfunctionPage = () => {
             <div className="text-blue-600 flex justify-center mb-2">
               <Users size={36} />
             </div>
-            <h3 className="text-2xl font-bold text-blue-600">40%</h3>
+            <h3 className="text-2xl font-bold text-blue-600">1 in 6</h3>
             <p className="mt-2 text-sm text-gray-600">
-              of men under 40 experience ED at some point.
+              couples worldwide are affected by infertility at some point.
             </p>
           </div>
 
@@ -40,9 +41,9 @@ const SecondErectileDysfunctionPage = () => {
             <div className="text-blue-600 flex justify-center mb-2">
               <TrendingUp size={36} />
             </div>
-            <h3 className="text-2xl font-bold text-blue-600">1 in 10</h3>
+            <h3 className="text-2xl font-bold text-blue-600">85%+</h3>
             <p className="mt-2 text-sm text-gray-600">
-              men worldwide are estimated to have ED.
+              success rate achieved with donor oocyte IVF cycles at LifeSeed.
             </p>
           </div>
 
@@ -51,9 +52,10 @@ const SecondErectileDysfunctionPage = () => {
             <div className="text-blue-600 flex justify-center mb-2">
               <BarChart3 size={36} />
             </div>
-            <h3 className="text-2xl font-bold text-blue-600">60%</h3>
+            <h3 className="text-2xl font-bold text-blue-600">30%</h3>
             <p className="mt-2 text-sm text-gray-600">
-              of men over 55 report dealing with ED.
+              of IVF cycles globally now use donor eggs, reflecting growing
+              acceptance and success.
             </p>
           </div>
         </div>
@@ -62,11 +64,12 @@ const SecondErectileDysfunctionPage = () => {
       {/* CTA Section - Full Width */}
       <div className="w-full bg-blue-600 text-white text-center py-12 px-6">
         <h3 className="text-xl md:text-2xl font-semibold mb-3">
-          Evaluate Your Symptoms Confidentially
+          Find Out If Oocyte Donation Is Right for You
         </h3>
         <p className="max-w-2xl mx-auto mb-6 text-sm md:text-base">
-          Our 2-minute assessment helps you understand your symptoms and
-          provides a confidential starting point for your recovery journey.
+          Our confidential 2-minute fertility assessment helps you understand
+          your options and connects you with our expert team for personalised
+          guidance.
         </p>
         <button
           onClick={() => router.push("/#assessment")}
@@ -79,4 +82,4 @@ const SecondErectileDysfunctionPage = () => {
   );
 };
 
-export default SecondErectileDysfunctionPage;
+export default SecondOocyteDonationPage;

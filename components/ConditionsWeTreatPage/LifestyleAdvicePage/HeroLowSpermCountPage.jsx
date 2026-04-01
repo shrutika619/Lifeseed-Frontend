@@ -3,26 +3,28 @@ import React from "react";
 import CountUp from "react-countup";
 import Link from "next/link";
 
-const HeroLowSpermCountPage = () => {
+const HeroLifestyleAdvicePage = () => {
   return (
     <section className="w-full">
       {/* =================== HERO SECTION =================== */}
       <div className="text-center px-4 sm:px-6 md:px-12 lg:px-20 py-16 md:py-24 bg-[#F9FAFB]">
         {/* Heading */}
         <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-gray-900 leading-snug">
-          Low Sperm Count{" "}
+          Lifestyle Advice for{" "}
           <span className="bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] bg-clip-text text-transparent">
-            Treatment <br /> (Oligospermia)
+            Fertility & <br /> Reproductive Health
           </span>
         </h1>
 
         {/* Subtitle */}
         <p className="mt-6 text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-          Revive fertility naturally—restore healthy sperm count without side
-          effects. Our Ayurvedic therapies have helped thousands regain normal
-          sperm count with an{" "}
-          <span className="font-semibold text-gray-900">86% success rate</span>{" "}
-          within 45 days.
+          Small, consistent changes in your daily habits can make a significant
+          difference in your fertility outcomes. Our experts provide{" "}
+          <span className="font-semibold text-gray-900">
+            personalized lifestyle guidance
+          </span>{" "}
+          to naturally boost your reproductive health and improve treatment
+          success rates.
         </p>
 
         {/* Buttons */}
@@ -45,18 +47,18 @@ const HeroLowSpermCountPage = () => {
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
           <div className="text-center">
             <p className="text-2xl sm:text-3xl font-bold text-blue-600">
-              <CountUp end={40} duration={4} redraw={true} />+ million/ml
+              <CountUp end={70} duration={4} redraw={true} />%+
             </p>
             <p className="text-gray-600 mt-2 text-sm sm:text-base">
-              Is a Normal Sperm Count
+              Fertility Issues Linked to Lifestyle
             </p>
           </div>
           <div className="text-center">
             <p className="text-2xl sm:text-3xl font-bold text-blue-600">
-              <CountUp end={40} duration={4} redraw={true} />+ million
+              <CountUp end={10000} duration={4} redraw={true} separator="," />+
             </p>
             <p className="text-gray-600 mt-2 text-sm sm:text-base">
-              Patient Recoveries We've Seen
+              Patients Guided Successfully
             </p>
           </div>
           <div className="text-center">
@@ -64,7 +66,7 @@ const HeroLowSpermCountPage = () => {
               100% Natural
             </p>
             <p className="text-gray-600 mt-2 text-sm sm:text-base">
-              Non-Invasive, Lasting Results
+              Drug-Free, Holistic Approach
             </p>
           </div>
         </div>
@@ -75,27 +77,39 @@ const HeroLowSpermCountPage = () => {
         {/* Title */}
         <div className="text-center max-w-3xl mx-auto mb-14">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 leading-snug">
-            A Major Factor in{" "}
-            <span className="text-blue-600">Male Infertility</span>
+            Why Lifestyle Matters for{" "}
+            <span className="text-blue-600">Fertility Health</span>
           </h2>
           <p className="mt-4 text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed">
-            Low sperm count is a{" "}
-            <span className="font-medium text-gray-900">primary reason</span> for
-            infertility in couples, and its prevalence is{" "}
-            <span className="text-gray-800 font-semibold">rising</span> due to
-            modern lifestyle and environmental pressures.
+            Your daily habits have a{" "}
+            <span className="font-medium text-gray-900">direct impact</span> on
+            hormone levels, egg and sperm quality, and overall reproductive
+            function — making lifestyle changes a{" "}
+            <span className="text-gray-800 font-semibold">
+              powerful first step
+            </span>{" "}
+            toward better fertility outcomes.
           </p>
         </div>
 
         {/* Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
           {[
-            { title: "1 in 6", text: "couples experience infertility." },
-            { title: "40–50%", text: "of cases involve male factors." },
-            { title: "<15 mil/ml", text: "is low sperm count (WHO)." },
             {
-              title: "Rising",
-              text: "due to lifestyle & environmental risks.",
+              title: "Diet",
+              text: "A balanced, nutrient-rich diet directly supports hormonal balance and egg quality.",
+            },
+            {
+              title: "Exercise",
+              text: "Moderate physical activity improves blood flow, reduces stress, and regulates cycles.",
+            },
+            {
+              title: "Sleep",
+              text: "Poor sleep disrupts reproductive hormones and reduces fertility in both men and women.",
+            },
+            {
+              title: "Stress",
+              text: "Chronic stress elevates cortisol levels, which can interfere with ovulation and conception.",
             },
           ].map((card, i) => (
             <div
@@ -116,4 +130,4 @@ const HeroLowSpermCountPage = () => {
   );
 };
 
-export default HeroLowSpermCountPage;
+export default HeroLifestyleAdvicePage;

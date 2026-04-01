@@ -1,19 +1,16 @@
 "use client";
 import React, { useState, useEffect } from "react";
-// ❌ Removed useRouter from LoginModal to prevent redirects
 import { useRouter } from "next/navigation"; 
 import { toast } from "sonner";
 
-// ✅ Services
 import { sendLoginOtp, verifyLoginOtp } from "@/app/services/auth/auth.service"; 
 import { getConcerns, getQuestions, submitAssessment, getMyAssessment } from "@/app/services/patient/assesment.service";
 
-// ✅ Redux
 import { useSelector, useDispatch } from "react-redux";
 import { selectIsAuthenticated, setCredentials } from "@/redux/slices/authSlice"; 
 import { useAssessment } from "@/app/hooks/useAssessment"; 
 
-// =================== Login Modal (Pure Logic, No Redirects) ===================
+// =================== Login Modal ===================
 const LoginModal = ({ onClose, onLoginSuccess }) => {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -56,18 +53,13 @@ const LoginModal = ({ onClose, onLoginSuccess }) => {
     setMessage(""); 
 
     try {
-      // 1. Call Service (Proxy sets HTTP-Only Cookie)
       const data = await verifyLoginOtp(phone, otp);
       const { accessToken, user } = data;
       
       if (!accessToken) throw new Error("Access Token missing");
 
-      // 2. Update Redux (So api.js can see the token immediately)
       dispatch(setCredentials({ accessToken, user }));
       toast.success("Login successful!");
-
-      // 3. Trigger Success Callback (This submits the form)
-      // 🛑 NO REDIRECTS HERE
       onLoginSuccess(); 
 
     } catch (err) {
@@ -103,6 +95,127 @@ const LoginModal = ({ onClose, onLoginSuccess }) => {
   );
 };
 
+// =================== Lifeseed Fertility Assessment Questions ===================
+const lifeseedQuestions = {
+  // ---------- MALE ----------
+  "Erectile Dysfunction": [
+    "Do you have difficulty achieving or maintaining an erection during sexual activity?",
+    "Has this problem been present for more than 3 months?",
+    "Do you experience early morning or nocturnal erections?",
+    "Do you have conditions like diabetes, hypertension, or heart disease?",
+    "Do you feel anxious or stressed during sexual activity?",
+  ],
+  "Premature Ejaculation": [
+    "Do you ejaculate within 1–2 minutes of penetration?",
+    "Do you feel you have little or no control over when you ejaculate?",
+    "Does this cause distress or affect your relationship?",
+    "Has this been a consistent issue for the past 6 months?",
+    "Do you experience performance anxiety before intercourse?",
+  ],
+  "Delayed Ejaculation": [
+    "Do you take more than 30 minutes to ejaculate during intercourse?",
+    "Are you sometimes unable to ejaculate at all during sex?",
+    "Does this issue cause frustration or distress to you or your partner?",
+    "Do you have no trouble ejaculating during masturbation but struggle during sex?",
+    "Are you on any medications like antidepressants or blood pressure drugs?",
+  ],
+  "Low Sperm Count": [
+    "Have you been trying to conceive for more than 12 months without success?",
+    "Have you had a semen analysis done? If yes, was the count below normal?",
+    "Do you have a history of mumps, testicular infection, or injury?",
+    "Do you experience pain or swelling around the testicles?",
+    "Are you exposed to high heat, radiation, or chemicals regularly?",
+  ],
+  "Couple Sex Problems": [
+    "Do you and your partner frequently experience conflict around sexual intimacy?",
+    "Has your sexual frequency significantly decreased in the past 6 months?",
+    "Do either of you avoid sexual activity due to fear, pain, or past trauma?",
+    "Do you feel emotionally disconnected from your partner during sex?",
+    "Have you both discussed your sexual concerns with each other openly?",
+  ],
+  "Sexual Dysfunction": [
+    "Do you experience a persistent lack of interest in sexual activity?",
+    "Do you have pain during or after sexual intercourse?",
+    "Do you feel your sexual health has impacted your relationship or mental health?",
+    "Have you noticed changes in your libido in the past 3–6 months?",
+    "Have you previously sought treatment for any sexual health concern?",
+  ],
+
+  // ---------- FEMALE ----------
+  "Hormonal Imbalance": [
+    "Do you experience irregular or missed menstrual cycles?",
+    "Do you have symptoms like acne, excess facial/body hair, or hair thinning?",
+    "Have you been diagnosed with PCOS or thyroid disorder?",
+    "Do you experience mood swings, fatigue, or unexplained weight changes?",
+    "Have you had difficulty conceiving despite regular unprotected intercourse?",
+  ],
+  "Fertility Issues": [
+    "Have you been trying to conceive for over 12 months without success?",
+    "Do you have a history of miscarriage or failed IVF cycles?",
+    "Have you ever been diagnosed with endometriosis or blocked fallopian tubes?",
+    "Do you experience irregular ovulation or were told you have low AMH levels?",
+    "Are you over 35 years of age and trying to conceive?",
+  ],
+  "Menstrual Disorders": [
+    "Do you experience very heavy or prolonged bleeding during periods?",
+    "Do you have severe pain (dysmenorrhea) during your menstrual cycle?",
+    "Are your periods irregular, absent, or very infrequent?",
+    "Do you experience spotting between periods or after intercourse?",
+    "Has your menstrual pattern changed significantly in the past 6 months?",
+  ],
+  "Sexual Pain (Dyspareunia)": [
+    "Do you experience pain during or after sexual intercourse?",
+    "Is the pain located at the entry point, deep inside, or both?",
+    "Do you experience vaginal dryness or insufficient lubrication?",
+    "Has the pain been present for more than 3 months?",
+    "Does the pain affect your desire or ability to have sex?",
+  ],
+
+  // ---------- SHARED (Male & Female) ----------
+  "Couples Counseling": [
+    "Are you and your partner struggling to communicate about fertility treatment?",
+    "Do you feel emotionally unsupported during your fertility journey?",
+    "Has infertility caused significant stress or conflict in your relationship?",
+    "Do either of you feel guilty or blamed for the fertility challenges?",
+    "Would you consider counseling to better cope with the emotional impact of IVF?",
+  ],
+  "Fertility Counseling": [
+    "Do you feel overwhelmed or anxious about starting fertility treatment?",
+    "Have you had a previous failed fertility treatment or miscarriage?",
+    "Do you need guidance on IVF, IUI, or other assisted reproductive techniques?",
+    "Are you unsure about the emotional and physical demands of fertility treatment?",
+    "Would you like support in making informed decisions about your fertility options?",
+  ],
+  "Lifestyle Advice": [
+    "Do you smoke, consume alcohol, or use recreational drugs?",
+    "Is your BMI outside the healthy range (18.5–24.9)?",
+    "Do you follow a balanced diet and exercise regularly?",
+    "Are you under high levels of stress in your personal or professional life?",
+    "Have you been advised by a doctor to make lifestyle changes to improve fertility?",
+  ],
+  "Oocyte Donation": [
+    "Have you been told your egg quality or reserve is too low to conceive naturally?",
+    "Are you above 40 years of age and considering egg donation?",
+    "Have you had multiple failed IVF cycles using your own eggs?",
+    "Do you carry a genetic condition you do not want to pass on?",
+    "Have you discussed oocyte donation as an option with your fertility specialist?",
+  ],
+  "Semen Banking and Supply": [
+    "Are you planning to undergo chemotherapy, radiation, or surgery that may affect fertility?",
+    "Do you wish to preserve your sperm before a vasectomy?",
+    "Have you been advised to bank sperm due to low count or quality?",
+    "Are you considering donor sperm for assisted reproduction?",
+    "Do you have a condition that may cause future fertility decline?",
+  ],
+  "Medico Legal Support": [
+    "Do you need legal documentation for a surrogacy or donor arrangement?",
+    "Are you seeking clarity on consent forms or patient rights in fertility treatment?",
+    "Have you faced any dispute or complication related to your IVF procedure?",
+    "Do you require legal guidance on egg/sperm donor agreements?",
+    "Are you aware of the legal requirements for fertility treatments in India?",
+  ],
+};
+
 // =================== Assessment Component ===================
 const Assessment = () => {
   const router = useRouter(); 
@@ -121,24 +234,18 @@ const Assessment = () => {
   const [questionsDb, setQuestionsDb] = useState({}); 
   const [loading, setLoading] = useState(false);
 
-  // Sync State Logic
   useEffect(() => {
     const handleAuthStateChange = async () => {
-      // 1. Logged Out -> Reset Form
       if (!isLoggedIn) {
         resetAssessment(); 
         return;
       }
 
-      // 2. Logged In
       if (isLoggedIn) {
-        // 🛑 CRITICAL: If user already has selected conditions (local state), 
-        // DO NOT fetch from backend. Keep local answers so we can submit them.
         if (selectedConditions.length > 0) {
             return; 
         }
 
-        // Only fetch history if the form is empty (fresh login from dashboard)
         try {
           const res = await getMyAssessment(); 
           if (res.success && res.data) {
@@ -168,8 +275,6 @@ const Assessment = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]); 
 
-
-  // Fetch Concerns
   useEffect(() => {
     const fetchConcerns = async () => {
         if(gender) {
@@ -202,10 +307,19 @@ const Assessment = () => {
     }
     setLoading(true);
     const result = await getQuestions(gender, selectedConditions);
-    if (result.success) {
+    if (result.success && result.data && Object.keys(result.data).length > 0) {
       setQuestionsDb(result.data); 
-      setShowQuestions(true); 
+    } else {
+      // ✅ Fallback to Lifeseed hardcoded questions if backend returns empty
+      const fallback = {};
+      selectedConditions.forEach((cond) => {
+        if (lifeseedQuestions[cond]) {
+          fallback[cond] = lifeseedQuestions[cond];
+        }
+      });
+      setQuestionsDb(fallback);
     }
+    setShowQuestions(true); 
     setLoading(false);
   };
   
@@ -229,7 +343,6 @@ const Assessment = () => {
       });
     }); 
 
-    // API Call (Interceptor attaches token from Redux)
     const result = await submitAssessment(gender, selectedConditions, formattedAnswers);
 
     if (result.success) {
@@ -253,7 +366,6 @@ const Assessment = () => {
     setLoading(false);
   };
 
-  // ✅ HANDLER: Closes modal and submits immediately
   const handleLoginSuccess = () => {
     setShowLoginModal(false);
     handleSubmitAssessment(); 
@@ -390,10 +502,9 @@ const QuestionsView = ({ selectedConditions, questionsDb, answers, onAnswer, onB
           </div>
         </div>
     );
-}
+};
 
-
-    const SecondHomePage = () => {
+const SecondHomePage = () => {
   const { isStarted, startAssessment } = useAssessment();
 
   useEffect(() => {

@@ -2,18 +2,18 @@
 import React from "react";
 import { Search, ClipboardCheck } from "lucide-react";
 
-const FourthErectileDysfunctionPage = () => {
+const FourthOocyteDonationPage = () => {
   return (
     <section className="px-4 sm:px-6 lg:px-20 py-16 bg-white">
       {/* Title */}
       <div className="text-center max-w-3xl mx-auto mb-12">
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
-          Our Approach to Erectile Dysfunction
+          Our Approach to Oocyte Donation
         </h2>
         <p className="mt-3 text-gray-600 text-sm sm:text-base lg:text-lg leading-relaxed">
-          Understanding the causes, treating the root issue, and restoring your
-          confidence for good. Our process is confidential, personalized, and
-          science-backed.
+          Matching the right donor, supporting every step of the journey, and
+          helping you build the family you've always dreamed of. Our process is
+          confidential, compassionate, and clinically proven.
         </p>
       </div>
 
@@ -28,14 +28,14 @@ const FourthErectileDysfunctionPage = () => {
           </div>
           <div>
             <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl">
-              Comprehensive Evaluation
+              Thorough Screening & Matching
             </h3>
             <p className="mt-2 text-gray-600 text-sm sm:text-base leading-relaxed">
-              We start by identifying the precise root cause—be it physical,
-              psychological, or lifestyle-related. Your journey begins with a
-              confidential self-assessment, followed by an in-depth,
-              one-on-one consultation with our expert doctors to understand
-              your unique situation.
+              We begin with a detailed assessment of both the recipient and
+              potential donors — evaluating medical history, genetic background,
+              and compatibility. Our specialists conduct a confidential
+              one-on-one consultation to understand your unique needs and ensure
+              the most suitable donor match for your fertility journey.
             </p>
           </div>
         </div>
@@ -49,14 +49,15 @@ const FourthErectileDysfunctionPage = () => {
           </div>
           <div>
             <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl">
-              Personalized & Integrative Plan
+              Personalized & Guided Treatment Plan
             </h3>
             <p className="mt-2 text-gray-600 text-sm sm:text-base leading-relaxed">
-              Based on your evaluation, we create a holistic treatment plan
-              combining effective, Ayurveda-based medicine with personalized
-              diet, exercise, and stress-management guidance. We believe in
-              integrative care that supports your complete physical and mental
-              well-being for lasting results.
+              Based on your screening results, we design a tailored oocyte
+              donation protocol combining advanced reproductive techniques with
+              personalized hormonal preparation, nutritional support, and
+              emotional counseling. We believe in holistic care that nurtures
+              your physical and psychological well-being throughout the entire
+              process.
             </p>
           </div>
         </div>
@@ -65,4 +66,4 @@ const FourthErectileDysfunctionPage = () => {
   );
 };
 
-export default FourthErectileDysfunctionPage;
+export default FourthOocyteDonationPage;

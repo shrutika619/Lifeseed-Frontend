@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 
-const HeroSectionPrematureEjaculationPage = () => {
+const HeroSectionFertilityCounselingPage = () => {
   return (
     <section>
       {/* ================= HERO SECTION ================= */}
@@ -11,14 +11,14 @@ const HeroSectionPrematureEjaculationPage = () => {
       >
         <div className="text-center max-w-3xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">
-            Premature Ejaculation{" "}
-            <span className="text-blue-600">Treatment</span>
+            Fertility Counseling &{" "}
+            <span className="text-blue-600">Emotional Support</span>
           </h1>
           <p className="mt-4 text-gray-600 text-lg md:text-xl">
-            Restore control and confidence—naturally and effectively. Our
-            Ayurvedic-rooted approach offers long-term results with{" "}
-            <span className="font-semibold">91% effectiveness</span>, all at an
-            affordable price.
+            Navigate your fertility journey with clarity and confidence. Our
+            expert counselors provide compassionate, personalized support with a{" "}
+            <span className="font-semibold">92% patient satisfaction rate</span>
+            , helping you make informed decisions every step of the way.
           </p>
 
           {/* Buttons */}
@@ -41,18 +41,20 @@ const HeroSectionPrematureEjaculationPage = () => {
         {/* Stats */}
         <div className="mt-14 flex flex-col md:flex-row justify-center gap-12 text-center">
           <div>
-            <p className="text-3xl font-bold text-blue-600">30%</p>
+            <p className="text-3xl font-bold text-blue-600">1 in 6</p>
             <p className="text-gray-600 text-base mt-1">
-              of men experience PE
+              couples face fertility challenges
             </p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-blue-600">4–6 Weeks</p>
-            <p className="text-gray-600 text-base mt-1">Recovery Begins</p>
+            <p className="text-3xl font-bold text-blue-600">1–3 Sessions</p>
+            <p className="text-gray-600 text-base mt-1">
+              to build your personalized plan
+            </p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-blue-600">7000+</p>
-            <p className="text-gray-600 text-base mt-1">Patients Helped</p>
+            <p className="text-3xl font-bold text-blue-600">8000+</p>
+            <p className="text-gray-600 text-base mt-1">Patients Supported</p>
           </div>
         </div>
       </div>
@@ -61,11 +63,12 @@ const HeroSectionPrematureEjaculationPage = () => {
       <div className="px-6 md:px-20 py-16 bg-white">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
-            It&apos;s More Common Than You Think
+            You Don&apos;t Have to Face This Alone
           </h2>
           <p className="mt-3 text-gray-600 text-base md:text-lg">
-            PE is the most common sexual dysfunction in men, yet many hesitate
-            to seek help due to stigma. You&apos;re not alone in this journey.
+            The emotional toll of fertility struggles is real, yet many couples
+            suffer in silence. Fertility counseling bridges the gap between
+            medical treatment and emotional well-being.
           </p>
         </div>
 
@@ -73,19 +76,20 @@ const HeroSectionPrematureEjaculationPage = () => {
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           <div className="p-6 bg-white shadow-md rounded-lg text-center">
             <p className="text-blue-600 font-bold text-xl md:text-2xl">
-              1 in 3 Men
+              60% of Couples
             </p>
             <p className="text-gray-600 mt-2 text-sm md:text-base">
-              report experiencing premature ejaculation at some point in their
-              lives.
+              undergoing fertility treatment report significant emotional
+              distress and anxiety throughout the process.
             </p>
           </div>
           <div className="p-6 bg-white shadow-md rounded-lg text-center">
             <p className="text-blue-600 font-bold text-xl md:text-2xl">
-              Only 9%
+              Only 20%
             </p>
             <p className="text-gray-600 mt-2 text-sm md:text-base">
-              of men with PE actually seek treatment, often due to embarrassment.
+              of those struggling with fertility seek professional counseling,
+              despite it significantly improving treatment outcomes.
             </p>
           </div>
         </div>
@@ -94,4 +98,4 @@ const HeroSectionPrematureEjaculationPage = () => {
   );
 };
 
-export default HeroSectionPrematureEjaculationPage;
+export default HeroSectionFertilityCounselingPage;

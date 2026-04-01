@@ -14,12 +14,9 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto grid gap-8 md:grid-cols-4">
         {/* Brand / Mission */}
         <div>
-          <h3 className="text-lg font-bold text-blue-500">MEN10</h3>
+          <h3 className="text-lg font-bold text-blue-500">LifeSeed</h3>
           <p className="mt-3 text-sm leading-6">
-            Our mission is to provide accessible,
-            confidential, and holistic sexual wellness
-            solutions for men, blending ancient Ayurvedic
-            wisdom with modern science.
+            Our mission is to provide accessible, confidential, and compassionate fertility care solutions, blending advanced IVF technology with personalized patient support.
           </p>
           <div className="flex space-x-4 mt-4">
             <a href="#" aria-label="Facebook">
@@ -73,7 +70,7 @@ const Footer = () => {
             </li>
             <li className="flex items-center">
               <Mail className="w-4 h-4 mr-2 text-gray-400" />
-              support@men10.com
+              support@lifeseed.com
             </li>
             <li className="flex items-center">
               <Phone className="w-4 h-4 mr-2 text-gray-400" />
@@ -86,7 +83,7 @@ const Footer = () => {
       {/* Divider + Bottom Bar */}
       <div className="max-w-7xl mx-auto mt-10 border-t border-gray-700 pt-6 flex flex-col md:flex-row justify-between text-sm text-gray-400">
         <p>
-          © 2026 <span className="font-semibold">MEN10</span>. All rights reserved.
+          © 2026 <span className="font-semibold">LifeSeed</span>. All rights reserved.
         </p>
         <div className="space-x-6 mt-3 md:mt-0">
           <Link href="/privacy-policy">Privacy Policy</Link>

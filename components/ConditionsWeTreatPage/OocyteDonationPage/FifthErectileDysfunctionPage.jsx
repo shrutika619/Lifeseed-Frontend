@@ -2,24 +2,24 @@
 
 import React, { useState } from "react";
 
-const FifthErectileDysfunctionPage = () => {
+const FifthOocyteDonationPage = () => {
   const [openIndex, setOpenIndex] = useState(0);
 
   const faqs = [
     {
-      question: "Can ED be treated for the long term?",
+      question: "Who is eligible to receive donor oocytes?",
       answer:
-        "Yes. Our approach focuses on treating the root cause rather than just managing symptoms. By addressing underlying health issues, lifestyle factors, and psychological elements, we aim for sustainable, long-term improvement.",
+        "Women with premature ovarian failure, poor ovarian reserve, repeated IVF failures, or those carrying genetic conditions may be eligible for oocyte donation. Our specialists conduct a thorough evaluation to determine the best path forward for each individual.",
     },
     {
-      question: "Is ED a normal part of getting older?",
+      question: "Is the donor identity kept confidential?",
       answer:
-        "No, ED is not a normal part of aging. While it may become more common with age, it usually indicates an underlying issue that can be treated.",
+        "Yes. We follow strict anonymity protocols as per legal and ethical guidelines. Donor and recipient identities are kept completely confidential throughout the entire process.",
     },
     {
-      question: "How private is the treatment process?",
+      question: "How successful is oocyte donation compared to regular IVF?",
       answer:
-        "Your privacy is our top priority. All consultations and treatments are conducted with complete confidentiality.",
+        "Oocyte donation generally has higher success rates than conventional IVF, especially for women with poor egg quality or low ovarian reserve, as the eggs come from thoroughly screened, healthy young donors.",
     },
   ];
 
@@ -29,15 +29,15 @@ const FifthErectileDysfunctionPage = () => {
 
   return (
     <div>
-      {/* Journey to Recovery Section */}
+      {/* Journey Section */}
       <section className="w-full bg-[#F9FAFB] py-16 px-6 md:px-20">
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            Your Journey to Recovery
+            Your Oocyte Donation Journey
           </h2>
           <p className="text-gray-600 mb-12">
-            We guide you through a clear, supportive, and effective treatment
-            process from start to finish.
+            We guide you through every step of the oocyte donation process with
+            compassion, clarity, and expert clinical support.
           </p>
 
           {/* Steps */}
@@ -45,23 +45,23 @@ const FifthErectileDysfunctionPage = () => {
             {[
               {
                 number: "1",
-                title: "Evaluation",
-                desc: "Start with a confidential assessment and a detailed consultation with our doctors.",
+                title: "Screening & Matching",
+                desc: "Begin with a confidential medical assessment and get matched with a compatible, thoroughly screened donor.",
               },
               {
                 number: "2",
-                title: "Personalized Plan",
-                desc: "Receive a custom treatment plan targeting the root cause of your ED.",
+                title: "Preparation Protocol",
+                desc: "Receive a personalized hormonal preparation plan to ready your uterus for embryo transfer.",
               },
               {
                 number: "3",
-                title: "Treatment & Monitoring",
-                desc: "Begin your treatment with regular follow-ups and continuous care manager support.",
+                title: "Retrieval & Fertilization",
+                desc: "Donor eggs are retrieved and fertilized with your partner's or donor sperm under expert laboratory care.",
               },
               {
                 number: "4",
-                title: "Long-Term Wellness",
-                desc: "Achieve lasting results with ongoing support and lifestyle guidance.",
+                title: "Transfer & Support",
+                desc: "Undergo embryo transfer with continuous monitoring and emotional support throughout your two-week wait.",
               },
             ].map((step, index) => (
               <div
@@ -118,4 +118,4 @@ const FifthErectileDysfunctionPage = () => {
   );
 };
 
-export default FifthErectileDysfunctionPage;
+export default FifthOocyteDonationPage;

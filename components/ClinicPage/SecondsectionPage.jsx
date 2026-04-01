@@ -1,52 +1,52 @@
 import React, { useState } from 'react';
 import { ChevronDown, Shield, Target, Heart, Lock } from 'lucide-react';
 
-export default function SecondsectionPage() {
+export default function SecondsectionLifeseedPage() {
   const [openFaq, setOpenFaq] = useState(null);
 
   const faqs = [
     {
       id: 1,
-      question: "How do I book a consultation?",
-      answer: "You can book a consultation directly by clicking the 'Book Now' button on any clinic card or by booking a free online consultation. You can also call the clinic directly to schedule your appointment."
+      question: "How do I register my fertility clinic on LifeSeed?",
+      answer: "Your clinic can register directly through the LifeSeed platform. Once you submit your details, our super admin team will verify and approve your clinic, providing you with a dedicated workspace to manage your doctors, patients, and IVF treatment workflows."
     },
     {
       id: 2,
-      question: "Is my consultation confidential?",
-      answer: "Yes, absolutely. All consultations are completely confidential and private. We follow strict privacy protocols to protect your personal health information."
+      question: "Is patient data secure on the LifeSeed platform?",
+      answer: "Absolutely. LifeSeed follows strict data privacy and security protocols. Each hospital's data, patient records, and treatment information are fully isolated under our multi-tenant architecture, ensuring complete confidentiality and compliance."
     },
     {
       id: 3,
-      question: "What should I expect during my first visit?",
-      answer: "During your first visit, our expert doctors will discuss your concerns in detail, perform any necessary examinations, and create a personalized treatment plan tailored to your needs."
+      question: "What should a patient expect when registering on LifeSeed?",
+      answer: "Patients can register under their specific fertility clinic, build their fertility profile, upload medical reports, book appointments, and track their complete IVF treatment progress — all from one secure, easy-to-use dashboard."
     },
     {
       id: 4,
-      question: "Do I need to book an appointment in advance?",
-      answer: "While walk-ins are welcome, we highly recommend booking an appointment in advance to ensure minimal wait time and guaranteed availability with our specialists."
+      question: "Can doctors manage their own schedules and treatment plans?",
+      answer: "Yes. Doctors have a dedicated module to manage their availability, patient consultations, IVF cycle updates, and treatment plans. The platform is designed to streamline clinical workflows and reduce administrative burden."
     }
   ];
 
   const features = [
     {
       icon: <Shield className="w-8 h-8 text-blue-600" />,
-      title: "Expert Ayurvedic Doctors",
-      description: "Our doctors specialize in men's health and have years of experience in diagnosing and treating various conditions."
+      title: "Multi-Tenant Architecture",
+      description: "Multiple hospitals and fertility clinics can operate independently on a single secure platform with fully isolated data and workflows."
     },
     {
       icon: <Target className="w-8 h-8 text-blue-600" />,
-      title: "83% Success Rate",
-      description: "Our treatment plans are backed by proven results, ensuring long-lasting and effective results."
+      title: "Complete IVF Workflow",
+      description: "From hormonal stimulation and egg retrieval to embryo transfer and pregnancy testing — every stage of IVF is managed in one place."
     },
     {
       icon: <Heart className="w-8 h-8 text-purple-600" />,
-      title: "Holistic Approach",
-      description: "We take a natural, comprehensive approach to men's health, combining ancient wisdom with modern science."
+      title: "Patient-Centered Care",
+      description: "Patients can track their fertility journey, access reports, and stay connected with their care team through a seamless digital experience."
     },
     {
       icon: <Lock className="w-8 h-8 text-red-400" />,
-      title: "100% Confidential",
-      description: "Your privacy is our priority. All consultations and records are completely confidential."
+      title: "100% Secure & Confidential",
+      description: "Role-based access control ensures that sensitive medical data is only accessible to authorized users — doctors, admins, and patients."
     }
   ];
 
@@ -61,33 +61,36 @@ export default function SecondsectionPage() {
   return (
     <div className="bg-gray-50 py-16 px-4">
       <div className="max-w-6xl mx-auto space-y-20">
-        
+
         {/* Online Consultation Section */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-8 md:p-12 shadow-lg">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                Can't visit a clinic?
+                Can't visit a clinic in person?
               </h2>
               <h3 className="text-xl font-semibold text-gray-700 mb-3">
-                Get a Free Online Consultation
+                Connect with a Fertility Specialist Online
               </h3>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Consult with our expert doctors from the comfort and privacy of your home. No commute, convenient, and completely confidential.
+                LifeSeed connects you with verified IVF doctors and fertility
+                specialists from the comfort of your home. Book a confidential
+                online consultation, share your reports digitally, and get a
+                personalized fertility care plan — all through one secure platform.
               </p>
-              <button 
+              <button
                 onClick={handleBookConsultation}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold shadow-md transition-colors"
               >
                 Book Your Online Consultation
               </button>
             </div>
-            
+
             <div className="flex justify-center">
               <div className="rounded-2xl overflow-hidden shadow-2xl">
-                <img 
+                <img
                   src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&h=400&fit=crop"
-                  alt="Online consultation"
+                  alt="Online fertility consultation"
                   className="w-full h-auto object-cover"
                 />
               </div>
@@ -95,18 +98,19 @@ export default function SecondsectionPage() {
           </div>
         </div>
 
-        {/* Why Choose MEN10 Section */}
+        {/* Why Choose LifeSeed Section */}
         <div className="text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Why Choose MEN10?
+            Why Choose LifeSeed?
           </h2>
           <p className="text-gray-600 mb-12 max-w-2xl mx-auto">
-            A blend of ancient wisdom and modern science for holistic healing
+            A unified cloud-based platform purpose-built for IVF clinics,
+            fertility specialists, and patients — all in one secure ecosystem.
           </p>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-gray-100"
               >
@@ -134,7 +138,7 @@ export default function SecondsectionPage() {
 
           <div className="space-y-4">
             {faqs.map((faq) => (
-              <div 
+              <div
                 key={faq.id}
                 className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
               >
@@ -145,13 +149,13 @@ export default function SecondsectionPage() {
                   <span className="font-semibold text-gray-900 text-left">
                     {faq.question}
                   </span>
-                  <ChevronDown 
+                  <ChevronDown
                     className={`w-5 h-5 text-gray-500 transition-transform ${
                       openFaq === faq.id ? 'rotate-180' : ''
                     }`}
                   />
                 </button>
-                
+
                 {openFaq === faq.id && (
                   <div className="px-6 pb-4 text-gray-600 text-sm leading-relaxed">
                     {faq.answer}

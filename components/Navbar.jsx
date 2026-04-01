@@ -94,15 +94,14 @@ const Navbar = () => {
       document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const conditionLinks = {
-    "Sexual Dysfunction": "sexual-dysfunction",
-    "Erectile Dysfunction": "erectile-dysfunction",
-    "Premature Ejaculation": "premature-ejaculation",
-    "Delayed Ejaculation": "delayed-ejaculation",
-    "Couple Sex Problems": "couple-sex-problems",
-    "Low Sperm Count": "low-sperm-count",
+const conditionLinks = {
+    "Medico Legal Support": "medico-legal-support",
+    "Semen Banking and Supply": "semen-banking-and-supply",
+    "Oocyte Donation": "oocyte-donation",
+    "Lifestyle Advice": "lifestyle-advice",
+    "Fertility Counseling": "fertility-counseling",
+    "Couples Counseling": "couples-counseling",
   };
-
   useEffect(() => {
     const fetchCityData = async () => {
       try {

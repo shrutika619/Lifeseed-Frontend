@@ -1,19 +1,19 @@
 import React from "react";
-import { Heart, Brain, Activity } from "lucide-react"; // Icons for cards
+import { Heart, Brain, Activity } from "lucide-react";
 
-const SecondPrematureEjaculationPage = () => {
+const SecondFertilityCounselingPage = () => {
   return (
     <section className="w-full">
       {/* =================== WHAT CAUSES SECTION =================== */}
       <div className="px-4 sm:px-6 md:px-12 lg:px-20 py-12 md:py-16 bg-[#F9FAFB]">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">
-            What Causes Premature Ejaculation?
+            Why Do Couples Seek Fertility Counseling?
           </h2>
           <p className="mt-3 text-gray-600 text-sm sm:text-base md:text-lg">
-            PE is a complex issue with interconnected physical, psychological,
-            and lifestyle roots. Understanding the cause is the first step
-            toward lasting control.
+            Fertility challenges affect every aspect of life — emotional,
+            relational, and physical. Understanding these dimensions helps our
+            counselors provide truly holistic support.
           </p>
         </div>
 
@@ -24,14 +24,14 @@ const SecondPrematureEjaculationPage = () => {
             <div className="flex items-center gap-2 mb-3">
               <Heart className="text-blue-600 w-5 h-5 sm:w-6 sm:h-6" />
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                Physical/Physiological
+                Emotional Challenges
               </h3>
             </div>
             <ul className="list-disc list-inside text-gray-600 text-sm sm:text-base space-y-1">
-              <li>Serotonin imbalance</li>
-              <li>Penile hypersensitivity</li>
-              <li>Hormonal factors (thyroid, testosterone)</li>
-              <li>Inflammation or infection</li>
+              <li>Grief after pregnancy loss</li>
+              <li>Anxiety around treatment cycles</li>
+              <li>Fear of the unknown</li>
+              <li>Feelings of guilt or inadequacy</li>
             </ul>
           </div>
 
@@ -40,14 +40,14 @@ const SecondPrematureEjaculationPage = () => {
             <div className="flex items-center gap-2 mb-3">
               <Brain className="text-blue-600 w-5 h-5 sm:w-6 sm:h-6" />
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                Psychological
+                Psychological Impact
               </h3>
             </div>
             <ul className="list-disc list-inside text-gray-600 text-sm sm:text-base space-y-1">
-              <li>Anxiety & stress</li>
-              <li>Performance pressure</li>
-              <li>Excessive masturbation</li>
-              <li>Past negative experiences</li>
+              <li>Depression & low self-worth</li>
+              <li>Chronic stress & burnout</li>
+              <li>Decision-making overwhelm</li>
+              <li>Identity & relationship strain</li>
             </ul>
           </div>
 
@@ -56,14 +56,14 @@ const SecondPrematureEjaculationPage = () => {
             <div className="flex items-center gap-2 mb-3">
               <Activity className="text-blue-600 w-5 h-5 sm:w-6 sm:h-6" />
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                Lifestyle Factors
+                Relational Factors
               </h3>
             </div>
             <ul className="list-disc list-inside text-gray-600 text-sm sm:text-base space-y-1">
-              <li>Excessive alcohol use</li>
-              <li>Poor diet & nutrition</li>
-              <li>Sedentary habits</li>
-              <li>Smoking</li>
+              <li>Communication breakdown</li>
+              <li>Intimacy & sexual concerns</li>
+              <li>Differing treatment expectations</li>
+              <li>Family & social pressure</li>
             </ul>
           </div>
         </div>
@@ -73,23 +73,25 @@ const SecondPrematureEjaculationPage = () => {
       <section className="w-full bg-white py-12 md:py-16 px-4 sm:px-6 md:px-12 lg:px-20">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
-            Why Our Ayurvedic Solution <span className="text-blue-600">Works</span>
+            Why Our Counseling Approach{" "}
+            <span className="text-blue-600">Works</span>
           </h2>
           <p className="mt-4 text-gray-600 text-sm sm:text-base md:text-lg leading-relaxed">
-            MED10’s proprietary Ayurvedic medicines are designed to treat the
-            root causes of PE naturally. By balancing key neurotransmitters,
-            reducing hypersensitivity, and calming the nervous system, our
-            herbal formulations help you regain control and restore sexual
-            vitality without harmful side effects.
+            Our fertility counseling is built on evidence-based therapeutic
+            techniques including Cognitive Behavioral Therapy (CBT), mindfulness
+            practices, and couples communication frameworks. We work alongside
+            your medical team to ensure your emotional health is treated with the
+            same priority as your physical health throughout every stage of
+            treatment.
           </p>
           <p className="mt-6 text-gray-800 text-sm sm:text-base md:text-lg font-medium">
-            Our integrated approach delivers a{" "}
-            <span className="text-blue-600 font-semibold">97% success rate</span>.
+            Our integrated support model achieves a{" "}
+            <span className="text-blue-600 font-semibold">92% patient satisfaction rate</span>.
           </p>
           <p className="mt-4 text-gray-600 text-sm sm:text-base md:text-lg leading-relaxed">
-            We complement our powerful herbal remedies with guidance on yoga,
-            pelvic floor exercises, and counseling to ensure a truly holistic
-            recovery.
+            We complement individual sessions with couples counseling, group
+            support circles, and guided stress-relief programs to ensure a
+            truly comprehensive emotional wellness journey.
           </p>
         </div>
       </section>
@@ -97,4 +99,4 @@ const SecondPrematureEjaculationPage = () => {
   );
 };
 
-export default SecondPrematureEjaculationPage;
+export default SecondFertilityCounselingPage;
